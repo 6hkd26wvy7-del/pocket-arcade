@@ -1,0 +1,2551 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BOYGAM</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#8bac0f">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="BOYGAM">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+<style>
+/* Layout: one narrow column styled as a green handheld LCD. Top bar with three tabs, then one screen at a time: games, scores, account, Snake. One look in both themes. */
+:root {
+  --page: #8bac0f;
+  --lcd: #9bbc0f;
+  --field: #a9c91a;
+  --mid: #306230;
+  --ink: #0f380f;
+  --err: #7a1f1f;
+  --pixel: "Press Start 2P", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html { background: var(--page); }
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--pixel);
+  font-size: 9px;
+  line-height: 1.9;
+}
+[hidden] { display: none !important; }
+.wrap {
+  max-width: 460px;
+  margin: 0 auto;
+  padding-block: 14px 28px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+a { color: var(--ink); }
+h2 { font-size: 11px; letter-spacing: 0.05em; margin: 0 0 14px; font-weight: normal; }
+p { margin: 0 0 12px; }
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 14px;
+  flex-wrap: wrap;
+  padding-bottom: 10px;
+  border-bottom: 3px solid var(--ink);
+  margin-bottom: 18px;
+}
+.logo { font-size: 11px; letter-spacing: 0.06em; color: var(--ink); text-decoration: none; }
+.nav { display: flex; flex-wrap: wrap; gap: 4px 14px; min-width: 0; }
+.nav a {
+  font-size: 8px;
+  color: var(--ink);
+  text-decoration: none;
+  padding: 10px 2px;
+  border-bottom: 2px solid transparent;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nav a.on { border-bottom-color: var(--ink); }
+
+.panel {
+  background: var(--lcd);
+  border: 3px solid var(--ink);
+  padding: 14px;
+  margin-bottom: 14px;
+}
+.btn {
+  display: inline-block;
+  background: var(--ink);
+  color: var(--lcd);
+  border: 3px solid var(--ink);
+  border-radius: 4px;
+  padding: 12px 14px;
+  font-family: var(--pixel);
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn:active { background: var(--mid); border-color: var(--mid); }
+.btn.alt { background: transparent; color: var(--ink); }
+.btn.alt:active { background: var(--field); border-color: var(--ink); }
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+.tab {
+  background: transparent;
+  color: var(--ink);
+  border: 3px solid var(--ink);
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-family: var(--pixel);
+  font-size: 8px;
+  cursor: pointer;
+}
+.tab[aria-pressed="true"] { background: var(--ink); color: var(--lcd); }
+
+label { display: block; margin-bottom: 6px; font-size: 8px; }
+input, select {
+  width: 100%;
+  font: 16px var(--mono);
+  color: var(--ink);
+  padding: 11px;
+  border: 3px solid var(--ink);
+  border-radius: 0;
+  background: var(--field);
+  margin-bottom: 4px;
+}
+.hint { font-size: 8px; color: var(--mid); margin: 0 0 12px; }
+.msg { min-height: 1.9em; margin: 10px 0 0; font-size: 8px; }
+.msg.err { color: var(--err); }
+.sep { border: 0; border-top: 2px dotted var(--mid); margin: 18px 0; }
+
+.game { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.game h3 { margin: 0 0 6px; font-size: 11px; font-weight: normal; letter-spacing: 0.05em; }
+.game p { margin: 0; font-size: 8px; }
+.game > div { min-width: 0; }
+
+.lb { list-style: none; margin: 8px 0 0; padding: 0; }
+.lb li {
+  display: grid;
+  grid-template-columns: 3.4em minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 6px;
+  border-bottom: 2px dotted var(--mid);
+}
+.lb li.me { background: var(--ink); color: var(--lcd); border-bottom-color: var(--ink); }
+.lb .ps { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+#view-snake, #view-arena, #view-blocks, #view-space {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  min-height: calc(100vh - 100px);
+  min-height: calc(100dvh - 100px);
+}
+.stage { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.screen {
+  display: block;
+  width: min(100%, 420px, max(160px, calc((100vh - 230px) * 144 / 208)));
+  width: min(100%, 420px, max(160px, calc((100dvh - 230px) * 144 / 208)));
+  max-width: 100%;
+  aspect-ratio: 144 / 208;
+  background: var(--lcd);
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  border: 4px solid var(--ink);
+  touch-action: none;
+}
+.stage .msg { text-align: center; margin: 0; }
+.xpbar { height: 14px; border: 3px solid var(--ink); background: var(--field); margin: 6px 0 8px; }
+.xpbar > i { display: block; height: 100%; background: var(--ink); }
+.line { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 2px dotted var(--mid); }
+.line:last-child { border-bottom: 0; }
+.line > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin: 8px 0 0; }
+.badge { border: 3px solid var(--ink); padding: 8px; font-size: 7px; }
+.badge.off { opacity: .35; border-style: dashed; }
+.badge b { display: block; font-weight: normal; font-size: 8px; margin-bottom: 4px; }
+.small { font-size: 7px; }
+.chat { max-height: 240px; overflow-y: auto; border: 3px solid var(--ink); background: var(--field); padding: 8px; margin: 8px 0; }
+.chat p { margin: 0 0 8px; font-size: 8px; overflow-wrap: anywhere; }
+.chat p.mine { text-align: right; }
+.chat p.mine span { background: var(--ink); color: var(--lcd); padding: 2px 5px; }
+.btn.mini { padding: 8px 10px; font-size: 7px; }
+textarea { width: 100%; font: 16px var(--mono); color: var(--ink); padding: 11px; border: 3px solid var(--ink); border-radius: 0; background: var(--field); margin-bottom: 4px; }
+.foot { margin-top: 26px; font-size: 7px; text-align: center; }
+.btn:focus-visible, .tab:focus-visible, .nav a:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, .screen:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="bar">
+    <a class="logo" href="#menu">BOYGAM</a>
+    <nav class="nav" aria-label="Navigation">
+      <a href="#menu" data-nav="menu">JEUX</a>
+      <a href="#scores" data-nav="scores">SCORES</a>
+      <a href="#amis" data-nav="amis">AMIS</a>
+      <a href="#boutique" data-nav="boutique">BOUTIQUE</a>
+      <a href="#compte" data-nav="compte" id="nav-account">COMPTE</a>
+    </nav>
+  </header>
+
+  <div id="test-banner" class="panel" hidden><p style="margin:0">MODE TEST : base de données de test. Rien ici n'est réel.</p></div>
+
+  <div id="maint-box" class="panel" hidden><p id="maint-text" style="margin:0"></p></div>
+
+  <div id="offline" class="panel" hidden>
+    <p style="margin:0">Mode hors ligne : les comptes et le classement sont désactivés tant que le site n'est pas relié à sa base de données. Les jeux fonctionnent normalement.</p>
+  </div>
+
+  <main>
+    <section id="view-menu" hidden>
+      <div class="panel"><p id="menu-status" style="margin:0"></p></div>
+      <div id="install-hint" class="panel" hidden>
+        <p id="install-text" style="margin:0 0 10px"></p>
+        <button class="btn" id="b-install" type="button" hidden>INSTALLER L'APPLI</button>
+      </div>
+      <div id="news-box" class="panel" hidden></div>
+      <div id="me-card" class="panel" hidden></div>
+      <div id="season-box" class="panel" hidden></div>
+      <div id="missions-box" class="panel" hidden></div>
+      <h2>CHOISIS UN JEU</h2>
+      <div id="game-list"></div>
+    </section>
+
+    <section id="view-scores" hidden>
+      <h2>CLASSEMENT</h2>
+      <label for="lb-game">JEU</label>
+      <select id="lb-game"></select>
+      <div class="tabs" role="group" aria-label="Portée du classement" style="margin-top:10px">
+        <button class="tab" id="tab-all" type="button" aria-pressed="true">MONDE</button>
+        <button class="tab" id="tab-fr" type="button" aria-pressed="false">FRANCE</button>
+        <button class="tab" id="tab-friends" type="button" aria-pressed="false">AMIS</button>
+        <button class="tab" id="tab-season" type="button" aria-pressed="false">SAISON</button>
+      </div>
+      <p id="lb-note" class="msg" role="status"></p>
+      <p id="lb-me" class="msg"></p>
+      <ol id="lb-list" class="lb"></ol>
+    </section>
+
+    <section id="view-amis" hidden>
+      <h2>AMIS</h2>
+      <div id="fr-info" class="panel"></div>
+      <div id="fr-notifs" class="panel" hidden></div>
+      <div id="fr-add" class="panel" hidden></div>
+      <div id="fr-list" class="panel" hidden></div>
+      <div id="fr-chat" class="panel" hidden></div>
+      <p id="fr-msg" class="msg" role="status"></p>
+    </section>
+
+    <section id="view-admin" hidden>
+      <h2>ADMINISTRATION</h2>
+      <div id="adm-body"></div>
+      <p id="adm-msg" class="msg" role="status"></p>
+    </section>
+
+    <section id="view-boutique" hidden>
+      <h2>BOUTIQUE</h2>
+      <div id="shop-body" class="panel"></div>
+      <p id="shop-msg" class="msg" role="status"></p>
+    </section>
+
+    <section id="view-compte" hidden>
+      <h2>MON COMPTE</h2>
+      <div id="acc-body" class="panel"></div>
+      <p id="acc-msg" class="msg" role="status"></p>
+    </section>
+
+    <section id="view-arena" hidden>
+      <div id="ar-lobby" class="panel">
+        <h3 style="margin:0 0 8px;font-size:11px;font-weight:normal">JOUER EN LIGNE</h3>
+        <p>À deux, en direct. Choisis un jeu, crée une salle, puis donne le code à un ami.</p>
+        <div class="row" style="flex-direction:column">
+          <button class="btn" id="ar-create-S" type="button">SNAKE ARENA (DUEL)</button>
+          <button class="btn" id="ar-create-P" type="button">SPACE ATTACK (ÉQUIPE)</button>
+          <button class="btn" id="ar-create-B" type="button">BLOCK PUZZLE (DUEL)</button>
+        </div>
+        <hr class="sep">
+        <label for="ar-code">OU ENTRE LE CODE D'UN AMI</label>
+        <input id="ar-code" maxlength="8" autocomplete="off" autocapitalize="characters" spellcheck="false">
+        <div class="row" style="margin-top:10px"><button class="btn alt" id="ar-join" type="button">REJOINDRE</button></div>
+      </div>
+      <div class="stage" id="ar-stage" hidden>
+        <p id="ar-top" class="msg" role="status"></p>
+        <canvas id="ar-screen" class="screen" width="240" height="264" style="aspect-ratio:240/264;width:min(100%,420px)" tabindex="0" aria-label="Jeu en ligne. Glisse un doigt pour jouer."></canvas>
+        <p id="ar-msg" class="msg" role="status"></p>
+        <div class="row"><button class="btn alt" id="ar-leave" type="button">QUITTER</button></div>
+      </div>
+      <p id="ar-note" class="msg" role="status"></p>
+    </section>
+
+    <section id="view-blocks" hidden>
+      <div class="stage">
+        <canvas id="bl-screen" class="screen" width="144" height="232" style="aspect-ratio:144/232;width:min(100%,360px)" tabindex="0" aria-label="Block Puzzle. Glisse pour déplacer, touche pour tourner."></canvas>
+        <p id="bl-msg" class="msg" role="status"></p>
+        <div class="row">
+          <button class="btn" id="bl-pause" type="button">PAUSE</button>
+          <button class="btn alt" id="bl-restart" type="button">REJOUER</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-space" hidden>
+      <div class="stage">
+        <canvas id="sp-screen" class="screen" width="144" height="208" tabindex="0" aria-label="Space Attack. Glisse le doigt pour déplacer ton vaisseau, il tire tout seul."></canvas>
+        <p id="sp-msg" class="msg" role="status"></p>
+        <div class="row">
+          <button class="btn" id="sp-pause" type="button">PAUSE</button>
+          <button class="btn alt" id="sp-restart" type="button">REJOUER</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-snake" hidden>
+      <div class="stage">
+        <canvas id="screen" class="screen" width="144" height="208" tabindex="0" aria-label="Écran du jeu Snake. Glisse un doigt pour tourner."></canvas>
+        <p id="snake-msg" class="msg" role="status"></p>
+        <div class="row">
+          <button class="btn" id="b-pause" type="button">PAUSE</button>
+          <button class="btn" id="b-sound" type="button" aria-pressed="true">SON</button>
+          <button class="btn alt" id="b-restart" type="button">REJOUER</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot"><a href="privacy.html">CONFIDENTIALITÉ</a> &middot; <a href="cgu.html">CONDITIONS</a></footer>
+
+  <!-- Emplacement publicité : colle ici le code de ta régie pub, puis retire l'attribut hidden. -->
+  <aside id="ad-slot" hidden aria-label="Publicité"></aside>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.0/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script>if (true) { document.write('<script src="config.test.js"><\/script>'); }</script>
+<script>
+(function () {
+  "use strict";
+
+  /* To add a game: add it here, add its score cap in schema.sql, and build its own screen. */
+  var GAMES = [
+    { id: "snake", name: "SNAKE", desc: "Mange, grandis, ne touche ni les murs ni ta queue." },
+    { id: "blocks", name: "BLOCK PUZZLE", desc: "Empile les blocs, complète des lignes. Glisse pour bouger, touche pour tourner." },
+    { id: "space", name: "SPACE ATTACK", desc: "Détruis les envahisseurs. Glisse ton doigt, ton vaisseau tire tout seul." }
+  ];
+  var MULTI = [
+    { id: "arena", name: "EN LIGNE", desc: "Snake, Space Attack ou Block Puzzle à deux, en direct avec un ami." }
+  ];
+
+  var cfg = window.ARCADE_CONFIG || {};
+  var online = !!(window.supabase && cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && String(cfg.SUPABASE_URL).indexOf("VOTRE") === -1);
+  var sb = null;
+  if (online) {
+    try { sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY); } catch (e) { online = false; }
+  }
+
+  var session = null, profile = null, onlineBest = 0, current = null;
+  var accStep = "email", accEmail = "", accNotice = "";
+
+  function $(id) { return document.getElementById(id); }
+  function setMsg(el, text, isErr) { el.textContent = text || ""; el.classList.toggle("err", !!isErr); }
+  function localBest(game) {
+    try { return parseInt(localStorage.getItem("arcade-best-" + game) || "0", 10) || 0; } catch (e) { return 0; }
+  }
+  function saveLocalBest(game, v) {
+    try { localStorage.setItem("arcade-best-" + game, String(v)); } catch (e) { /* ignore */ }
+  }
+
+  /* ---------- Account data ---------- */
+  async function loadProfile() {
+    profile = null;
+    if (!sb || !session) return;
+    var r = await sb.from("profiles").select("pseudo,country").eq("id", session.user.id).maybeSingle();
+    if (!r.error && r.data) profile = r.data;
+  }
+
+  /* ---------- Level, coins, missions, shop (needs schema_v2.sql on the database) ---------- */
+  var me = null, missions = [], badgeCat = null, shopCat = null;
+  var role = null, notifs = [], maint = null, friends = [], chatWith = null, chatTimer = null, access = null, seasonRows = [];
+  var TITLES = { title_rookie: "RECRUE", title_legend: "LÉGENDE" };
+  var DEFAULT_LOOK = { page: "#8bac0f", lcd: "#9bbc0f", field: "#a9c91a", mid: "#306230", ink: "#0f380f" };
+  var THEMES = {
+    theme_night: { page: "#0f1f0f", lcd: "#1e3a1e", field: "#274927", mid: "#8bac0f", ink: "#cfe8a0" },
+    theme_sunset: { page: "#c4623a", lcd: "#e8a15a", field: "#efb97a", mid: "#7a3b2a", ink: "#3a1410" }
+  };
+  var SKINS = { skin_neon: "#d400a8", skin_gold: "#a67c00" };
+  var isTest = true;
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+
+  function equippedCode(prefix) {
+    if (!me || !me.items) return null;
+    for (var i = 0; i < me.items.length; i++) {
+      if (me.items[i].equipped && me.items[i].code.indexOf(prefix) === 0) return me.items[i].code;
+    }
+    return null;
+  }
+
+  function applyCosmetics() {
+    var look = THEMES[equippedCode("theme_")] || DEFAULT_LOOK;
+    var root = document.documentElement.style;
+    root.setProperty("--page", look.page);
+    root.setProperty("--lcd", look.lcd);
+    root.setProperty("--field", look.field);
+    root.setProperty("--mid", look.mid);
+    root.setProperty("--ink", look.ink);
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", look.page);
+    snake.setLook(look.lcd, look.mid, look.ink, SKINS[equippedCode("skin_")]);
+  }
+
+  async function loadMe() {
+    me = null;
+    missions = [];
+    if (sb && session && profile) {
+      var r = await sb.rpc("me");
+      if (!r.error && r.data) me = r.data;
+      if (me) {
+        var m = await sb.rpc("my_missions");
+        if (!m.error && m.data) missions = m.data;
+        var rr = await sb.rpc("my_role");
+        role = rr.error ? null : rr.data;
+        var nn = await sb.rpc("my_notifications", { p_limit: 30 });
+        notifs = (!nn.error && nn.data) ? nn.data : [];
+        var ac = await sb.rpc("my_access");
+        access = ac.error ? null : ac.data;
+        var sr = await sb.rpc("my_season_rewards");
+        seasonRows = (!sr.error && sr.data) ? sr.data : [];
+      }
+    }
+    if (!me) { role = null; notifs = []; access = null; seasonRows = []; }
+    applyCosmetics();
+  }
+
+  async function loadBadgeCat() {
+    if (badgeCat || !sb) return badgeCat;
+    var r = await sb.from("badges").select("code,name,description").order("sort");
+    if (!r.error && r.data) badgeCat = r.data;
+    return badgeCat;
+  }
+
+  function badgeName(code) {
+    var list = badgeCat || [];
+    for (var i = 0; i < list.length; i++) if (list[i].code === code) return list[i].name;
+    return code;
+  }
+
+  function rewardError(err) {
+    var m = String(err && err.message || "");
+    if (m.indexOf("already claimed") >= 0) return "Déjà récupéré aujourd'hui.";
+    if (m.indexOf("not done") >= 0) return "Mission pas encore terminée.";
+    if (m.indexOf("not enough") >= 0) return "Pas assez de BOYCOINS.";
+    if (m.indexOf("already owned") >= 0) return "Tu as déjà cet objet.";
+    if (m.indexOf("unknown player") >= 0) return "Joueur introuvable.";
+    if (m.indexOf("cannot add yourself") >= 0 || m.indexOf("cannot gift yourself") >= 0) return "Tu ne peux pas faire ça avec toi-même.";
+    if (m.indexOf("already friends") >= 0) return "Vous êtes déjà amis.";
+    if (m.indexOf("already requested") >= 0) return "Demande déjà envoyée.";
+    if (m.indexOf("too many") >= 0) return "Trop de demandes. Réessaie plus tard.";
+    if (m.indexOf("not friends") >= 0) return "Il faut être amis pour faire ça.";
+    if (m.indexOf("message refused") >= 0) return "Message refusé par le filtre.";
+    if (m.indexOf("too fast") >= 0) return "Doucement, réessaie dans quelques secondes.";
+    if (m.indexOf("level too low") >= 0) return "Il faut le niveau 3 pour offrir des BOYCOINS.";
+    if (m.indexOf("daily gift limit") >= 0) return "Limite de cadeaux du jour atteinte (100 BC).";
+    if (m.indexOf("invalid amount") >= 0) return "Montant invalide.";
+    if (m.indexOf("beta") >= 0) return "Bêta privée : ton compte n'est pas encore ajouté.";
+    if (m.indexOf("banned") >= 0) return "Ton compte est suspendu.";
+    if (m.indexOf("maintenance") >= 0) return "Maintenance en cours, réessaie plus tard.";
+    if (m.indexOf("forbidden") >= 0) return "Accès refusé.";
+    return "Impossible pour le moment. Réessaie plus tard.";
+  }
+
+  function renderMeCard() {
+    var box = $("me-card");
+    if (!me) { box.hidden = true; return; }
+    box.hidden = false;
+    box.textContent = "";
+    var title = TITLES[equippedCode("title_")];
+    var head = el("div", "line");
+    head.append(el("span", "", profile.pseudo + (title ? " · " + title : "")), el("span", "", "NIV " + me.level));
+    var bar = el("div", "xpbar");
+    var fill = document.createElement("i");
+    var span = Math.max(1, me.next_level_xp - me.level_start_xp);
+    fill.style.width = Math.max(0, Math.min(100, ((me.xp - me.level_start_xp) / span) * 100)) + "%";
+    bar.append(fill);
+    var xpLine = el("p", "small", me.xp + " / " + me.next_level_xp + " XP");
+    xpLine.style.margin = "0 0 8px";
+    var bc = el("p", "", "BOYCOINS : " + me.bc);
+    bc.style.margin = "0 0 10px";
+    box.append(head, bar, xpLine, bc);
+    if (me.daily_claimed_today) {
+      var done = el("p", "small", "Récompense du jour récupérée. Série : " + me.streak + " jour" + (me.streak > 1 ? "s" : "") + ".");
+      done.style.margin = "0";
+      box.append(done);
+    } else {
+      var b = el("button", "btn", "RÉCOMPENSE DU JOUR");
+      b.type = "button";
+      b.addEventListener("click", claimDaily);
+      box.append(b);
+    }
+    var unread = notifs.filter(function (n) { return !n.read; }).length;
+    if (unread) {
+      var nl = el("p", "small", "");
+      nl.style.margin = "10px 0 0";
+      var na = el("a", "", unread + " nouvelle" + (unread > 1 ? "s" : "") + " notification" + (unread > 1 ? "s" : "") + " : voir");
+      na.href = "#amis";
+      nl.append(na);
+      box.append(nl);
+    }
+    if (access && access.beta_on && !access.allowed) {
+      var bn = el("p", "small", "Bêta privée en cours : ton compte n'a pas encore été ajouté. Demande au créateur du site.");
+      bn.style.margin = "10px 0 0";
+      box.append(bn);
+    }
+    var note = el("p", "msg", "");
+    note.id = "me-msg";
+    note.setAttribute("role", "status");
+    box.append(note);
+  }
+
+  async function claimDaily() {
+    var note = $("me-msg");
+    setMsg(note, "…");
+    var r = await sb.rpc("claim_daily");
+    if (r.error) { setMsg(note, rewardError(r.error), true); return; }
+    var d = r.data || {};
+    await loadBadgeCat();
+    var txt = "Jour " + d.day + " sur 7 : +" + d.bc + " BOYCOINS.";
+    if (d.new_badges && d.new_badges.length) txt += " Badge : " + d.new_badges.map(badgeName).join(", ") + ".";
+    await loadMe();
+    renderMeCard();
+    renderMissions();
+    setMsg($("me-msg"), txt);
+  }
+
+  function renderMissions() {
+    var box = $("missions-box");
+    if (!me || !missions.length) { box.hidden = true; return; }
+    box.hidden = false;
+    box.textContent = "";
+    box.append(el("h3", "", "MISSIONS DU JOUR"));
+    box.firstChild.style.cssText = "margin:0 0 6px;font-size:10px;font-weight:normal";
+    missions.forEach(function (m) {
+      var row = el("div", "line");
+      var left = el("span", "", m.name + " (" + m.progress + "/" + m.goal + ") +" + m.reward_bc + " BC");
+      row.append(left);
+      if (m.claimed) {
+        row.append(el("span", "small", "FAIT"));
+      } else if (m.progress >= m.goal) {
+        var b = el("button", "btn", "RÉCUPÉRER");
+        b.type = "button";
+        b.addEventListener("click", function () { claimMission(m.code); });
+        row.append(b);
+      } else {
+        row.append(el("span", "small", "…"));
+      }
+      box.append(row);
+    });
+    var note = el("p", "msg", "");
+    note.id = "mission-msg";
+    note.setAttribute("role", "status");
+    box.append(note);
+  }
+
+  async function claimMission(code) {
+    var r = await sb.rpc("claim_mission", { p_code: code });
+    if (r.error) { setMsg($("mission-msg"), rewardError(r.error), true); return; }
+    var d = r.data || {};
+    await loadBadgeCat();
+    var txt = "Mission réussie : +" + (d.bc || 0) + " BOYCOINS, +" + (d.xp || 0) + " XP.";
+    if (d.new_badges && d.new_badges.length) txt += " Badge : " + d.new_badges.map(badgeName).join(", ") + ".";
+    await loadMe();
+    renderMeCard();
+    renderMissions();
+    setMsg($("mission-msg"), txt);
+  }
+
+  /* ---------- Récompenses de fin de saison ---------- */
+  var GAME_NAMES = { snake: "Snake", blocks: "Block Puzzle", space: "Space Attack" };
+  function renderSeason() {
+    var box = $("season-box");
+    var todo = seasonRows.filter(function (r) { return !r.claimed; });
+    if (!me || !todo.length) { box.hidden = true; return; }
+    box.hidden = false;
+    box.textContent = "";
+    var h = el("h3", "", "RÉCOMPENSE DE SAISON " + todo[0].season);
+    h.style.cssText = "margin:0 0 6px;font-size:10px;font-weight:normal";
+    box.append(h);
+    var total = 0;
+    todo.forEach(function (r) {
+      total += r.reward;
+      var row = el("div", "line");
+      row.append(el("span", "", (GAME_NAMES[r.game] || r.game) + " : n°" + r.rang), el("span", "", "+" + r.reward + " BC"));
+      box.append(row);
+    });
+    var b = el("button", "btn", "RÉCUPÉRER " + total + " BC");
+    b.type = "button";
+    b.style.marginTop = "10px";
+    b.addEventListener("click", async function () {
+      var r = await sb.rpc("claim_season_rewards");
+      if (r.error) { setMsg($("season-msg"), rewardError(r.error), true); return; }
+      await loadMe();
+      renderMeCard();
+      renderSeason();
+    });
+    box.append(b);
+    var note = el("p", "msg", "");
+    note.id = "season-msg";
+    box.append(note);
+  }
+
+  /* ---------- Maintenance, news ---------- */
+  async function loadMaint() {
+    if (!sb) return;
+    var r = await sb.rpc("get_maintenance");
+    maint = (!r.error && r.data) ? r.data : null;
+    var box = $("maint-box");
+    if (maint && maint.on) {
+      $("maint-text").textContent = "MAINTENANCE : " + (maint.message || "le site est en pause, reviens bientôt.") + (role ? " (Équipe : tu peux jouer.)" : "");
+      box.hidden = false;
+    } else {
+      box.hidden = true;
+    }
+  }
+
+  async function renderNews() {
+    var box = $("news-box");
+    box.hidden = true;
+    if (!sb) return;
+    var r = await sb.from("news").select("id,title,body,created_at").order("id", { ascending: false }).limit(3);
+    if (r.error || !r.data || !r.data.length) return;
+    box.textContent = "";
+    var h = el("h3", "", "ACTUALITÉS");
+    h.style.cssText = "margin:0 0 6px;font-size:10px;font-weight:normal";
+    box.append(h);
+    r.data.forEach(function (n) {
+      var row = el("div", "line");
+      row.style.display = "block";
+      var t = el("p", "", n.title);
+      t.style.margin = "0 0 4px";
+      row.append(t, el("p", "small", n.body));
+      row.lastChild.style.margin = "0";
+      box.append(row);
+    });
+    box.hidden = false;
+  }
+
+  /* ---------- Shop ---------- */
+  async function renderShop() {
+    var body = $("shop-body"), msg = $("shop-msg");
+    setMsg(msg, "");
+    body.textContent = "";
+    if (!online) { body.append(el("p", "", "La boutique demande un compte. Elle sera disponible une fois le site relié à sa base de données.")); return; }
+    if (!session || !profile) {
+      var p = el("p", "", "Connecte-toi pour utiliser la boutique. ");
+      var a = el("a", "", "Mon compte");
+      a.href = "#compte";
+      p.append(a);
+      body.append(p);
+      return;
+    }
+    if (!me) { body.append(el("p", "", "La boutique n'est pas encore disponible.")); return; }
+    if (!shopCat) {
+      var r = await sb.from("shop_items").select("code,kind,name,price").order("sort");
+      if (r.error) { body.append(el("p", "", "Impossible de charger la boutique. Réessaie plus tard.")); return; }
+      shopCat = r.data;
+    }
+    body.textContent = "";
+    var bal = el("p", "", "TES BOYCOINS : " + me.bc);
+    body.append(bal);
+    shopCat.forEach(function (it) {
+      var owned = null;
+      me.items.forEach(function (x) { if (x.code === it.code) owned = x; });
+      var row = el("div", "line");
+      row.append(el("span", "", it.name + (owned ? "" : " (" + it.price + " BC)")));
+      var b = el("button", owned ? "btn alt" : "btn", owned ? (owned.equipped ? "ENLEVER" : "METTRE") : "ACHETER");
+      b.type = "button";
+      b.addEventListener("click", async function () {
+        setMsg(msg, "…");
+        var res = owned ? await sb.rpc("equip_item", { p_code: it.code, p_on: !owned.equipped }) : await sb.rpc("buy_item", { p_code: it.code });
+        if (res.error) { setMsg(msg, rewardError(res.error), true); return; }
+        await loadMe();
+        await renderShop();
+        setMsg($("shop-msg"), owned ? "C'est fait." : "Acheté ! Tu peux le mettre.");
+      });
+      row.append(b);
+      body.append(row);
+    });
+  }
+
+  async function syncBest() {
+    onlineBest = 0;
+    if (!sb || !session || !profile) return;
+    var r = await sb.rpc("my_standing", { p_game: "snake", p_country: null });
+    if (!r.error && r.data && r.data.length) onlineBest = r.data[0].score || 0;
+  }
+
+  async function refreshAuth(s) {
+    session = s;
+    await loadProfile();
+    await syncBest();
+    await loadMe();
+    renderNav();
+    if (session && !profile && current !== "compte") { location.hash = "#compte"; return; }
+    if (current === "compte") renderAccount();
+    if (current === "menu") renderMenu();
+    if (current === "boutique") renderShop();
+    if (current === "amis") renderFriends();
+    if (current === "admin") renderAdmin();
+    loadMaint();
+  }
+
+  function renderNav() {
+    var a = $("nav-account");
+    a.textContent = profile ? profile.pseudo.toUpperCase() : "COMPTE";
+  }
+
+  /* ---------- Install on the home screen ---------- */
+  var deferredInstall = null;
+
+  function isStandalone() {
+    return window.navigator.standalone === true ||
+      (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+  }
+
+  function setupInstall() {
+    var box = $("install-hint"), txt = $("install-text"), btn = $("b-install");
+    if (isStandalone()) { box.hidden = true; return; }
+    var ua = window.navigator.userAgent || "";
+    var ios = /iphone|ipad|ipod/i.test(ua) || (window.navigator.platform === "MacIntel" && window.navigator.maxTouchPoints > 1);
+    if (deferredInstall) {
+      txt.textContent = "Installe BOYGAM sur ton téléphone.";
+      btn.hidden = false;
+      box.hidden = false;
+    } else if (ios) {
+      txt.textContent = "Installe l'appli : dans Safari, touche Partager (le carré avec la flèche), puis « Sur l'écran d'accueil ».";
+      btn.hidden = true;
+      box.hidden = false;
+    } else {
+      box.hidden = true;
+    }
+  }
+
+  window.addEventListener("beforeinstallprompt", function (e) {
+    e.preventDefault();
+    deferredInstall = e;
+    setupInstall();
+  });
+  $("b-install").addEventListener("click", function () {
+    if (!deferredInstall) return;
+    deferredInstall.prompt();
+    deferredInstall = null;
+    $("install-hint").hidden = true;
+  });
+
+  /* ---------- Menu ---------- */
+  function renderMenu() {
+    setupInstall();
+    var st = $("menu-status");
+    st.textContent = "";
+    if (!online) {
+      st.textContent = "Tu joues sans compte. Ton score reste sur cet appareil.";
+    } else if (profile) {
+      st.textContent = "Salut " + profile.pseudo + " ! Tes scores sont gardés sur ton compte.";
+    } else {
+      st.append("Tu joues sans compte. ");
+      var a = document.createElement("a");
+      a.href = "#compte";
+      a.textContent = "Crée un compte";
+      st.append(a, " pour garder tes scores.");
+    }
+    renderMeCard();
+    renderSeason();
+    renderMissions();
+    renderNews();
+    var list = $("game-list");
+    list.textContent = "";
+    var shown = GAMES.concat(cfg.ARENA_URL ? MULTI : []);
+    shown.forEach(function (g) {
+      var card = document.createElement("div");
+      card.className = "panel game";
+      var info = document.createElement("div");
+      var h = document.createElement("h3");
+      h.textContent = g.name;
+      var p = document.createElement("p");
+      p.textContent = g.desc;
+      info.append(h, p);
+      var go = document.createElement("a");
+      go.className = "btn";
+      go.href = "#" + g.id;
+      go.textContent = "JOUER";
+      card.append(info, go);
+      list.append(card);
+    });
+  }
+
+  /* ---------- Scores ---------- */
+  var scoreScope = "ALL", scoreGame = GAMES[0].id, scoreToken = 0;
+
+  function buildGameSelect() {
+    var sel = $("lb-game");
+    GAMES.forEach(function (g) {
+      var o = document.createElement("option");
+      o.value = g.id;
+      o.textContent = g.name;
+      sel.append(o);
+    });
+    sel.addEventListener("change", function () { scoreGame = sel.value; loadScores(); });
+    $("tab-all").addEventListener("click", function () { setScope("ALL"); });
+    $("tab-fr").addEventListener("click", function () { setScope("FR"); });
+    $("tab-friends").addEventListener("click", function () { setScope("FRIENDS"); });
+    $("tab-season").addEventListener("click", function () { setScope("SEASON"); });
+  }
+
+  function setScope(s) {
+    scoreScope = s;
+    $("tab-all").setAttribute("aria-pressed", String(s === "ALL"));
+    $("tab-fr").setAttribute("aria-pressed", String(s === "FR"));
+    $("tab-friends").setAttribute("aria-pressed", String(s === "FRIENDS"));
+    $("tab-season").setAttribute("aria-pressed", String(s === "SEASON"));
+    loadScores();
+  }
+
+  async function loadScores() {
+    var token = ++scoreToken;
+    var list = $("lb-list"), note = $("lb-note"), me = $("lb-me");
+    list.textContent = "";
+    setMsg(me, "");
+    if (!online) {
+      setMsg(note, "Classement indisponible hors ligne. Ton meilleur score sur cet appareil : " + localBest(scoreGame) + ".");
+      return;
+    }
+    setMsg(note, "Chargement…");
+    var country = scoreScope === "FR" ? "FR" : null;
+    var fn = "leaderboard", args = { p_game: scoreGame, p_country: country, p_limit: 50 };
+    var simple = scoreScope === "ALL" || scoreScope === "FR";
+    if (scoreScope === "FRIENDS") {
+      if (!session || !profile) { setMsg(note, "Connecte-toi pour voir le classement de tes amis."); return; }
+      fn = "leaderboard_friends"; args = { p_game: scoreGame, p_limit: 50 };
+    } else if (scoreScope === "SEASON") {
+      fn = "leaderboard_season"; args = { p_game: scoreGame, p_country: null, p_limit: 50 };
+    }
+    var r = await sb.rpc(fn, args);
+    if (token !== scoreToken) return;
+    if (r.error) { setMsg(note, "Impossible de charger le classement. Réessaie plus tard.", true); return; }
+    setMsg(note, r.data.length ? "" : (scoreScope === "FRIENDS" ? "Aucun score parmi tes amis pour l'instant." : "Personne n'est encore classé. Sois le premier !"));
+    r.data.forEach(function (row) {
+      var li = document.createElement("li");
+      if (row.moi) li.className = "me";
+      var rk = document.createElement("span");
+      rk.textContent = "N°" + row.rang;
+      var ps = document.createElement("span");
+      ps.className = "ps";
+      ps.textContent = row.pseudo;
+      var sc = document.createElement("span");
+      sc.textContent = String(row.score);
+      li.append(rk, ps, sc);
+      list.append(li);
+    });
+    if (!simple) {
+      setMsg(me, scoreScope === "SEASON" ? "Classement du mois en cours : il repart de zéro chaque mois." : "");
+    } else if (session && profile) {
+      var m = await sb.rpc("my_standing", { p_game: scoreGame, p_country: country });
+      if (token !== scoreToken) return;
+      if (!m.error && m.data && m.data.length) {
+        setMsg(me, "Ton rang : n°" + m.data[0].rang + " avec " + m.data[0].score + " points.");
+      } else {
+        setMsg(me, "Joue une partie pour entrer au classement.");
+      }
+    } else {
+      setMsg(me, "Connecte-toi pour apparaître dans le classement.");
+    }
+  }
+
+  /* ---------- Friends, messages, gifts ---------- */
+  function notifText(n) {
+    if (n.kind === "friend_request") return n.body + " veut devenir ton ami.";
+    if (n.kind === "friend_accept") return n.body + " est maintenant ton ami.";
+    if (n.kind === "message") return "Nouveau message de " + n.body + ".";
+    return n.body;
+  }
+
+  function stopChatTimer() { if (chatTimer) { clearInterval(chatTimer); chatTimer = null; } }
+
+  async function renderFriends() {
+    var info = $("fr-info"), msg = $("fr-msg");
+    setMsg(msg, "");
+    ["fr-notifs", "fr-add", "fr-list", "fr-chat"].forEach(function (id) { $(id).hidden = true; });
+    info.textContent = "";
+    info.hidden = false;
+    if (!online) { info.textContent = "Les amis demandent un compte. Ils seront disponibles une fois le site relié à sa base de données."; return; }
+    if (!session || !profile) {
+      info.append("Connecte-toi pour ajouter des amis. ");
+      var a = el("a", "", "Mon compte");
+      a.href = "#compte";
+      info.append(a);
+      return;
+    }
+    if (!me) { info.textContent = "Les amis ne sont pas encore disponibles."; return; }
+    info.hidden = true;
+
+    var nb = $("fr-notifs");
+    var nlist = notifs.slice(0, 8);
+    if (nlist.length) {
+      nb.textContent = "";
+      nb.append(el("h3", "", "NOTIFICATIONS"));
+      nb.firstChild.style.cssText = "margin:0 0 6px;font-size:10px;font-weight:normal";
+      nlist.forEach(function (n) {
+        var row = el("div", "line");
+        row.append(el("span", n.read ? "small" : "", (n.read ? "" : "• ") + notifText(n)));
+        nb.append(row);
+      });
+      nb.hidden = false;
+      if (notifs.some(function (n) { return !n.read; })) {
+        sb.rpc("mark_notifications_read").then(function () {
+          notifs.forEach(function (n) { n.read = true; });
+        });
+      }
+    }
+
+    var add = $("fr-add");
+    add.textContent = "";
+    add.append(el("h3", "", "AJOUTER UN AMI"));
+    add.firstChild.style.cssText = "margin:0 0 6px;font-size:10px;font-weight:normal";
+    var form = document.createElement("form");
+    form.noValidate = true;
+    var lab = el("label", "", "PSEUDO DE TON AMI");
+    lab.setAttribute("for", "in-friend");
+    var inp = document.createElement("input");
+    inp.id = "in-friend";
+    inp.maxLength = 16;
+    inp.autocomplete = "off";
+    inp.autocapitalize = "off";
+    inp.spellcheck = false;
+    var row0 = el("div", "row");
+    row0.style.marginTop = "10px";
+    var sub = el("button", "btn", "ENVOYER LA DEMANDE");
+    sub.type = "submit";
+    row0.append(sub);
+    form.append(lab, inp, row0);
+    form.addEventListener("submit", async function (e) {
+      e.preventDefault();
+      var name = inp.value.trim();
+      if (!name) return;
+      setMsg(msg, "…");
+      var r = await sb.rpc("send_friend_request", { p_pseudo: name });
+      if (r.error) { setMsg(msg, rewardError(r.error), true); return; }
+      inp.value = "";
+      setMsg(msg, r.data === "accepted" ? "Vous êtes maintenant amis !" : "Demande envoyée.");
+      await loadFriendsList();
+    });
+    add.append(form);
+    add.hidden = false;
+
+    await loadFriendsList();
+    if (chatWith) openChat(chatWith);
+  }
+
+  async function loadFriendsList() {
+    var box = $("fr-list"), msg = $("fr-msg");
+    var r = await sb.rpc("my_friends");
+    if (r.error) { box.hidden = true; setMsg(msg, "Impossible de charger tes amis.", true); return; }
+    friends = r.data || [];
+    box.textContent = "";
+    var h = el("h3", "", "MES AMIS (" + friends.filter(function (f) { return f.relation === "friend"; }).length + ")");
+    h.style.cssText = "margin:0 0 6px;font-size:10px;font-weight:normal";
+    box.append(h);
+    if (!friends.length) box.append(el("p", "small", "Pas encore d'amis. Envoie une demande avec son pseudo."));
+    friends.forEach(function (f) {
+      var row = el("div", "line");
+      row.append(el("span", "", f.pseudo + " (NIV " + f.level + ")"));
+      var acts = el("span", "row");
+      function btn(label, alt, fn) {
+        var b = el("button", "btn mini" + (alt ? " alt" : ""), label);
+        b.type = "button";
+        b.addEventListener("click", fn);
+        acts.append(b);
+      }
+      if (f.relation === "incoming") {
+        btn("ACCEPTER", false, async function () { await answerFriend(f.pseudo, true); });
+        btn("REFUSER", true, async function () { await answerFriend(f.pseudo, false); });
+      } else if (f.relation === "outgoing") {
+        acts.append(el("span", "small", "EN ATTENTE"));
+      } else {
+        btn("CHAT", false, function () { openChat(f.pseudo); });
+        btn("RETIRER", true, async function () {
+          if (!window.confirm("Retirer " + f.pseudo + " de tes amis ?")) return;
+          await sb.rpc("remove_friend", { p_pseudo: f.pseudo });
+          if (chatWith === f.pseudo) { chatWith = null; stopChatTimer(); $("fr-chat").hidden = true; }
+          await loadFriendsList();
+        });
+      }
+      row.append(acts);
+      box.append(row);
+    });
+    box.hidden = false;
+  }
+
+  async function answerFriend(pseudo, accept) {
+    var r = await sb.rpc("respond_friend_request", { p_pseudo: pseudo, p_accept: accept });
+    if (r.error) { setMsg($("fr-msg"), rewardError(r.error), true); return; }
+    await loadFriendsList();
+  }
+
+  async function openChat(pseudo) {
+    chatWith = pseudo;
+    var box = $("fr-chat"), msg = $("fr-msg");
+    var r = await sb.rpc("conversation", { p_pseudo: pseudo, p_limit: 50 });
+    if (r.error) { setMsg(msg, rewardError(r.error), true); box.hidden = true; return; }
+    box.textContent = "";
+    var h = el("h3", "", "CHAT AVEC " + pseudo.toUpperCase());
+    h.style.cssText = "margin:0 0 6px;font-size:10px;font-weight:normal";
+    box.append(h);
+    var log = el("div", "chat");
+    if (!r.data.length) log.append(el("p", "small", "Aucun message. Dis bonjour !"));
+    r.data.forEach(function (m) {
+      var p = el("p", m.mine ? "mine" : "");
+      p.append(el("span", "", m.body));
+      log.append(p);
+    });
+    box.append(log);
+    log.scrollTop = log.scrollHeight;
+
+    var form = document.createElement("form");
+    form.noValidate = true;
+    var ta = document.createElement("textarea");
+    ta.rows = 2;
+    ta.maxLength = 300;
+    ta.setAttribute("aria-label", "Ton message");
+    var row = el("div", "row");
+    var send = el("button", "btn", "ENVOYER");
+    send.type = "submit";
+    row.append(send);
+    form.append(ta, row);
+    form.addEventListener("submit", async function (e) {
+      e.preventDefault();
+      var txt = ta.value.trim();
+      if (!txt) return;
+      var res = await sb.rpc("send_message", { p_pseudo: pseudo, p_body: txt });
+      if (res.error) { setMsg(msg, rewardError(res.error), true); return; }
+      setMsg(msg, "");
+      openChat(pseudo);
+    });
+    box.append(form);
+
+    var gifts = el("div", "row");
+    gifts.style.marginTop = "10px";
+    [10, 25, 50].forEach(function (amt) {
+      var b = el("button", "btn alt mini", "OFFRIR " + amt + " BC");
+      b.type = "button";
+      b.addEventListener("click", async function () {
+        var res = await sb.rpc("send_gift", { p_pseudo: pseudo, p_amount: amt });
+        if (res.error) { setMsg(msg, rewardError(res.error), true); return; }
+        await loadMe();
+        setMsg(msg, "Cadeau envoyé : " + amt + " BOYCOINS à " + pseudo + ".");
+      });
+      gifts.append(b);
+    });
+    var rb = el("button", "btn alt mini", "SIGNALER");
+    rb.type = "button";
+    rb.addEventListener("click", async function () {
+      var why = window.prompt("Pourquoi signales-tu " + pseudo + " ?");
+      if (!why || !why.trim()) return;
+      var res = await sb.rpc("report_user", { p_pseudo: pseudo, p_reason: why.trim() });
+      setMsg(msg, res.error ? rewardError(res.error) : "Signalement envoyé à l'équipe.", !!res.error);
+    });
+    gifts.append(rb);
+    box.append(gifts);
+    box.hidden = false;
+
+    stopChatTimer();
+    chatTimer = setInterval(function () {
+      if (current !== "amis" || !chatWith || document.hidden) return;
+      if (document.activeElement && document.activeElement.tagName === "TEXTAREA" && document.activeElement.value) return;
+      openChat(chatWith);
+    }, 10000);
+  }
+
+  /* ---------- Administration (équipe) ---------- */
+  async function renderAdmin() {
+    var body = $("adm-body"), msg = $("adm-msg");
+    setMsg(msg, "");
+    body.textContent = "";
+    if (!sb || !session || !role) {
+      var p0 = el("div", "panel");
+      p0.append(el("p", "", "Accès réservé à l'équipe."));
+      body.append(p0);
+      return;
+    }
+    function panel(title) {
+      var d = el("div", "panel");
+      var h = el("h3", "", title);
+      h.style.cssText = "margin:0 0 8px;font-size:10px;font-weight:normal";
+      d.append(h);
+      body.append(d);
+      return d;
+    }
+    function field(parent, label, tag) {
+      var l = el("label", "", label);
+      var i = document.createElement(tag || "input");
+      i.style.marginBottom = "10px";
+      parent.append(l, i);
+      return i;
+    }
+    function button(parent, label, alt, fn) {
+      var b = el("button", "btn mini" + (alt ? " alt" : ""), label);
+      b.type = "button";
+      b.addEventListener("click", fn);
+      parent.append(b);
+      return b;
+    }
+    async function act(call, ok) {
+      var r = await call;
+      if (r.error) { setMsg(msg, rewardError(r.error), true); return false; }
+      setMsg(msg, ok);
+      return true;
+    }
+
+    var st = await sb.rpc("staff_stats");
+    var ps = panel("CHIFFRES (RÔLE : " + role.toUpperCase() + ")");
+    if (!st.error && st.data) {
+      var d = st.data;
+      [["Joueurs", d.players], ["Nouveaux aujourd'hui", d.new_today], ["Parties aujourd'hui", d.games_today],
+       ["BOYCOINS en circulation", d.bc_in_circulation], ["Signalements ouverts", d.open_reports], ["Comptes suspendus", d.banned]]
+        .forEach(function (x) { var l = el("div", "line"); l.append(el("span", "", x[0]), el("span", "", String(x[1]))); ps.append(l); });
+    }
+
+    var isAdmin = role === "founder" || role === "admin";
+    if (isAdmin) {
+      var pm = panel("MAINTENANCE");
+      pm.append(el("p", "small", "État : " + (maint && maint.on ? "ACTIVE" : "éteinte")));
+      var mi = field(pm, "MESSAGE AFFICHÉ AUX JOUEURS");
+      mi.maxLength = 200;
+      var rowm = el("div", "row");
+      button(rowm, "ACTIVER", false, async function () { if (await act(sb.rpc("staff_set_maintenance", { p_on: true, p_message: mi.value }), "Maintenance activée.")) { await loadMaint(); renderAdmin(); } });
+      button(rowm, "DÉSACTIVER", true, async function () { if (await act(sb.rpc("staff_set_maintenance", { p_on: false, p_message: "" }), "Maintenance désactivée.")) { await loadMaint(); renderAdmin(); } });
+      pm.append(rowm);
+
+      var pn = panel("PUBLIER UNE ACTUALITÉ");
+      var nt = field(pn, "TITRE"); nt.maxLength = 80;
+      var nb = field(pn, "TEXTE", "textarea"); nb.rows = 3; nb.maxLength = 600;
+      var rown = el("div", "row");
+      button(rown, "PUBLIER", false, async function () {
+        if (!nt.value.trim() || !nb.value.trim()) { setMsg(msg, "Titre et texte obligatoires.", true); return; }
+        if (await act(sb.rpc("staff_post_news", { p_title: nt.value, p_body: nb.value }), "Actualité publiée.")) { nt.value = ""; nb.value = ""; }
+      });
+      pn.append(rown);
+    }
+
+    if (isAdmin) {
+      var pbeta = panel("BÊTA PRIVÉE");
+      var bst = await sb.rpc("my_access");
+      var betaOn = !!(bst.data && bst.data.beta_on);
+      pbeta.append(el("p", "small", "État : " + (betaOn ? "ACTIVE (seuls les testeurs ajoutés peuvent jouer en ligne)" : "éteinte (tout le monde peut jouer)")));
+      var rowbeta = el("div", "row");
+      button(rowbeta, betaOn ? "DÉSACTIVER" : "ACTIVER", betaOn, async function () { if (await act(sb.rpc("staff_set_beta", { p_on: !betaOn }), betaOn ? "Bêta privée désactivée." : "Bêta privée activée.")) renderAdmin(); });
+      pbeta.append(rowbeta);
+      var bl = await sb.rpc("staff_beta_list");
+      pbeta.append(el("p", "small", "Testeurs : " + ((bl.data && bl.data.length) ? bl.data.map(function (x) { return x.pseudo; }).join(", ") : "aucun")));
+      var bpseudo = field(pbeta, "PSEUDO DU TESTEUR"); bpseudo.maxLength = 16;
+      var rowb2 = el("div", "row");
+      button(rowb2, "AJOUTER", false, async function () { if (await act(sb.rpc("staff_beta_add", { p_pseudo: bpseudo.value }), "Testeur ajouté.")) renderAdmin(); });
+      button(rowb2, "RETIRER", true, async function () { if (await act(sb.rpc("staff_beta_remove", { p_pseudo: bpseudo.value }), "Testeur retiré.")) renderAdmin(); });
+      pbeta.append(rowb2);
+
+      var pbk = panel("SAUVEGARDE");
+      pbk.append(el("p", "small", "Télécharge toutes les données (comptes, scores, BOYCOINS, amis…) dans un fichier. Les mots de passe n'y sont pas. Garde le fichier en lieu sûr."));
+      var rowbk = el("div", "row");
+      button(rowbk, "TÉLÉCHARGER LA SAUVEGARDE", false, async function () {
+        setMsg(msg, "Préparation…");
+        var ex = await sb.rpc("staff_export");
+        if (ex.error) { setMsg(msg, rewardError(ex.error), true); return; }
+        var blob = new Blob([JSON.stringify(ex.data)], { type: "application/json" });
+        var a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "boygam-sauvegarde-" + new Date().toISOString().slice(0, 10) + ".json";
+        document.body.append(a);
+        a.click();
+        a.remove();
+        setMsg(msg, "Sauvegarde téléchargée.");
+      });
+      pbk.append(rowbk);
+    }
+    if (role === "founder") {
+      var prl = panel("RÔLES (FONDATEUR)");
+      var rls = await sb.rpc("staff_list_roles");
+      prl.append(el("p", "small", "Équipe : " + ((rls.data && rls.data.length) ? rls.data.map(function (x) { return x.pseudo + " (" + x.role + ")"; }).join(", ") : "personne")));
+      var rp = field(prl, "PSEUDO"); rp.maxLength = 16;
+      var sel = field(prl, "RÔLE", "select");
+      [["admin", "Administrateur"], ["moderator", "Modérateur"], ["none", "Aucun (retirer)"]].forEach(function (o) { var op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; sel.append(op); });
+      var rowr = el("div", "row");
+      button(rowr, "VALIDER", false, async function () { if (await act(sb.rpc("staff_set_role", { p_pseudo: rp.value, p_role: sel.value }), "Rôle mis à jour.")) renderAdmin(); });
+      prl.append(rowr);
+    }
+
+    var pr = panel("SIGNALEMENTS");
+    var rep = await sb.rpc("staff_reports");
+    if (rep.error || !rep.data || !rep.data.length) {
+      pr.append(el("p", "small", "Aucun signalement ouvert."));
+    } else {
+      rep.data.forEach(function (x) {
+        var blk = el("div", "line");
+        blk.style.display = "block";
+        blk.append(el("p", "small", x.reporter + " signale " + x.reported + " : " + x.reason));
+        var rr = el("div", "row");
+        button(rr, "RÉSOLU", true, async function () { if (await act(sb.rpc("staff_resolve_report", { p_id: x.id }), "Marqué résolu.")) renderAdmin(); });
+        button(rr, "SUSPENDRE 1 J", false, async function () { if (await act(sb.rpc("staff_ban", { p_pseudo: x.reported, p_reason: x.reason, p_days: 1 }), x.reported + " suspendu 1 jour.")) { await sb.rpc("staff_resolve_report", { p_id: x.id }); renderAdmin(); } });
+        button(rr, "SUSPENDRE 7 J", false, async function () { if (await act(sb.rpc("staff_ban", { p_pseudo: x.reported, p_reason: x.reason, p_days: 7 }), x.reported + " suspendu 7 jours.")) { await sb.rpc("staff_resolve_report", { p_id: x.id }); renderAdmin(); } });
+        blk.append(rr);
+        pr.append(blk);
+      });
+    }
+
+    var pb = panel("SUSPENDRE / RÉTABLIR UN JOUEUR");
+    var bp = field(pb, "PSEUDO"); bp.maxLength = 16;
+    var rowb = el("div", "row");
+    button(rowb, "SUSPENDRE (DÉFINITIF)", false, async function () { if (!window.confirm("Suspendre " + bp.value + " sans limite de durée ?")) return; await act(sb.rpc("staff_ban", { p_pseudo: bp.value, p_reason: "décision de l'équipe", p_days: null }), "Joueur suspendu."); });
+    button(rowb, "RÉTABLIR", true, async function () { await act(sb.rpc("staff_unban", { p_pseudo: bp.value }), "Joueur rétabli."); });
+    pb.append(rowb);
+  }
+
+  /* ---------- Account screen ---------- */
+  function renderAccount() {
+    var body = $("acc-body"), msg = $("acc-msg");
+    setMsg(msg, "");
+    if (!online) {
+      body.innerHTML = "<p style=\"margin:0\">Les comptes sont désactivés dans cet aperçu. Ils fonctionneront une fois le site relié à sa base de données.</p>";
+      return;
+    }
+    if (!session) {
+      renderAuthForm();
+    } else if (!profile) {
+      renderProfileForm();
+    } else {
+      renderMe();
+    }
+    if (accNotice) { setMsg(msg, accNotice); accNotice = ""; }
+  }
+
+  var authMode = "signup";
+
+  function authError(err, isSignup) {
+    var m = String(err && err.message || "").toLowerCase();
+    if (err && err.status === 429) return "Trop d'essais. Réessaie dans quelques minutes.";
+    if (m.indexOf("already registered") >= 0) return "Cette adresse a déjà un compte. Choisis « Se connecter ».";
+    if (m.indexOf("invalid login") >= 0) return "E-mail ou mot de passe incorrect.";
+    if (m.indexOf("not confirmed") >= 0) return "Ce compte demande encore une confirmation par e-mail. Préviens le créateur du site.";
+    if (m.indexOf("password") >= 0) return "Mot de passe refusé : choisis-en un plus long ou plus compliqué.";
+    return isSignup ? "Impossible de créer le compte. Réessaie." : "Connexion impossible. Réessaie.";
+  }
+
+  function renderAuthForm() {
+    var body = $("acc-body"), msg = $("acc-msg");
+    var isSignup = authMode === "signup";
+    body.innerHTML =
+      "<div class=\"tabs\" role=\"group\" aria-label=\"Mode\" style=\"margin-bottom:14px\">" +
+      "<button class=\"tab\" type=\"button\" id=\"m-signup\" aria-pressed=\"" + isSignup + "\">CRÉER UN COMPTE</button>" +
+      "<button class=\"tab\" type=\"button\" id=\"m-signin\" aria-pressed=\"" + !isSignup + "\">SE CONNECTER</button></div>" +
+      "<form id=\"f-auth\" novalidate>" +
+      "<label for=\"in-email\">ADRESSE E-MAIL</label>" +
+      "<input id=\"in-email\" type=\"email\" inputmode=\"email\" autocomplete=\"email\" autocapitalize=\"off\" required>" +
+      "<label for=\"in-pass\" style=\"margin-top:10px\">MOT DE PASSE</label>" +
+      "<input id=\"in-pass\" type=\"password\" autocomplete=\"" + (isSignup ? "new-password" : "current-password") + "\" minlength=\"8\" required>" +
+      (isSignup ? "<p class=\"hint\">8 caractères minimum. Note-le bien : si tu l'oublies, ton compte est perdu et personne ne peut le retrouver.</p>" : "") +
+      "<div class=\"row\" style=\"margin-top:12px\"><button class=\"btn\" type=\"submit\">" + (isSignup ? "CRÉER MON COMPTE" : "ME CONNECTER") + "</button></div>" +
+      "</form>";
+    $("m-signup").addEventListener("click", function () { authMode = "signup"; renderAccount(); });
+    $("m-signin").addEventListener("click", function () { authMode = "signin"; renderAccount(); });
+    $("f-auth").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      var email = $("in-email").value.trim();
+      var pass = $("in-pass").value;
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { setMsg(msg, "Adresse e-mail invalide.", true); return; }
+      if (pass.length < 8) { setMsg(msg, "Le mot de passe doit faire au moins 8 caractères.", true); return; }
+      setMsg(msg, isSignup ? "Création du compte…" : "Connexion…");
+      var r;
+      if (isSignup) {
+        r = await sb.auth.signUp({ email: email, password: pass });
+        if (!r.error && r.data && r.data.user && r.data.user.identities && r.data.user.identities.length === 0) {
+          setMsg(msg, "Cette adresse a déjà un compte. Choisis « Se connecter ».", true);
+          return;
+        }
+        if (!r.error && !(r.data && r.data.session)) {
+          r = await sb.auth.signInWithPassword({ email: email, password: pass });
+        }
+      } else {
+        r = await sb.auth.signInWithPassword({ email: email, password: pass });
+      }
+      if (r.error) { setMsg(msg, authError(r.error, isSignup), true); return; }
+      accNotice = isSignup ? "Compte créé." : "Connecté.";
+    });
+  }
+
+  function renderProfileForm() {
+    var body = $("acc-body"), msg = $("acc-msg");
+    body.innerHTML =
+      "<p>Dernière étape : choisis ton pseudo. Il sera visible de tous dans le classement.</p>" +
+      "<form id=\"f-profile\" novalidate>" +
+      "<label for=\"in-pseudo\">PSEUDO</label>" +
+      "<input id=\"in-pseudo\" maxlength=\"16\" autocomplete=\"off\" autocapitalize=\"off\" spellcheck=\"false\" required>" +
+      "<p class=\"hint\">3 à 16 caractères : lettres, chiffres, _ et -</p>" +
+      "<label for=\"in-country\">PAYS</label>" +
+      "<select id=\"in-country\"><option value=\"FR\">France</option><option value=\"OTHER\">Autre pays</option></select>" +
+      "<div class=\"row\" style=\"margin-top:12px\"><button class=\"btn\" type=\"submit\">CRÉER MON PROFIL</button></div>" +
+      "</form>";
+    $("f-profile").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      var pseudo = $("in-pseudo").value.trim();
+      var country = $("in-country").value;
+      if (!/^[A-Za-z0-9_-]{3,16}$/.test(pseudo)) { setMsg(msg, "Pseudo invalide : 3 à 16 lettres, chiffres, _ ou -.", true); return; }
+      setMsg(msg, "Création du profil…");
+      var r = await sb.from("profiles").insert({ id: session.user.id, pseudo: pseudo, country: country });
+      if (r.error) {
+        setMsg(msg, r.error.code === "23505" ? "Ce pseudo est déjà pris. Essaie-en un autre." : "Impossible de créer le profil. Réessaie.", true);
+        return;
+      }
+      accNotice = "Profil créé. Bienvenue !";
+      await refreshAuth(session);
+    });
+  }
+
+  function renderMe() {
+    var body = $("acc-body"), msg = $("acc-msg");
+    body.innerHTML =
+      "<p>CONNECTÉ EN TANT QUE</p>" +
+      "<p id=\"acc-pseudo\" style=\"font-size:12px\"></p>" +
+      "<p id=\"acc-mail\" style=\"word-break:break-all;font-size:8px\"></p>" +
+      "<p id=\"acc-country\" style=\"font-size:8px\"></p>" +
+      "<p id=\"acc-level\" style=\"font-size:8px\"></p>" +
+      "<div id=\"acc-badges\"></div>" +
+      "<div class=\"row\" style=\"margin-top:12px\"><button class=\"btn\" type=\"button\" id=\"b-out\">SE DÉCONNECTER</button></div>" +
+      "<hr class=\"sep\">" +
+      "<div id=\"del-ask\"><button class=\"btn alt\" type=\"button\" id=\"b-del\">SUPPRIMER MON COMPTE</button></div>" +
+      "<div id=\"del-confirm\" hidden>" +
+      "<p>Tous tes scores seront effacés pour toujours. Cette action est définitive.</p>" +
+      "<div class=\"row\"><button class=\"btn\" type=\"button\" id=\"b-del-yes\">OUI, SUPPRIMER</button>" +
+      "<button class=\"btn alt\" type=\"button\" id=\"b-del-no\">ANNULER</button></div></div>";
+    $("acc-pseudo").textContent = profile.pseudo;
+    $("acc-mail").textContent = session.user.email || "";
+    $("acc-country").textContent = profile.country === "FR" ? "PAYS : FRANCE" : "PAYS : AUTRE";
+    if (role) {
+      var al = el("p", "", "");
+      var aa = el("a", "btn", "ADMINISTRATION");
+      aa.href = "#admin";
+      al.append(aa);
+      $("acc-level").after(al);
+    }
+    if (me) {
+      $("acc-level").textContent = "NIVEAU " + me.level + " · " + me.xp + " XP · " + me.bc + " BOYCOINS";
+      loadBadgeCat().then(function () {
+        var box = $("acc-badges");
+        if (!box || !badgeCat) return;
+        box.append(el("p", "", "BADGES"));
+        var grid = el("div", "badges");
+        badgeCat.forEach(function (b) {
+          var on = me.badges.indexOf(b.code) >= 0;
+          var card = el("div", on ? "badge" : "badge off");
+          card.append(el("b", "", on ? b.name : "???"), el("span", "", b.description));
+          grid.append(card);
+        });
+        box.append(grid);
+      });
+    }
+    $("b-out").addEventListener("click", async function () {
+      await sb.auth.signOut();
+    });
+    $("b-del").addEventListener("click", function () { $("del-ask").hidden = true; $("del-confirm").hidden = false; });
+    $("b-del-no").addEventListener("click", function () { $("del-ask").hidden = false; $("del-confirm").hidden = true; });
+    $("b-del-yes").addEventListener("click", async function () {
+      setMsg(msg, "Suppression…");
+      var r = await sb.rpc("delete_my_account");
+      if (r.error) { setMsg(msg, "Impossible de supprimer le compte. Réessaie plus tard.", true); return; }
+      accNotice = "Ton compte et tes scores ont été supprimés.";
+      await sb.auth.signOut();
+    });
+  }
+
+  /* ---------- Snake ---------- */
+  var snake = (function () {
+    var W = 144, H = 208, CELL = 8, HUD = 16;
+    var COLS = W / CELL, ROWS = (H - HUD) / CELL;
+    var C0 = "#9bbc0f", C2 = "#306230", C3 = "#0f380f", SKIN = null;
+
+    var canvas = $("screen");
+    var ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+
+    var best = localBest("snake");
+    var body, dir, queue, food, score, speed, acc, last, deathAt;
+    var state = "ready", soundOn = true, audio = null, running = false;
+
+    function reset() {
+      var cx = Math.floor(COLS / 2), cy = Math.floor(ROWS / 2);
+      body = [{ x: cx, y: cy }, { x: cx - 1, y: cy }, { x: cx - 2, y: cy }];
+      dir = { x: 1, y: 0 };
+      queue = [];
+      score = 0;
+      speed = 240;
+      acc = 0;
+      spawnFood();
+      setMsg($("snake-msg"), "");
+    }
+
+    function spawnFood() {
+      var free = [];
+      for (var y = 0; y < ROWS; y++) {
+        for (var x = 0; x < COLS; x++) {
+          var taken = false;
+          for (var i = 0; i < body.length; i++) {
+            if (body[i].x === x && body[i].y === y) { taken = true; break; }
+          }
+          if (!taken) free.push({ x: x, y: y });
+        }
+      }
+      food = free.length ? free[Math.floor(Math.random() * free.length)] : null;
+    }
+
+    function beep(freq, ms, delay) {
+      if (!soundOn) return;
+      try {
+        if (!audio) {
+          var AC = window.AudioContext || window.webkitAudioContext;
+          if (!AC) return;
+          audio = new AC();
+        }
+        if (audio.state === "suspended") audio.resume();
+        var t = audio.currentTime + (delay || 0);
+        var osc = audio.createOscillator();
+        var gain = audio.createGain();
+        osc.type = "square";
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.05, t);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + ms / 1000);
+        osc.connect(gain);
+        gain.connect(audio.destination);
+        osc.start(t);
+        osc.stop(t + ms / 1000 + 0.02);
+      } catch (e) { /* sound is optional */ }
+    }
+
+    function step() {
+      if (queue.length) dir = queue.shift();
+      var head = { x: body[0].x + dir.x, y: body[0].y + dir.y };
+      if (head.x < 0 || head.y < 0 || head.x >= COLS || head.y >= ROWS) return die();
+      var eating = food && head.x === food.x && head.y === food.y;
+      var limit = eating ? body.length : body.length - 1;
+      for (var i = 0; i < limit; i++) {
+        if (body[i].x === head.x && body[i].y === head.y) return die();
+      }
+      body.unshift(head);
+      if (eating) {
+        score++;
+        speed = Math.max(130, 240 - score * 4);
+        beep(880, 70);
+        spawnFood();
+        if (!food) win();
+      } else {
+        body.pop();
+      }
+    }
+
+    function die() {
+      state = "dying";
+      deathAt = performance.now();
+      beep(220, 140);
+      beep(165, 140, 0.15);
+      beep(110, 260, 0.3);
+    }
+
+    function win() {
+      beep(660, 100);
+      beep(880, 100, 0.12);
+      beep(1320, 200, 0.24);
+      finish();
+    }
+
+    function finish() {
+      state = "over";
+      if (score > best) { best = score; saveLocalBest("snake", best); }
+      if (score > 0) submit(score);
+    }
+
+    async function submit(value) {
+      var m = $("snake-msg");
+      if (!online) { setMsg(m, "Score gardé sur cet appareil."); return; }
+      if (!session || !profile) {
+        m.textContent = "";
+        m.append("Score non enregistré en ligne. ");
+        var a = document.createElement("a");
+        a.href = "#compte";
+        a.textContent = "Crée un compte";
+        m.append(a, " pour le garder.");
+        return;
+      }
+      setMsg(m, "Envoi du score…");
+      var r = await sb.rpc("submit_score", { p_game: "snake", p_score: value });
+      if (r.error) {
+        var em = String(r.error.message || "");
+        if (em.indexOf("maintenance") >= 0) setMsg(m, "Maintenance en cours : score non enregistré.", true);
+        else if (em.indexOf("beta") >= 0) setMsg(m, "Bêta privée : ton compte n'est pas encore ajouté, score non enregistré.", true);
+        else if (em.indexOf("banned") >= 0) setMsg(m, "Ton compte est suspendu : score non enregistré.", true);
+        else setMsg(m, "Score non envoyé. Joue une autre partie pour réessayer.", true);
+        return;
+      }
+      if (value > onlineBest) onlineBest = value;
+      var d = r.data;
+      if (d && typeof d === "object" && d.xp !== undefined) {
+        await loadBadgeCat();
+        var txt = "Score enregistré. +" + d.xp + " XP, +" + d.bc + " BOYCOINS.";
+        if (d.level_up) txt += " NIVEAU " + d.level + " !";
+        if (d.new_badges && d.new_badges.length) txt += " Badge : " + d.new_badges.map(badgeName).join(", ") + ".";
+        setMsg(m, txt);
+        loadMe();
+      } else {
+        setMsg(m, "Score enregistré sur ton compte.");
+      }
+    }
+
+    function action() {
+      if (state === "ready") { state = "playing"; beep(660, 60); }
+      else if (state === "playing") { state = "paused"; }
+      else if (state === "paused") { state = "playing"; beep(660, 60); }
+      else if (state === "over") { reset(); state = "playing"; beep(660, 60); }
+    }
+
+    function togglePause() {
+      if (state === "playing") state = "paused";
+      else if (state === "paused") { state = "playing"; beep(660, 60); }
+    }
+
+    function restart() {
+      reset();
+      state = "playing";
+      beep(660, 60);
+    }
+
+    function turn(dx, dy) {
+      if (state === "dying" || state === "over" || state === "paused") return;
+      if (state === "ready") {
+        if (dx === -dir.x && dy === -dir.y) body.reverse();
+        dir = { x: dx, y: dy };
+        state = "playing";
+        beep(660, 60);
+        return;
+      }
+      var ref = queue.length ? queue[queue.length - 1] : dir;
+      if (dx === ref.x && dy === ref.y) return;
+      if (dx === -ref.x && dy === -ref.y) return;
+      if (queue.length < 3) queue.push({ x: dx, y: dy });
+    }
+
+    function text(str, x, y, color) { ctx.fillStyle = color; ctx.fillText(str, x, y); }
+    function pad(n, len) { var s = String(n); while (s.length < len) s = "0" + s; return s; }
+    function centered(str, y, color) { text(str, Math.round((W - str.length * 8) / 2), y, color); }
+
+    function panel(lines) {
+      var maxLen = 0;
+      for (var i = 0; i < lines.length; i++) maxLen = Math.max(maxLen, lines[i].length);
+      var w = maxLen * 8 + 16;
+      var h = lines.length * 12 + 12;
+      var x = Math.round((W - w) / 2);
+      var y = Math.round(HUD + (H - HUD - h) / 2);
+      ctx.fillStyle = C3;
+      ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
+      ctx.fillStyle = C0;
+      ctx.fillRect(x, y, w, h);
+      for (var j = 0; j < lines.length; j++) centered(lines[j], y + 14 + j * 12, C3);
+    }
+
+    function draw(now) {
+      ctx.fillStyle = C0;
+      ctx.fillRect(0, 0, W, H);
+      ctx.font = "8px 'Press Start 2P', monospace";
+      ctx.textBaseline = "alphabetic";
+
+      text("SCORE " + pad(score, 3), 4, 11, C3);
+      var hi = "REC " + pad(Math.max(best, onlineBest, score), 3);
+      text(hi, W - 4 - hi.length * 8, 11, C3);
+      ctx.fillStyle = C3;
+      ctx.fillRect(0, HUD - 1, W, 1);
+
+      if (food) {
+        var fx = food.x * CELL, fy = HUD + food.y * CELL;
+        ctx.fillStyle = C3;
+        ctx.fillRect(fx + 3, fy + 1, 2, 6);
+        ctx.fillRect(fx + 1, fy + 3, 6, 2);
+      }
+
+      var hidden = state === "dying" && Math.floor((now - deathAt) / 110) % 2 === 1;
+      if (!hidden) {
+        for (var i = body.length - 1; i >= 0; i--) {
+          var s = body[i];
+          var px = s.x * CELL, py = HUD + s.y * CELL;
+          if (i === 0) {
+            ctx.fillStyle = SKIN || C3;
+            ctx.fillRect(px, py, CELL, CELL);
+            ctx.fillStyle = C0;
+            var ex = dir.x === 1 ? 5 : dir.x === -1 ? 1 : 2;
+            var ey = dir.y === 1 ? 5 : dir.y === -1 ? 1 : 2;
+            ctx.fillRect(px + ex, py + ey, 2, 2);
+            if (dir.x !== 0) ctx.fillRect(px + ex, py + 5 - (ey - 2), 2, 2);
+            else ctx.fillRect(px + 5 - (ex - 2), py + ey, 2, 2);
+          } else {
+            ctx.fillStyle = C2;
+            ctx.fillRect(px + 1, py + 1, CELL - 2, CELL - 2);
+            ctx.fillStyle = SKIN || C3;
+            ctx.fillRect(px + 2, py + 2, CELL - 4, CELL - 4);
+          }
+        }
+      }
+
+      if (state === "ready") {
+        panel(["SNAKE", "", "GLISSE POUR", "COMMENCER"]);
+      } else if (state === "paused") {
+        panel(["PAUSE", "", "TOUCHE POUR", "REPRENDRE"]);
+      } else if (state === "over") {
+        var newBest = score > 0 && score >= Math.max(best, onlineBest);
+        var lines = [body.length >= COLS * ROWS ? "BRAVO !" : "PERDU", "SCORE " + score];
+        if (newBest) lines.push("NOUVEAU REC !");
+        lines.push("", "TOUCHE POUR", "REJOUER");
+        panel(lines);
+      }
+    }
+
+    function frame(now) {
+      if (current !== "snake") { running = false; return; }
+      if (last == null) last = now;
+      var dt = Math.min(now - last, 250);
+      last = now;
+      if (state === "playing") {
+        acc += dt;
+        while (acc >= speed && state === "playing") { acc -= speed; step(); }
+      } else if (state === "dying") {
+        if (now - deathAt > 800) finish();
+      }
+      draw(now);
+      requestAnimationFrame(frame);
+    }
+
+    function enter() {
+      last = null;
+      if (!running) { running = true; requestAnimationFrame(frame); }
+    }
+
+    function leave() {
+      if (state === "playing") state = "paused";
+    }
+
+    /* Keyboard (only while Snake is on screen) */
+    window.addEventListener("keydown", function (e) {
+      if (current !== "snake") return;
+      var k = e.key, handled = true;
+      if (k === "ArrowUp" || k === "w" || k === "W" || k === "z" || k === "Z") turn(0, -1);
+      else if (k === "ArrowDown" || k === "s" || k === "S") turn(0, 1);
+      else if (k === "ArrowLeft" || k === "a" || k === "A" || k === "q" || k === "Q") turn(-1, 0);
+      else if (k === "ArrowRight" || k === "d" || k === "D") turn(1, 0);
+      else if (k === " " || k === "Enter" || k === "p" || k === "P") action();
+      else handled = false;
+      if (handled) e.preventDefault();
+    });
+
+    $("b-pause").addEventListener("click", togglePause);
+    $("b-restart").addEventListener("click", restart);
+    var soundBtn = $("b-sound");
+    soundBtn.addEventListener("click", function () {
+      soundOn = !soundOn;
+      soundBtn.setAttribute("aria-pressed", String(soundOn));
+      soundBtn.textContent = soundOn ? "SON" : "MUET";
+      if (soundOn) beep(660, 60);
+    });
+
+    /* Swipe anywhere on the Snake screen; tap to resume or replay */
+    var area = $("view-snake");
+    var sx = 0, sy = 0, moved = false, tracking = false;
+    area.addEventListener("pointerdown", function (e) {
+      if (e.target.closest && e.target.closest("button, a")) return;
+      tracking = true; moved = false; sx = e.clientX; sy = e.clientY;
+    });
+    area.addEventListener("pointermove", function (e) {
+      if (!tracking) return;
+      var dx = e.clientX - sx, dy = e.clientY - sy;
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      moved = true;
+      if (Math.abs(dx) > Math.abs(dy)) turn(dx > 0 ? 1 : -1, 0);
+      else turn(0, dy > 0 ? 1 : -1);
+      sx = e.clientX; sy = e.clientY;
+    });
+    area.addEventListener("pointerup", function () {
+      if (tracking && !moved && state !== "ready" && state !== "playing" && state !== "dying") action();
+      tracking = false;
+    });
+    area.addEventListener("pointercancel", function () { tracking = false; });
+
+    document.addEventListener("visibilitychange", function () {
+      if (document.hidden && state === "playing") state = "paused";
+    });
+
+    reset();
+    if (document.fonts && document.fonts.load) {
+      document.fonts.load("8px 'Press Start 2P'").catch(function () { /* fallback font is fine */ });
+    }
+
+    function setLook(c0, c2, c3, skin) { C0 = c0; C2 = c2; C3 = c3; SKIN = skin || null; }
+
+    return { enter: enter, leave: leave, setLook: setLook };
+  })();
+
+  /* ---------- Block Puzzle ---------- */
+  /*BLOCKS-LOGIC-START*/
+  var BL = (function () {
+    var COLS = 10, ROWS = 18;
+    var PIECES = [
+      [[1, 1, 1, 1]],
+      [[1, 1], [1, 1]],
+      [[0, 1, 0], [1, 1, 1]],
+      [[0, 1, 1], [1, 1, 0]],
+      [[1, 1, 0], [0, 1, 1]],
+      [[1, 0, 0], [1, 1, 1]],
+      [[0, 0, 1], [1, 1, 1]]
+    ];
+    function rotate(m) {
+      var h = m.length, w = m[0].length, r = [];
+      for (var x = 0; x < w; x++) { r[x] = []; for (var y = h - 1; y >= 0; y--) r[x].push(m[y][x]); }
+      return r;
+    }
+    function newGrid() {
+      var g = [];
+      for (var y = 0; y < ROWS; y++) { g[y] = []; for (var x = 0; x < COLS; x++) g[y][x] = 0; }
+      return g;
+    }
+    function fits(grid, m, px, py) {
+      for (var y = 0; y < m.length; y++) {
+        for (var x = 0; x < m[y].length; x++) {
+          if (!m[y][x]) continue;
+          var gx = px + x, gy = py + y;
+          if (gx < 0 || gx >= COLS || gy >= ROWS) return false;
+          if (gy >= 0 && grid[gy][gx]) return false;
+        }
+      }
+      return true;
+    }
+    function lock(grid, m, px, py) {
+      for (var y = 0; y < m.length; y++) {
+        for (var x = 0; x < m[y].length; x++) {
+          if (m[y][x] && py + y >= 0) grid[py + y][px + x] = 1;
+        }
+      }
+    }
+    function clearLines(grid) {
+      var n = 0;
+      for (var y = ROWS - 1; y >= 0; y--) {
+        var full = true;
+        for (var x = 0; x < COLS; x++) if (!grid[y][x]) { full = false; break; }
+        if (full) {
+          grid.splice(y, 1);
+          var row = [];
+          for (var i = 0; i < COLS; i++) row.push(0);
+          grid.unshift(row);
+          n++;
+          y++;
+        }
+      }
+      return n;
+    }
+    function lineScore(n, level) { return [0, 100, 300, 500, 800][n] * level; }
+    function levelFor(lines) { return 1 + Math.floor(lines / 10); }
+    function gravityMs(level) { return Math.max(90, 700 - (level - 1) * 60); }
+    function makeBag(rand) {
+      var a = [0, 1, 2, 3, 4, 5, 6];
+      for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(rand() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; }
+      return a;
+    }
+    return { COLS: COLS, ROWS: ROWS, PIECES: PIECES, rotate: rotate, newGrid: newGrid, fits: fits, lock: lock,
+             clearLines: clearLines, lineScore: lineScore, levelFor: levelFor, gravityMs: gravityMs, makeBag: makeBag };
+  })();
+  /*BLOCKS-LOGIC-END*/
+
+  var blocks = (function () {
+    var CELL = 12, FX = 12, FY = 16, W = 144, H = 232;
+    var canvas = $("bl-screen"), ctx = canvas.getContext("2d");
+    var grid, cur, curX, curY, next, bag = [], score, lines, level, state = "ready", acc = 0, last = 0, running = false;
+    var best = localBest("blocks");
+
+    function rand() { return Math.random(); }
+    function take() {
+      if (!bag.length) bag = BL.makeBag(rand);
+      return BL.PIECES[bag.pop()];
+    }
+    function spawn() {
+      cur = next || take();
+      next = take();
+      curX = Math.floor((BL.COLS - cur[0].length) / 2);
+      curY = 0;
+      if (!BL.fits(grid, cur, curX, curY)) finish();
+    }
+    function reset() {
+      grid = BL.newGrid(); bag = []; next = null; score = 0; lines = 0; level = 1; acc = 0;
+      state = "ready";
+      setMsg($("bl-msg"), "");
+      spawn();
+    }
+    function move(dx) { if (state === "playing" && BL.fits(grid, cur, curX + dx, curY)) curX += dx; }
+    function rot() {
+      if (state !== "playing") return;
+      var r = BL.rotate(cur), kicks = [0, -1, 1, -2, 2];
+      for (var i = 0; i < kicks.length; i++) {
+        if (BL.fits(grid, r, curX + kicks[i], curY)) { cur = r; curX += kicks[i]; return; }
+      }
+    }
+    function drop() {
+      if (BL.fits(grid, cur, curX, curY + 1)) { curY++; return true; }
+      BL.lock(grid, cur, curX, curY);
+      var n = BL.clearLines(grid);
+      if (n) { lines += n; score += BL.lineScore(n, level); level = BL.levelFor(lines); }
+      spawn();
+      return false;
+    }
+    function soft() { if (state === "playing" && drop()) score += 1; acc = 0; }
+    function hard() {
+      if (state !== "playing") return;
+      var c = 0;
+      while (BL.fits(grid, cur, curX, curY + 1)) { curY++; c++; }
+      score += c * 2;
+      drop();
+      acc = 0;
+    }
+    function finish() {
+      state = "over";
+      if (score > best) { best = score; saveLocalBest("blocks", best); }
+      if (score > 0) submit(score);
+    }
+    async function submit(value) {
+      var m = $("bl-msg");
+      if (!online) { setMsg(m, "Score gardé sur cet appareil."); return; }
+      if (!session || !profile) {
+        m.textContent = "";
+        m.append("Score non enregistré en ligne. ");
+        var a = document.createElement("a");
+        a.href = "#compte";
+        a.textContent = "Crée un compte";
+        m.append(a, " pour le garder.");
+        return;
+      }
+      setMsg(m, "Envoi du score…");
+      var r = await sb.rpc("submit_score", { p_game: "blocks", p_score: value });
+      if (r.error) {
+        var em = String(r.error.message || "");
+        if (em.indexOf("maintenance") >= 0) setMsg(m, "Maintenance en cours : score non enregistré.", true);
+        else if (em.indexOf("beta") >= 0) setMsg(m, "Bêta privée : ton compte n'est pas encore ajouté, score non enregistré.", true);
+        else if (em.indexOf("banned") >= 0) setMsg(m, "Ton compte est suspendu : score non enregistré.", true);
+        else if (em.indexOf("unknown game") >= 0) setMsg(m, "Ce jeu n'est pas encore ouvert au classement.", true);
+        else setMsg(m, "Score non envoyé. Joue une autre partie pour réessayer.", true);
+        return;
+      }
+      var d = r.data;
+      if (d && typeof d === "object" && d.xp !== undefined) {
+        var txt = "Score enregistré. +" + d.xp + " XP, +" + d.bc + " BOYCOINS.";
+        if (d.level_up) txt += " NIVEAU " + d.level + " !";
+        setMsg(m, txt);
+        loadMe();
+      } else {
+        setMsg(m, "Score enregistré sur ton compte.");
+      }
+    }
+
+    function action() {
+      if (state === "ready") state = "playing";
+      else if (state === "paused") state = "playing";
+      else if (state === "over") { reset(); state = "playing"; }
+    }
+    function togglePause() {
+      if (state === "playing") state = "paused";
+      else if (state === "paused") state = "playing";
+    }
+
+    function css(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+    function block(x, y, lcd, ink) {
+      ctx.fillStyle = ink; ctx.fillRect(x, y, CELL, CELL);
+      ctx.fillStyle = lcd; ctx.fillRect(x + 2, y + 2, CELL - 4, CELL - 4);
+      ctx.fillStyle = ink; ctx.fillRect(x + 4, y + 4, CELL - 8, CELL - 8);
+    }
+    function draw() {
+      var lcd = css("--lcd") || "#9bbc0f", ink = css("--ink") || "#0f380f";
+      ctx.fillStyle = lcd; ctx.fillRect(0, 0, W, H);
+      ctx.font = "8px 'Press Start 2P', monospace";
+      ctx.fillStyle = ink;
+      ctx.fillText(String(score), 4, 11);
+      ctx.fillText("N" + level, 40, 11);
+      ctx.fillRect(0, FY - 1, W, 1);
+      ctx.strokeStyle = ink; ctx.lineWidth = 2;
+      ctx.strokeRect(FX - 1, FY, BL.COLS * CELL + 2, BL.ROWS * CELL + 1);
+      for (var y = 0; y < BL.ROWS; y++) for (var x = 0; x < BL.COLS; x++) if (grid[y][x]) block(FX + x * CELL, FY + 1 + y * CELL, lcd, ink);
+      if (cur && state !== "over") {
+        for (var cy = 0; cy < cur.length; cy++) for (var cx = 0; cx < cur[cy].length; cx++) {
+          if (cur[cy][cx]) block(FX + (curX + cx) * CELL, FY + 1 + (curY + cy) * CELL, lcd, ink);
+        }
+      }
+      if (next) {
+        ctx.fillStyle = ink;
+        ctx.fillText("SUIV", 64, 11);
+        for (var ny = 0; ny < next.length; ny++) for (var nx = 0; nx < next[ny].length; nx++) {
+          if (next[ny][nx]) ctx.fillRect(W - 6 - 16 + nx * 4, 3 + ny * 4, 3, 3);
+        }
+      }
+      if (state === "ready") panel(["BLOCK PUZZLE", "", "TOUCHE POUR", "COMMENCER"]);
+      else if (state === "paused") panel(["PAUSE", "", "TOUCHE POUR", "REPRENDRE"]);
+      else if (state === "over") panel(["PERDU", "SCORE " + score, "REC " + Math.max(best, score), "LIGNES " + lines, "", "TOUCHE POUR", "REJOUER"]);
+    }
+    function panel(linesArr) {
+      var lcd = css("--lcd") || "#9bbc0f", ink = css("--ink") || "#0f380f";
+      var maxLen = 0;
+      linesArr.forEach(function (l) { maxLen = Math.max(maxLen, l.length); });
+      var w = maxLen * 8 + 16, h = linesArr.length * 12 + 12;
+      var x = Math.round((W - w) / 2), y = Math.round((H - h) / 2);
+      ctx.fillStyle = ink; ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
+      ctx.fillStyle = lcd; ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = ink;
+      linesArr.forEach(function (l, i) { ctx.fillText(l, Math.round((W - l.length * 8) / 2), y + 14 + i * 12); });
+    }
+
+    function frame(now) {
+      if (current !== "blocks") { running = false; return; }
+      var dt = Math.min(100, now - last);
+      last = now;
+      if (state === "playing") {
+        acc += dt;
+        var g = BL.gravityMs(level);
+        while (acc >= g && state === "playing") { acc -= g; drop(); }
+      }
+      draw();
+      requestAnimationFrame(frame);
+    }
+
+    function enter() {
+      reset();
+      if (!running) { running = true; last = performance.now(); requestAnimationFrame(frame); }
+    }
+    function leave() { if (state === "playing") state = "paused"; }
+
+    window.addEventListener("keydown", function (e) {
+      if (current !== "blocks") return;
+      var k = e.key, used = true;
+      if (k === "ArrowLeft") move(-1);
+      else if (k === "ArrowRight") move(1);
+      else if (k === "ArrowUp") { if (state === "playing") rot(); else action(); }
+      else if (k === "ArrowDown") soft();
+      else if (k === " ") { if (state === "playing") hard(); else action(); }
+      else if (k === "p" || k === "P") togglePause();
+      else used = false;
+      if (used) e.preventDefault();
+    });
+
+    var view = $("view-blocks"), t0 = null, moved = false;
+    view.addEventListener("touchstart", function (e) {
+      if (e.target.closest && e.target.closest("button,a")) return;
+      var t = e.changedTouches[0];
+      t0 = { x: t.clientX, y: t.clientY, ox: t.clientX, oy: t.clientY, at: Date.now() };
+      moved = false;
+    }, { passive: true });
+    view.addEventListener("touchmove", function (e) {
+      if (!t0) return;
+      var t = e.changedTouches[0], dx = t.clientX - t0.x, dy = t.clientY - t0.y;
+      if (Math.abs(dx) >= 22) {
+        move(dx > 0 ? 1 : -1); t0.x = t.clientX; moved = true;
+      } else if (dy >= 26) {
+        soft(); t0.y = t.clientY; moved = true;
+      }
+    }, { passive: true });
+    view.addEventListener("touchend", function (e) {
+      if (!t0) return;
+      var t = e.changedTouches[0], dt = Date.now() - t0.at;
+      var totalDy = t.clientY - t0.oy, totalDx = t.clientX - t0.ox;
+      if (!moved && Math.abs(totalDx) < 12 && Math.abs(totalDy) < 12 && dt < 300) {
+        if (state === "playing") rot(); else action();
+      } else if (totalDy > 70 && dt < 220 && Math.abs(totalDx) < 40) {
+        hard();
+      }
+      t0 = null;
+    }, { passive: true });
+    $("bl-pause").addEventListener("click", togglePause);
+    $("bl-restart").addEventListener("click", function () { reset(); state = "playing"; });
+
+    return { enter: enter, leave: leave };
+  })();
+
+  /* ---------- Space Attack ---------- */
+  /*SPACE-LOGIC-START*/
+  var SP = (function () {
+    var W = 144, H = 208, HUD = 16, SHIP_W = 12, SHIP_H = 8, SHIP_Y = H - 16;
+    var EW = 10, EH = 8, COLS = 6;
+    function wave(n) {
+      var rows = Math.min(2 + Math.floor((n - 1) / 2), 5), list = [];
+      for (var r = 0; r < rows; r++) for (var c = 0; c < COLS; c++) list.push({ x: 10 + c * 16, y: HUD + 10 + r * 14, row: r });
+      return list;
+    }
+    function create() {
+      return { ship: { x: W / 2 - SHIP_W / 2 }, bullets: [], shots: [], enemies: wave(1), dir: 1, wave: 1, score: 0, lives: 3,
+               t: 0, fireAt: 0, enemyFireAt: 1500, invuln: 0, over: false, flash: 0 };
+    }
+    function hit(a, b) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
+    // dt en secondes ; input.targetX = position voulue du centre du vaisseau (ou null)
+    function step(g, dt, input, rand) {
+      if (g.over) return g;
+      dt = Math.min(dt, 0.05);
+      g.t += dt * 1000;
+      if (g.invuln > 0) g.invuln = Math.max(0, g.invuln - dt * 1000);
+
+      // vaisseau
+      if (input && input.targetX !== null && input.targetX !== undefined) {
+        var want = Math.max(0, Math.min(W - SHIP_W, input.targetX - SHIP_W / 2));
+        var maxMove = 150 * dt, d = want - g.ship.x;
+        g.ship.x += Math.abs(d) <= maxMove ? d : (d > 0 ? maxMove : -maxMove);
+      }
+      // tir automatique
+      if (g.t >= g.fireAt) { g.bullets.push({ x: g.ship.x + SHIP_W / 2 - 1, y: SHIP_Y - 4 }); g.fireAt = g.t + 320; }
+      g.bullets.forEach(function (b) { b.y -= 190 * dt; });
+      g.bullets = g.bullets.filter(function (b) { return b.y > HUD - 4; });
+
+      // formation d'ennemis
+      var speed = 14 + g.wave * 5 + (COLS * 5 - g.enemies.length) * 0.4;
+      var edge = false;
+      g.enemies.forEach(function (e) { e.x += g.dir * speed * dt; if (e.x < 2 || e.x + EW > W - 2) edge = true; });
+      if (edge) { g.dir = -g.dir; g.enemies.forEach(function (e) { e.x += g.dir * 2; e.y += 6; }); }
+
+      // tirs ennemis
+      if (g.enemies.length && g.t >= g.enemyFireAt) {
+        var shooter = g.enemies[Math.floor(rand() * g.enemies.length)];
+        g.shots.push({ x: shooter.x + EW / 2 - 1, y: shooter.y + EH });
+        g.enemyFireAt = g.t + Math.max(450, 1300 - g.wave * 80);
+      }
+      g.shots.forEach(function (s) { s.y += (70 + g.wave * 6) * dt; });
+      g.shots = g.shots.filter(function (s) { return s.y < H; });
+
+      // balles du joueur contre ennemis
+      g.bullets = g.bullets.filter(function (b) {
+        var bb = { x: b.x, y: b.y, w: 2, h: 5 };
+        for (var i = 0; i < g.enemies.length; i++) {
+          var e = g.enemies[i];
+          if (hit(bb, { x: e.x, y: e.y, w: EW, h: EH })) { g.enemies.splice(i, 1); g.score += 10 + (4 - Math.min(e.row, 4)) * 2; return false; }
+        }
+        return true;
+      });
+
+      // tirs ennemis contre le vaisseau
+      var ship = { x: g.ship.x, y: SHIP_Y, w: SHIP_W, h: SHIP_H };
+      if (g.invuln <= 0) {
+        for (var k = 0; k < g.shots.length; k++) {
+          if (hit({ x: g.shots[k].x, y: g.shots[k].y, w: 2, h: 5 }, ship)) {
+            g.shots.splice(k, 1); g.lives--; g.invuln = 1500; g.flash = 1500;
+            if (g.lives <= 0) { g.over = true; return g; }
+            break;
+          }
+        }
+      }
+      // ennemis qui atteignent le bas
+      for (var j = 0; j < g.enemies.length; j++) if (g.enemies[j].y + EH >= SHIP_Y) { g.over = true; return g; }
+
+      // vague terminée
+      if (!g.enemies.length) { g.score += 100 * g.wave; g.wave++; g.enemies = wave(g.wave); g.shots = []; g.dir = 1; g.enemyFireAt = g.t + 1500; }
+      return g;
+    }
+    return { W: W, H: H, HUD: HUD, SHIP_W: SHIP_W, SHIP_H: SHIP_H, SHIP_Y: SHIP_Y, EW: EW, EH: EH, create: create, step: step, wave: wave };
+  })();
+  /*SPACE-LOGIC-END*/
+
+  var space = (function () {
+    var canvas = $("sp-screen"), ctx = canvas.getContext("2d");
+    var g, state = "ready", last = 0, running = false, targetX = null, keys = { l: false, r: false };
+    var best = localBest("space");
+
+    function reset() { g = SP.create(); state = "ready"; targetX = null; setMsg($("sp-msg"), ""); }
+    function finish() {
+      state = "over";
+      if (g.score > best) { best = g.score; saveLocalBest("space", best); }
+      if (g.score > 0) submit(g.score);
+    }
+    async function submit(value) {
+      var m = $("sp-msg");
+      if (!online) { setMsg(m, "Score gardé sur cet appareil."); return; }
+      if (!session || !profile) {
+        m.textContent = "";
+        m.append("Score non enregistré en ligne. ");
+        var a = document.createElement("a");
+        a.href = "#compte";
+        a.textContent = "Crée un compte";
+        m.append(a, " pour le garder.");
+        return;
+      }
+      setMsg(m, "Envoi du score…");
+      var r = await sb.rpc("submit_score", { p_game: "space", p_score: Math.min(value, 20000) });
+      if (r.error) {
+        var em = String(r.error.message || "");
+        if (em.indexOf("maintenance") >= 0) setMsg(m, "Maintenance en cours : score non enregistré.", true);
+        else if (em.indexOf("beta") >= 0) setMsg(m, "Bêta privée : ton compte n'est pas encore ajouté, score non enregistré.", true);
+        else if (em.indexOf("banned") >= 0) setMsg(m, "Ton compte est suspendu : score non enregistré.", true);
+        else if (em.indexOf("unknown game") >= 0) setMsg(m, "Ce jeu n'est pas encore ouvert au classement.", true);
+        else setMsg(m, "Score non envoyé. Joue une autre partie pour réessayer.", true);
+        return;
+      }
+      var d = r.data;
+      if (d && typeof d === "object" && d.xp !== undefined) {
+        var txt = "Score enregistré. +" + d.xp + " XP, +" + d.bc + " BOYCOINS.";
+        if (d.level_up) txt += " NIVEAU " + d.level + " !";
+        setMsg(m, txt);
+        loadMe();
+      } else {
+        setMsg(m, "Score enregistré sur ton compte.");
+      }
+    }
+    function action() {
+      if (state === "ready" || state === "paused") state = "playing";
+      else if (state === "over") { reset(); state = "playing"; }
+    }
+    function togglePause() { if (state === "playing") state = "paused"; else if (state === "paused") state = "playing"; }
+
+    function css(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+    function draw() {
+      var lcd = css("--lcd") || "#9bbc0f", ink = css("--ink") || "#0f380f", mid = css("--mid") || "#306230";
+      ctx.fillStyle = lcd; ctx.fillRect(0, 0, SP.W, SP.H);
+      ctx.font = "8px 'Press Start 2P', monospace";
+      ctx.fillStyle = ink;
+      ctx.fillText("SC " + g.score, 4, 11);
+      var lv = "V" + g.wave + " ";
+      for (var i = 0; i < g.lives; i++) lv += "\u2665";
+      ctx.fillText(lv, SP.W - 4 - lv.length * 8, 11);
+      ctx.fillRect(0, SP.HUD - 1, SP.W, 1);
+      g.enemies.forEach(function (e) {
+        var x = Math.round(e.x), y = Math.round(e.y);
+        ctx.fillStyle = ink;
+        ctx.fillRect(x + 1, y, 8, 2); ctx.fillRect(x, y + 2, 10, 3); ctx.fillRect(x + 1, y + 5, 2, 3); ctx.fillRect(x + 7, y + 5, 2, 3);
+        ctx.fillStyle = lcd; ctx.fillRect(x + 2, y + 2, 2, 2); ctx.fillRect(x + 6, y + 2, 2, 2);
+      });
+      ctx.fillStyle = ink;
+      g.bullets.forEach(function (b) { ctx.fillRect(Math.round(b.x), Math.round(b.y), 2, 5); });
+      ctx.fillStyle = mid;
+      g.shots.forEach(function (s) { ctx.fillRect(Math.round(s.x), Math.round(s.y), 2, 5); });
+      var blink = g.invuln > 0 && Math.floor(g.invuln / 100) % 2 === 0;
+      if (!blink) {
+        ctx.fillStyle = ink;
+        var sx = Math.round(g.ship.x), sy = SP.SHIP_Y;
+        ctx.fillRect(sx + 5, sy, 2, 3); ctx.fillRect(sx + 3, sy + 3, 6, 2); ctx.fillRect(sx, sy + 5, 12, 3);
+      }
+      if (state === "ready") panel(["SPACE ATTACK", "", "GLISSE POUR", "BOUGER", "TOUCHE POUR", "COMMENCER"]);
+      else if (state === "paused") panel(["PAUSE", "", "TOUCHE POUR", "REPRENDRE"]);
+      else if (state === "over") panel(["PERDU", "SCORE " + g.score, "REC " + Math.max(best, g.score), "VAGUE " + g.wave, "", "TOUCHE POUR", "REJOUER"]);
+    }
+    function panel(lines) {
+      var lcd = css("--lcd") || "#9bbc0f", ink = css("--ink") || "#0f380f";
+      var maxLen = 0; lines.forEach(function (l) { maxLen = Math.max(maxLen, l.length); });
+      var w = maxLen * 8 + 16, h = lines.length * 12 + 12, x = Math.round((SP.W - w) / 2), y = Math.round((SP.H - h) / 2);
+      ctx.fillStyle = ink; ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
+      ctx.fillStyle = lcd; ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = ink;
+      lines.forEach(function (l, i) { ctx.fillText(l, Math.round((SP.W - l.length * 8) / 2), y + 14 + i * 12); });
+    }
+
+    function frame(now) {
+      if (current !== "space") { running = false; return; }
+      var dt = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      if (state === "playing") {
+        var tx = targetX;
+        if (keys.l || keys.r) tx = g.ship.x + SP.SHIP_W / 2 + (keys.r ? 1 : 0) * 40 - (keys.l ? 1 : 0) * 40;
+        SP.step(g, dt, { targetX: tx }, Math.random);
+        if (g.over) finish();
+      }
+      draw();
+      requestAnimationFrame(frame);
+    }
+    function enter() {
+      reset();
+      if (!running) { running = true; last = performance.now(); requestAnimationFrame(frame); }
+    }
+    function leave() { if (state === "playing") state = "paused"; keys.l = keys.r = false; }
+
+    window.addEventListener("keydown", function (e) {
+      if (current !== "space") return;
+      if (e.key === "ArrowLeft") { keys.l = true; if (state !== "playing") action(); e.preventDefault(); }
+      else if (e.key === "ArrowRight") { keys.r = true; if (state !== "playing") action(); e.preventDefault(); }
+      else if (e.key === " " || e.key === "ArrowUp") { action(); e.preventDefault(); }
+      else if (e.key === "p" || e.key === "P") togglePause();
+    });
+    window.addEventListener("keyup", function (e) {
+      if (e.key === "ArrowLeft") keys.l = false;
+      if (e.key === "ArrowRight") keys.r = false;
+    });
+    var view = $("view-space"), tStart = null, tMoved = false;
+    function toGame(clientX) { var r = canvas.getBoundingClientRect(); return (clientX - r.left) * (SP.W / r.width); }
+    view.addEventListener("touchstart", function (e) {
+      if (e.target.closest && e.target.closest("button,a")) return;
+      var t = e.changedTouches[0]; tStart = { x: t.clientX, y: t.clientY, at: Date.now() }; tMoved = false;
+      if (state === "playing") targetX = toGame(t.clientX);
+    }, { passive: true });
+    view.addEventListener("touchmove", function (e) {
+      if (!tStart) return;
+      var t = e.changedTouches[0];
+      if (Math.abs(t.clientX - tStart.x) > 8) tMoved = true;
+      targetX = toGame(t.clientX);
+    }, { passive: true });
+    view.addEventListener("touchend", function () {
+      if (tStart && !tMoved && Date.now() - tStart.at < 300 && state !== "playing") action();
+      tStart = null;
+    }, { passive: true });
+    canvas.addEventListener("mousedown", function (e) { if (state !== "playing") action(); else targetX = toGame(e.clientX); });
+    canvas.addEventListener("mousemove", function (e) { if (e.buttons && state === "playing") targetX = toGame(e.clientX); });
+    $("sp-pause").addEventListener("click", togglePause);
+    $("sp-restart").addEventListener("click", function () { reset(); state = "playing"; });
+
+    return { enter: enter, leave: leave };
+  })();
+
+  /* ---------- Jeux en ligne à 2 (serveur de jeu) ---------- */
+  var arena = (function () {
+    var CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+    var SIZES = { snake: [240, 264], space: [144, 208], blocks: [240, 236] };
+    var canvas = $("ar-screen"), ctx = canvas.getContext("2d");
+    var ws = null, code = "", kind = "snake", you = -1, names = ["", ""], st = null, phase = "idle";
+    var retries = 0, wantOpen = false, touch = null;
+
+    function say(id, txt, err) { setMsg($(id), txt, err); }
+    function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+    function show(inGame) { $("ar-lobby").hidden = inGame; $("ar-stage").hidden = !inGame; }
+    function kindOf(c) { return c.charAt(0) === "P" ? "space" : c.charAt(0) === "B" ? "blocks" : "snake"; }
+
+    function resize() {
+      var sz = SIZES[kind];
+      canvas.width = sz[0]; canvas.height = sz[1];
+      canvas.style.aspectRatio = sz[0] + "/" + sz[1];
+      canvas.style.width = kind === "space" ? "min(100%,360px)" : "min(100%,420px)";
+    }
+
+    function connect() {
+      if (!cfg.ARENA_URL) { say("ar-note", "Le serveur de jeu n'est pas encore branché.", true); return; }
+      if (!session || !profile) { say("ar-note", "Connecte-toi pour jouer en ligne.", true); return; }
+      wantOpen = true;
+      kind = kindOf(code);
+      resize();
+      show(true);
+      say("ar-top", "Connexion…");
+      say("ar-msg", "");
+      try { ws = new WebSocket(cfg.ARENA_URL.replace(/\/$/, "") + "/play/" + code); } catch (e) { say("ar-note", "Connexion impossible.", true); show(false); return; }
+      var mine = ws;
+      mine.addEventListener("open", function () {
+        sb.auth.getSession().then(function (r) {
+          var tok = r && r.data && r.data.session ? r.data.session.access_token : "";
+          mine.send(JSON.stringify({ t: "hello", token: tok }));
+        });
+      });
+      mine.addEventListener("message", function (ev) { if (mine === ws) onMsg(ev.data); });
+      mine.addEventListener("close", function () {
+        if (mine !== ws) return;
+        if (wantOpen && phase !== "over" && retries < 3) {
+          retries++;
+          say("ar-msg", "Connexion perdue, nouvel essai…");
+          setTimeout(function () { if (wantOpen) connect(); }, 1500);
+        } else if (wantOpen && phase !== "over") {
+          say("ar-msg", "Connexion perdue.", true);
+        }
+      });
+    }
+
+    function onMsg(raw) {
+      var m;
+      try { m = JSON.parse(raw); } catch (e) { return; }
+      if (m.t === "error") {
+        wantOpen = false;
+        var txt = m.code === "full" ? "Cette salle est déjà pleine." : m.code === "auth" ? "Connexion refusée. Reconnecte-toi puis réessaie." : "Erreur de connexion.";
+        say("ar-note", txt, true);
+        show(false);
+      } else if (m.t === "lobby") {
+        retries = 0;
+        you = m.you; names = m.players; phase = m.phase || "lobby";
+        st = null;
+        say("ar-top", names[1] ? names[0] + " et " + names[1] : "Salle " + m.code + " : en attente d'un ami. Donne-lui ce code.");
+        draw();
+      } else if (m.t === "countdown") {
+        phase = "countdown";
+        say("ar-top", names[0] + " et " + names[1]);
+        say("ar-msg", "Prépare-toi…");
+      } else if (m.t === "state") {
+        st = m;
+        if (m.over) { phase = "over"; wantOpen = false; endText(m); } else { phase = "playing"; say("ar-msg", ""); }
+        draw();
+      }
+    }
+
+    function endText(m) {
+      var t;
+      if (m.winner === "team") t = "PARTIE FINIE : " + m.score + " points, vague " + m.wave + ".";
+      else t = m.winner === "draw" ? "ÉGALITÉ" : m.winner === you ? "TU AS GAGNÉ !" : "TU AS PERDU";
+      if (m.reason === "left" && m.winner === you) t += " (ton adversaire est parti)";
+      say("ar-msg", t);
+    }
+
+    function colors() { return { lcd: css("--lcd") || "#9bbc0f", ink: css("--ink") || "#0f380f", mid: css("--mid") || "#306230" }; }
+    function font() { ctx.font = "8px 'Press Start 2P', monospace"; }
+    function banner(c, text, y, w) {
+      var W = canvas.width;
+      ctx.fillStyle = c.ink; ctx.fillRect(Math.round((W - w) / 2), y, w, 22);
+      ctx.fillStyle = c.lcd; ctx.fillText(text, Math.round((W - text.length * 8) / 2), y + 15);
+    }
+    function resultWord(m) { return m.winner === "team" ? "FIN" : m.winner === "draw" ? "EGALITE" : m.winner === you ? "GAGNE !" : "PERDU"; }
+
+    function draw() {
+      var c = colors();
+      ctx.fillStyle = c.lcd; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      font();
+      ctx.fillStyle = c.ink;
+      if (!st) {
+        var line = phase === "lobby" ? "CODE " + code : "...";
+        ctx.fillText(line, Math.round((canvas.width - line.length * 8) / 2), Math.round(canvas.height / 2));
+        return;
+      }
+      if (kind === "snake") drawSnake(c);
+      else if (kind === "space") drawSpace(c);
+      else drawBlocks(c);
+    }
+
+    function drawSnake(c) {
+      var CELL = 10, HUD = 24;
+      var a = (you === 0 ? ">" : "") + (names[0] || "J1").slice(0, 8), b = (names[1] || "J2").slice(0, 8) + (you === 1 ? "<" : "");
+      ctx.fillText(a + " " + st.players[0].score, 4, 15);
+      var rt = st.players[1].score + " " + b; ctx.fillText(rt, 236 - rt.length * 8, 15);
+      ctx.fillRect(0, HUD - 1, 240, 1);
+      st.food.forEach(function (f) { ctx.fillRect(f.x * CELL + 4, HUD + f.y * CELL + 1, 2, 8); ctx.fillRect(f.x * CELL + 1, HUD + f.y * CELL + 4, 8, 2); });
+      st.players.forEach(function (p, i) {
+        p.body.forEach(function (cell, k) {
+          var x = cell.x * CELL, y = HUD + cell.y * CELL;
+          if (!p.alive) { ctx.strokeStyle = c.mid; ctx.strokeRect(x + 1.5, y + 1.5, CELL - 3, CELL - 3); return; }
+          if (i === 0) { ctx.fillStyle = c.ink; ctx.fillRect(x, y, CELL, CELL); }
+          else { ctx.fillStyle = c.mid; ctx.fillRect(x + 1, y + 1, CELL - 2, CELL - 2); ctx.fillStyle = c.ink; ctx.fillRect(x + 3, y + 3, CELL - 6, CELL - 6); }
+          if (k === 0) { ctx.fillStyle = c.lcd; ctx.fillRect(x + 3, y + 3, 2, 2); ctx.fillRect(x + 6, y + 3, 2, 2); }
+        });
+      });
+      ctx.fillStyle = c.ink;
+      if (st.over) banner(c, resultWord(st), HUD + 8, 160);
+    }
+
+    function drawSpace(c) {
+      var W = 144, H = 208, HUD = 16;
+      ctx.fillText("SC " + st.score + " V" + st.wave, 4, 11);
+      var lv = "";
+      st.ships.forEach(function (s, i) { lv += (i === you ? "*" : "") + s.lives + " "; });
+      ctx.fillText(lv, W - 4 - lv.length * 8, 11);
+      ctx.fillRect(0, HUD - 1, W, 1);
+      st.enemies.forEach(function (e) {
+        var x = Math.round(e[0]), y = Math.round(e[1]);
+        ctx.fillStyle = c.ink;
+        ctx.fillRect(x + 1, y, 8, 2); ctx.fillRect(x, y + 2, 10, 3); ctx.fillRect(x + 1, y + 5, 2, 3); ctx.fillRect(x + 7, y + 5, 2, 3);
+        ctx.fillStyle = c.lcd; ctx.fillRect(x + 2, y + 2, 2, 2); ctx.fillRect(x + 6, y + 2, 2, 2);
+      });
+      ctx.fillStyle = c.ink;
+      st.bullets.forEach(function (b) { ctx.fillRect(Math.round(b[0]), Math.round(b[1]), 2, 5); });
+      ctx.fillStyle = c.mid;
+      st.shots.forEach(function (b) { ctx.fillRect(Math.round(b[0]), Math.round(b[1]), 2, 5); });
+      st.ships.forEach(function (s, i) {
+        if (s.lives <= 0) return;
+        if (s.invuln && Math.floor(Date.now() / 100) % 2 === 0) return;
+        ctx.fillStyle = i === you ? c.ink : c.mid;
+        var sx = Math.round(s.x), sy = H - 16;
+        ctx.fillRect(sx + 5, sy, 2, 3); ctx.fillRect(sx + 3, sy + 3, 6, 2); ctx.fillRect(sx, sy + 5, 12, 3);
+      });
+      ctx.fillStyle = c.ink;
+      if (st.over) banner(c, "FIN : " + st.score, 60, 112);
+    }
+
+    function drawBlocks(c) {
+      var CELL = 10, FY = 26, order = you === 1 ? [1, 0] : [0, 1], xs = [10, 130];
+      ctx.fillStyle = c.ink;
+      order.forEach(function (pi, slot) {
+        var p = st.players[pi], x0 = xs[slot];
+        var nm = (names[pi] || "J").slice(0, 9) + (pi === you ? "*" : "");
+        ctx.fillStyle = c.ink;
+        ctx.fillText(nm, x0, 11);
+        ctx.fillText(String(p.score), x0, 22);
+        ctx.strokeStyle = c.ink; ctx.lineWidth = 2;
+        ctx.strokeRect(x0 - 1, FY, 10 * CELL + 2, 18 * CELL + 2);
+        for (var y = 0; y < 18; y++) for (var x = 0; x < 10; x++) {
+          var v = p.grid[y].charAt(x);
+          if (v === "0") continue;
+          var px = x0 + x * CELL, py = FY + 1 + y * CELL;
+          ctx.fillStyle = c.ink; ctx.fillRect(px, py, CELL, CELL);
+          ctx.fillStyle = c.lcd; ctx.fillRect(px + 2, py + 2, CELL - 4, CELL - 4);
+          if (v === "1") { ctx.fillStyle = c.ink; ctx.fillRect(px + 4, py + 4, CELL - 8, CELL - 8); }
+        }
+        if (p.pending > 0) { ctx.fillStyle = c.mid; ctx.fillRect(x0 - 8, FY + 18 * CELL - p.pending * CELL + 1, 5, p.pending * CELL); }
+        if (!p.alive) { ctx.fillStyle = c.ink; ctx.fillRect(x0 + 10, FY + 80, 80, 20); ctx.fillStyle = c.lcd; ctx.fillText("PERDU", x0 + 30, FY + 94); }
+      });
+      ctx.fillStyle = c.ink;
+      if (st.over) banner(c, resultWord(st), 211, 112);
+    }
+
+    /* ----- envoi des commandes ----- */
+    function send(o) { if (ws && ws.readyState === 1 && phase === "playing") ws.send(JSON.stringify(o)); }
+    function dir(d) { send({ t: "dir", d: d }); }
+    function act(a) { send({ t: "act", a: a }); }
+    function toGameX(clientX) { var r = canvas.getBoundingClientRect(); return (clientX - r.left) * (144 / r.width); }
+
+    var KEYS = { ArrowUp: "U", ArrowDown: "D", ArrowLeft: "L", ArrowRight: "R", w: "U", s: "D", a: "L", d: "R" };
+    var spaceKeys = { l: false, r: false }, spaceX = 72, spaceTimer = null;
+    window.addEventListener("keydown", function (e) {
+      if (current !== "arena") return;
+      if (kind === "snake" && KEYS[e.key]) { e.preventDefault(); dir(KEYS[e.key]); }
+      else if (kind === "blocks") {
+        var m = { ArrowLeft: "L", ArrowRight: "R", ArrowUp: "ROT", ArrowDown: "SOFT", " ": "HARD" }[e.key];
+        if (m) { e.preventDefault(); act(m); }
+      } else if (kind === "space") {
+        if (e.key === "ArrowLeft") { spaceKeys.l = true; e.preventDefault(); }
+        if (e.key === "ArrowRight") { spaceKeys.r = true; e.preventDefault(); }
+      }
+    });
+    window.addEventListener("keyup", function (e) {
+      if (e.key === "ArrowLeft") spaceKeys.l = false;
+      if (e.key === "ArrowRight") spaceKeys.r = false;
+    });
+    function startSpaceKeys() {
+      if (spaceTimer) return;
+      spaceTimer = setInterval(function () {
+        if (kind !== "space" || (!spaceKeys.l && !spaceKeys.r)) return;
+        spaceX = Math.max(0, Math.min(144, spaceX + (spaceKeys.r ? 12 : 0) - (spaceKeys.l ? 12 : 0)));
+        send({ t: "move", x: spaceX });
+      }, 50);
+    }
+
+    var view = $("view-arena"), t0 = null, moved = false;
+    view.addEventListener("touchstart", function (e) {
+      if (e.target.closest && e.target.closest("button,input,a")) return;
+      var t = e.changedTouches[0];
+      t0 = { x: t.clientX, y: t.clientY, ox: t.clientX, oy: t.clientY, at: Date.now() };
+      moved = false;
+      if (kind === "space") { spaceX = toGameX(t.clientX); send({ t: "move", x: spaceX }); }
+    }, { passive: true });
+    view.addEventListener("touchmove", function (e) {
+      if (!t0) return;
+      var t = e.changedTouches[0], dx = t.clientX - t0.x, dy = t.clientY - t0.y;
+      if (kind === "snake") {
+        if (Math.abs(dx) < 18 && Math.abs(dy) < 18) return;
+        dir(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "R" : "L") : (dy > 0 ? "D" : "U"));
+        t0.x = t.clientX; t0.y = t.clientY;
+      } else if (kind === "space") {
+        spaceX = toGameX(t.clientX); send({ t: "move", x: spaceX });
+      } else if (kind === "blocks") {
+        if (Math.abs(dx) >= 22) { act(dx > 0 ? "R" : "L"); t0.x = t.clientX; moved = true; }
+        else if (dy >= 26) { act("SOFT"); t0.y = t.clientY; moved = true; }
+      }
+    }, { passive: true });
+    view.addEventListener("touchend", function (e) {
+      if (!t0) return;
+      var t = e.changedTouches[0], dt = Date.now() - t0.at;
+      var totalDy = t.clientY - t0.oy, totalDx = t.clientX - t0.ox;
+      if (kind === "blocks") {
+        if (!moved && Math.abs(totalDx) < 12 && Math.abs(totalDy) < 12 && dt < 300) act("ROT");
+        else if (totalDy > 70 && dt < 220 && Math.abs(totalDx) < 40) act("HARD");
+      }
+      t0 = null;
+    }, { passive: true });
+    canvas.addEventListener("mousemove", function (e) { if (kind === "space" && e.buttons) { spaceX = toGameX(e.clientX); send({ t: "move", x: spaceX }); } });
+    canvas.addEventListener("mousedown", function (e) { if (kind === "space") { spaceX = toGameX(e.clientX); send({ t: "move", x: spaceX }); } });
+
+    function newCode(prefix) {
+      var out = prefix;
+      var buf = new Uint8Array(4);
+      (window.crypto || window.msCrypto).getRandomValues(buf);
+      for (var i = 0; i < 4; i++) out += CODE_CHARS.charAt(buf[i] % CODE_CHARS.length);
+      return out;
+    }
+    function start(c) { code = c; phase = "lobby"; st = null; you = -1; names = ["", ""]; retries = 0; spaceX = 72; startSpaceKeys(); connect(); }
+
+    ["S", "P", "B"].forEach(function (k) {
+      $("ar-create-" + k).addEventListener("click", function () { say("ar-note", ""); start(newCode(k)); });
+    });
+    $("ar-join").addEventListener("click", function () {
+      var c = $("ar-code").value.trim().toUpperCase();
+      if (!/^[SPB][A-Z0-9]{3,7}$/.test(c)) { say("ar-note", "Code invalide.", true); return; }
+      say("ar-note", ""); start(c);
+    });
+    $("ar-leave").addEventListener("click", function () { leave(); show(false); });
+
+    function leave() {
+      wantOpen = false;
+      if (ws) { var w = ws; ws = null; try { w.close(); } catch (e) { /* ignore */ } }
+      phase = "idle";
+      if (spaceTimer) { clearInterval(spaceTimer); spaceTimer = null; }
+    }
+    function enter() {
+      show(false);
+      say("ar-note", "");
+      if (!online || !session || !profile) say("ar-note", "Connecte-toi pour jouer en ligne.", true);
+      else if (!cfg.ARENA_URL) say("ar-note", "Le serveur de jeu n'est pas encore branché.", true);
+    }
+    return { enter: enter, leave: leave };
+  })();
+
+  /* ---------- Router ---------- */
+  var VIEWS = ["menu", "scores", "amis", "boutique", "compte", "admin", "snake", "arena", "blocks", "space"];
+
+  function route() {
+    var h = (location.hash || "#menu").slice(1);
+    if (VIEWS.indexOf(h) < 0) h = "menu";
+    if (current === "snake" && h !== "snake") snake.leave();
+    if (current === "arena" && h !== "arena") arena.leave();
+    if (current === "blocks" && h !== "blocks") blocks.leave();
+    if (current === "space" && h !== "space") space.leave();
+    if (h !== "amis") stopChatTimer();
+    current = h;
+    VIEWS.forEach(function (v) { $("view-" + v).hidden = v !== h; });
+    document.querySelectorAll("[data-nav]").forEach(function (a) {
+      a.classList.toggle("on", a.getAttribute("data-nav") === h);
+    });
+    if (h === "menu") renderMenu();
+    if (h === "scores") loadScores();
+    if (h === "boutique") renderShop();
+    if (h === "amis") renderFriends();
+    if (h === "admin") renderAdmin();
+    if (h !== "snake") loadMaint();
+    if (h === "compte") renderAccount();
+    if (h === "snake") snake.enter();
+    if (h === "arena") arena.enter();
+    if (h === "blocks") blocks.enter();
+    if (h === "space") space.enter();
+    window.scrollTo(0, 0);
+  }
+
+  if ("serviceWorker" in window.navigator && location.protocol === "https:") {
+    window.addEventListener("load", function () {
+      window.navigator.serviceWorker.register("sw.js").catch(function () { /* installing is optional */ });
+    });
+  }
+
+  $("offline").hidden = online;
+  $("test-banner").hidden = !isTest;
+  buildGameSelect();
+  window.addEventListener("hashchange", route);
+  route();
+  renderNav();
+
+  if (sb) {
+    sb.auth.onAuthStateChange(function (event, s) {
+      /* Deferred on purpose: calling the client inside this callback can deadlock. */
+      setTimeout(function () { refreshAuth(s); }, 0);
+    });
+  }
+})();
+</script>
+</body>
+</html>
