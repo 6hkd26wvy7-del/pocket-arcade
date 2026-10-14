@@ -154,8 +154,8 @@ input, select {
 .stage { display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .screen {
   display: block;
-  width: min(100%, 420px, max(160px, calc((100vh - 230px) * 144 / 208)));
-  width: min(100%, 420px, max(160px, calc((100dvh - 230px) * 144 / 208)));
+  width: min(100%, 420px, max(160px, calc((100vh - 300px) * 144 / 208)));
+  width: min(100%, 420px, max(160px, calc((100dvh - 300px) * 144 / 208)));
   max-width: 100%;
   aspect-ratio: 144 / 208;
   background: var(--lcd);
@@ -314,6 +314,18 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-hi)
 .daily div.done { border-color: var(--green); color: var(--green); }
 .daily div.next { border-color: var(--primary-hi); box-shadow: 0 0 0 1px var(--primary-hi) inset; color: var(--text); }
 .coin { display: inline-block; width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #FDE68A, var(--orange)); vertical-align: -2px; margin-right: 4px; }
+
+/* Écrans de jeu : une couleur néon par jeu sur fond bleu nuit */
+#view-snake, #view-arena[data-kind="snake"] { --lcd: #0F172A; --ink: #34D399; --mid: #047857; --field: #0B1220; }
+#view-blocks, #view-arena[data-kind="blocks"] { --lcd: #0F172A; --ink: #FBBF24; --mid: #B45309; --field: #0B1220; }
+#view-space, #view-arena[data-kind="space"] { --lcd: #0F172A; --ink: #22D3EE; --mid: #F59E0B; --field: #0B1220; }
+#view-arena { --lcd: #0F172A; --ink: #F8FAFC; --mid: #64748B; }
+#view-arena[data-kind="snake"] { --ink: #34D399; --mid: #047857; }
+#view-arena[data-kind="blocks"] { --ink: #FBBF24; --mid: #B45309; }
+#view-arena[data-kind="space"] { --ink: #22D3EE; --mid: #F59E0B; }
+.screen { border: 3px solid var(--mid); border-radius: 14px; box-shadow: 0 0 0 1px var(--ink), 0 8px 30px rgba(0, 0, 0, .45); }
+#view-snake .btn, #view-blocks .btn, #view-space .btn, #view-arena .btn { background: var(--card-hi); box-shadow: inset 0 0 0 1px var(--line); }
+.stage .msg { color: var(--muted); }
 </style>
 </head>
 <body>
@@ -523,7 +535,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-hi)
   var me = null, missions = [], badgeCat = null, shopCat = null;
   var role = null, notifs = [], maint = null, friends = [], chatWith = null, chatTimer = null, access = null, seasonRows = [];
   var TITLES = { title_rookie: "RECRUE", title_legend: "LÉGENDE" };
-  var DEFAULT_LOOK = { page: "#8bac0f", lcd: "#9bbc0f", field: "#a9c91a", mid: "#306230", ink: "#0f380f" };
+  var DEFAULT_LOOK = { page: "#0F172A", lcd: "#0F172A", field: "#0B1220", mid: "#64748B", ink: "#F8FAFC" };
   var THEMES = {
     theme_night: { page: "#0f1f0f", lcd: "#1e3a1e", field: "#274927", mid: "#8bac0f", ink: "#cfe8a0" },
     theme_sunset: { page: "#c4623a", lcd: "#e8a15a", field: "#efb97a", mid: "#7a3b2a", ink: "#3a1410" }
@@ -547,7 +559,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-hi)
   }
 
   function applyCosmetics() {
-    var look = THEMES[equippedCode("theme_")] || DEFAULT_LOOK;
+    var look = DEFAULT_LOOK; /* les thèmes de la boutique seront refaits pour le nouveau design */
     var root = document.documentElement.style;
     root.setProperty("--page", look.page);
     root.setProperty("--lcd", look.lcd);
@@ -556,7 +568,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-hi)
     root.setProperty("--ink", look.ink);
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute("content", look.page);
-    snake.setLook(look.lcd, look.mid, look.ink, SKINS[equippedCode("skin_")]);
+    var sv = getComputedStyle($("view-snake"));
+    snake.setLook(sv.getPropertyValue("--lcd").trim() || look.lcd, sv.getPropertyValue("--mid").trim() || look.mid, sv.getPropertyValue("--ink").trim() || look.ink, SKINS[equippedCode("skin_")]);
   }
 
   async function loadMe() {
@@ -1758,9 +1771,10 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-hi)
 
       if (food) {
         var fx = food.x * CELL, fy = HUD + food.y * CELL;
-        ctx.fillStyle = C3;
+        ctx.fillStyle = "#F43F5E";
         ctx.fillRect(fx + 3, fy + 1, 2, 6);
         ctx.fillRect(fx + 1, fy + 3, 6, 2);
+        ctx.fillRect(fx + 2, fy + 2, 4, 4);
       }
 
       var hidden = state === "dying" && Math.floor((now - deathAt) / 110) % 2 === 1;
@@ -2050,7 +2064,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-hi)
       else if (state === "paused") state = "playing";
     }
 
-    function css(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+    function css(n) { return getComputedStyle($("view-blocks")).getPropertyValue(n).trim(); }
     function block(x, y, lcd, ink) {
       ctx.fillStyle = ink; ctx.fillRect(x, y, CELL, CELL);
       ctx.fillStyle = lcd; ctx.fillRect(x + 2, y + 2, CELL - 4, CELL - 4);
@@ -2290,7 +2304,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-hi)
     }
     function togglePause() { if (state === "playing") state = "paused"; else if (state === "paused") state = "playing"; }
 
-    function css(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+    function css(n) { return getComputedStyle($("view-space")).getPropertyValue(n).trim(); }
     function draw() {
       var lcd = css("--lcd") || "#9bbc0f", ink = css("--ink") || "#0f380f", mid = css("--mid") || "#306230";
       ctx.fillStyle = lcd; ctx.fillRect(0, 0, SP.W, SP.H);
@@ -2303,7 +2317,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-hi)
       ctx.fillRect(0, SP.HUD - 1, SP.W, 1);
       g.enemies.forEach(function (e) {
         var x = Math.round(e.x), y = Math.round(e.y);
-        ctx.fillStyle = ink;
+        ctx.fillStyle = "#F43F5E";
         ctx.fillRect(x + 1, y, 8, 2); ctx.fillRect(x, y + 2, 10, 3); ctx.fillRect(x + 1, y + 5, 2, 3); ctx.fillRect(x + 7, y + 5, 2, 3);
         ctx.fillStyle = lcd; ctx.fillRect(x + 2, y + 2, 2, 2); ctx.fillRect(x + 6, y + 2, 2, 2);
       });
@@ -2395,7 +2409,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-hi)
     var retries = 0, wantOpen = false, touch = null;
 
     function say(id, txt, err) { setMsg($(id), txt, err); }
-    function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+    function css(name) { return getComputedStyle($("view-arena")).getPropertyValue(name).trim(); }
     function show(inGame) { $("ar-lobby").hidden = inGame; $("ar-stage").hidden = !inGame; }
     function kindOf(c) { return c.charAt(0) === "P" ? "space" : c.charAt(0) === "B" ? "blocks" : "snake"; }
 
@@ -2411,6 +2425,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-hi)
       if (!session || !profile) { say("ar-note", "Connecte-toi pour jouer en ligne.", true); return; }
       wantOpen = true;
       kind = kindOf(code);
+      $("view-arena").setAttribute("data-kind", kind);
       resize();
       show(true);
       say("ar-top", "Connexion…");
@@ -2522,7 +2537,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-hi)
       ctx.fillRect(0, HUD - 1, W, 1);
       st.enemies.forEach(function (e) {
         var x = Math.round(e[0]), y = Math.round(e[1]);
-        ctx.fillStyle = c.ink;
+        ctx.fillStyle = "#F43F5E";
         ctx.fillRect(x + 1, y, 8, 2); ctx.fillRect(x, y + 2, 10, 3); ctx.fillRect(x + 1, y + 5, 2, 3); ctx.fillRect(x + 7, y + 5, 2, 3);
         ctx.fillStyle = c.lcd; ctx.fillRect(x + 2, y + 2, 2, 2); ctx.fillRect(x + 6, y + 2, 2, 2);
       });
