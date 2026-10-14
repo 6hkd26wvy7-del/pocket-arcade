@@ -326,9 +326,19 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-hi)
 .screen { border: 3px solid var(--mid); border-radius: 14px; box-shadow: 0 0 0 1px var(--ink), 0 8px 30px rgba(0, 0, 0, .45); }
 #view-snake .btn, #view-blocks .btn, #view-space .btn, #view-arena .btn { background: var(--card-hi); box-shadow: inset 0 0 0 1px var(--line); }
 .stage .msg { color: var(--muted); }
+
+/* Pendant une partie : le jeu prend tout l'écran, la page ne défile plus */
+#g-exit { display: none; }
+body.ingame { position: fixed; inset: 0; width: 100%; overflow: hidden; overscroll-behavior: none; }
+body.ingame .bar, body.ingame .foot, body.ingame #test-banner, body.ingame #maint-box, body.ingame #offline { display: none !important; }
+body.ingame .wrap { max-width: none; height: 100dvh; padding-block: calc(env(safe-area-inset-top, 0px) + 46px) calc(env(safe-area-inset-bottom, 0px) + 8px); }
+body.ingame main, body.ingame main > section:not([hidden]) { height: 100%; min-height: 0; }
+body.ingame main > section:not([hidden]) .stage { height: 100%; justify-content: center; }
+body.ingame #g-exit { display: inline-block; position: fixed; z-index: 30; left: max(12px, env(safe-area-inset-left, 0px)); top: calc(env(safe-area-inset-top, 0px) + 8px); }
 </style>
 </head>
 <body>
+<button class="btn alt mini" id="g-exit" type="button">&larr; QUITTER</button>
 <div class="wrap">
   <header class="bar">
     <a class="logo" href="#menu">BOYGAM</a>
@@ -441,7 +451,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-hi)
         <p id="ar-top" class="msg" role="status"></p>
         <canvas id="ar-screen" class="screen" width="240" height="264" style="aspect-ratio:240/264;width:min(100%,420px)" tabindex="0" aria-label="Jeu en ligne. Glisse un doigt pour jouer."></canvas>
         <p id="ar-msg" class="msg" role="status"></p>
-        <div class="row"><button class="btn alt" id="ar-leave" type="button">QUITTER</button></div>
+        <div class="row"><button class="btn" id="ar-again" type="button" hidden>REJOUER</button><button class="btn alt" id="ar-leave" type="button">QUITTER</button></div>
       </div>
       <p id="ar-note" class="msg" role="status"></p>
     </section>
@@ -2410,7 +2420,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-hi)
 
     function say(id, txt, err) { setMsg($(id), txt, err); }
     function css(name) { return getComputedStyle($("view-arena")).getPropertyValue(name).trim(); }
-    function show(inGame) { $("ar-lobby").hidden = inGame; $("ar-stage").hidden = !inGame; }
+    function show(inGame) { $("ar-lobby").hidden = inGame; $("ar-stage").hidden = !inGame; updateIngame(); }
     function kindOf(c) { return c.charAt(0) === "P" ? "space" : c.charAt(0) === "B" ? "blocks" : "snake"; }
 
     function resize() {
@@ -2418,6 +2428,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-hi)
       canvas.width = sz[0]; canvas.height = sz[1];
       canvas.style.aspectRatio = sz[0] + "/" + sz[1];
       canvas.style.width = kind === "space" ? "min(100%,360px)" : "min(100%,420px)";
+      fitGame();
     }
 
     function connect() {
@@ -2465,13 +2476,22 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-hi)
         st = null;
         say("ar-top", names[1] ? names[0] + " et " + names[1] : "Salle " + m.code + " : en attente d'un ami. Donne-lui ce code.");
         draw();
+      } else if (m.t === "rematch") {
+        if (m.wants && m.wants[1 - you] && !m.wants[you]) say("ar-msg", "Ton adversaire veut rejouer !");
+      } else if (m.t === "left") {
+        $("ar-again").hidden = true;
+        say("ar-msg", "Ton adversaire est parti.");
       } else if (m.t === "countdown") {
         phase = "countdown";
+        wantOpen = true;
+        st = null;
+        $("ar-again").hidden = true;
+        $("ar-again").disabled = false;
         say("ar-top", names[0] + " et " + names[1]);
         say("ar-msg", "Prépare-toi…");
       } else if (m.t === "state") {
         st = m;
-        if (m.over) { phase = "over"; wantOpen = false; endText(m); } else { phase = "playing"; say("ar-msg", ""); }
+        if (m.over) { phase = "over"; wantOpen = false; endText(m); if (m.reason !== "left") { $("ar-again").hidden = false; $("ar-again").disabled = false; } } else { phase = "playing"; say("ar-msg", ""); }
         draw();
       }
     }
@@ -2666,7 +2686,13 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-hi)
       if (!/^[SPB][A-Z0-9]{3,7}$/.test(c)) { say("ar-note", "Code invalide.", true); return; }
       say("ar-note", ""); start(c);
     });
-    $("ar-leave").addEventListener("click", function () { leave(); show(false); });
+    $("ar-leave").addEventListener("click", function () { $("ar-again").hidden = true; leave(); show(false); });
+    $("ar-again").addEventListener("click", function () {
+      if (!ws || ws.readyState !== 1) { say("ar-msg", "Connexion perdue. Quitte puis recrée une partie.", true); return; }
+      $("ar-again").disabled = true;
+      ws.send(JSON.stringify({ t: "again" }));
+      say("ar-msg", "En attente de ton adversaire…");
+    });
 
     function leave() {
       wantOpen = false;
@@ -2682,6 +2708,33 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-hi)
     }
     return { enter: enter, leave: leave };
   })();
+
+  /* ---------- Plein écran pendant une partie ---------- */
+  var GAME_CANVAS = { snake: "screen", blocks: "bl-screen", space: "sp-screen", arena: "ar-screen" };
+  function updateIngame() {
+    var on = !!GAME_CANVAS[current] && (current !== "arena" || !$("ar-stage").hidden);
+    document.body.classList.toggle("ingame", on);
+    window.scrollTo(0, 0);
+    fitGame();
+  }
+  function fitGame() {
+    var id = GAME_CANVAS[current];
+    if (!id || !document.body.classList.contains("ingame")) return;
+    var cv = $(id), stage = cv.parentNode;
+    var other = 0;
+    Array.prototype.forEach.call(stage.children, function (c) { if (c !== cv && !c.hidden) other += c.offsetHeight + 10; });
+    var availH = window.innerHeight - other - 70, availW = window.innerWidth - 24;
+    var k = Math.min(availW / cv.width, availH / cv.height);
+    k = Math.max(k, 0.5);
+    cv.style.width = Math.floor(cv.width * k) + "px";
+    cv.style.height = Math.floor(cv.height * k) + "px";
+    cv.style.aspectRatio = cv.width + "/" + cv.height;
+  }
+  window.addEventListener("resize", fitGame);
+  window.addEventListener("orientationchange", function () { setTimeout(fitGame, 200); });
+  $("g-exit").addEventListener("click", function () {
+    if (current === "arena") $("ar-leave").click(); else location.hash = "#menu";
+  });
 
   /* ---------- Router ---------- */
   var VIEWS = ["menu", "scores", "amis", "boutique", "compte", "admin", "snake", "arena", "blocks", "space"];
@@ -2710,6 +2763,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-hi)
     if (h === "arena") arena.enter();
     if (h === "blocks") blocks.enter();
     if (h === "space") space.enter();
+    updateIngame();
     window.scrollTo(0, 0);
   }
 

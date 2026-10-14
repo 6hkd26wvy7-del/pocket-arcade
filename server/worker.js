@@ -112,6 +112,8 @@ export class ArenaRoom {
     this.timer = null;
     this.graceTimers = [null, null];
     this.code = "";
+    this.again = [false, false];
+    this.endCloseMs = env.END_CLOSE_MS !== undefined ? Number(env.END_CLOSE_MS) : 90000;
   }
 
   async fetch(request) {
@@ -166,6 +168,7 @@ export class ArenaRoom {
         return;
       }
 
+      if (msg.t === "again") { this.onAgain(me.index); return; }
       if (this.phase === "playing" && this.game) this.kind.input(this.game, me.index, msg);
     });
 
@@ -228,6 +231,13 @@ export class ArenaRoom {
     if (!p || p.ws !== ws) return; // il a déjà été remplacé par une nouvelle connexion
     p.ws = null;
     if (this.phase === "lobby") { this.slots[index] = null; return; }
+    if (this.phase === "over") {
+      // revanche impossible si l'autre est parti
+      this.again[index] = false;
+      this.broadcast({ t: "left", index });
+      if (!this.slots.some((q) => q && q.ws)) { clearTimeout(this.closeTimer); this.slots = [null, null]; }
+      return;
+    }
     if (this.phase === "playing" || this.phase === "countdown") {
       // 10 secondes pour revenir, sinon l'autre gagne
       this.graceTimers[index] = setTimeout(() => {
@@ -256,6 +266,26 @@ export class ArenaRoom {
     clearTimeout(this.hardStop);
     if (this.game && !this.game.over) { this.game.over = true; this.game.winner = "draw"; this.game.reason = reason; }
     if (this.game) this.broadcast(snapshot(this.game, this.kind));
-    setTimeout(() => this.slots.forEach((p) => { if (p && p.ws) { try { p.ws.close(1000, "end"); } catch (e) { /* ignore */ } } }), 3000);
+    this.again = [false, false];
+    // les joueurs restent connectés un moment pour pouvoir rejouer
+    clearTimeout(this.closeTimer);
+    this.closeTimer = setTimeout(() => this.slots.forEach((p) => { if (p && p.ws) { try { p.ws.close(1000, "end"); } catch (e) { /* ignore */ } } }), this.endCloseMs);
+  }
+
+  // Un joueur demande à rejouer. Quand les deux sont d'accord, une nouvelle partie démarre.
+  onAgain(index) {
+    if (this.phase !== "over") return;
+    if (!this.slots[0] || !this.slots[1] || !this.slots[0].ws || !this.slots[1].ws) return;
+    this.again[index] = true;
+    this.broadcast({ t: "rematch", wants: this.again });
+    if (this.again[0] && this.again[1]) {
+      clearTimeout(this.closeTimer);
+      this.again = [false, false];
+      this.phase = "countdown";
+      const names = this.slots.map((p) => (p ? p.pseudo : null));
+      this.broadcast({ t: "countdown", ms: this.countdownMs, players: names });
+      this.game = this.kind.create(crypto.getRandomValues(new Uint32Array(1))[0]);
+      setTimeout(() => this.start(), this.countdownMs);
+    }
   }
 }
