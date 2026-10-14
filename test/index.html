@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>BOYGAM</title>
+<title>BOYGAMES</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="theme-color" content="#0F172A">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="BOYGAM">
+<meta name="apple-mobile-web-app-title" content="BOYGAMES">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rubik:wght@600;700;800&family=Manrope:wght@500;600;700&display=swap">
 <style>
 /* Layout: one narrow column styled as a green handheld LCD. Top bar with three tabs, then one screen at a time: games, scores, account, Snake. One look in both themes. */
@@ -187,7 +187,7 @@ textarea { width: 100%; font: 16px var(--mono); color: var(--ink); padding: 11px
   outline-offset: 3px;
 }
 
-/* ===== NOUVEAU LOOK BOYGAM (palette bleu nuit / violet). Les écrans de jeu gardent leurs couleurs LCD. ===== */
+/* ===== NOUVEAU LOOK BOYGAMES (palette bleu nuit / violet). Les écrans de jeu gardent leurs couleurs LCD. ===== */
 :root {
   --bg: #0F172A;
   --card: #1E293B;
@@ -287,7 +287,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-hi)
   display: grid; grid-template-columns: minmax(0, 1fr) 120px; gap: 10px; align-items: center;
 }
 .hero small { font-weight: 800; letter-spacing: .16em; font-size: 11px; color: var(--cyan); }
-.hero h1 { font-family: var(--display); font-weight: 800; font-size: clamp(32px, 9vw, 52px); line-height: 1; margin: 6px 0 8px; letter-spacing: .01em; }
+.hero h1 { font-family: var(--display); font-weight: 800; font-size: clamp(28px, 7.4vw, 52px); line-height: 1; margin: 6px 0 8px; letter-spacing: .01em; }
 .hero .btn { white-space: nowrap; padding: 12px 16px; }
 .hero p { color: #CBD5E1; margin: 0 0 14px; font-size: 14px; }
 .hero svg { width: 100%; height: auto; }
@@ -341,7 +341,7 @@ body.ingame #g-exit { display: inline-block; position: fixed; z-index: 30; left:
 <button class="btn alt mini" id="g-exit" type="button">&larr; QUITTER</button>
 <div class="wrap">
   <header class="bar">
-    <a class="logo" href="#menu">BOYGAM</a>
+    <a class="logo" href="#menu">BOYGAMES</a>
     <nav class="nav" aria-label="Navigation">
       <a href="#menu" data-nav="menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg><span>Accueil</span></a>
       <a href="#scores" data-nav="scores"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8v5a4 4 0 01-8 0V4z"/><path d="M8 6H4v2a3 3 0 003 3M16 6h4v2a3 3 0 01-3 3"/><path d="M12 13v4M8 20h8"/></svg><span>Classement</span></a>
@@ -364,7 +364,7 @@ body.ingame #g-exit { display: inline-block; position: fixed; z-index: 30; left:
       <div class="hero">
         <div>
           <small>BIENVENUE SUR</small>
-          <h1>BOYGAM</h1>
+          <h1>BOYGAMES</h1>
           <p>Une plateforme de jeux pour tous les joueurs.</p>
           <a class="btn" href="#game-list" id="hero-play">JOUER MAINTENANT</a>
         </div>
@@ -914,7 +914,7 @@ body.ingame #g-exit { display: inline-block; position: fixed; z-index: 30; left:
     var ua = window.navigator.userAgent || "";
     var ios = /iphone|ipad|ipod/i.test(ua) || (window.navigator.platform === "MacIntel" && window.navigator.maxTouchPoints > 1);
     if (deferredInstall) {
-      txt.textContent = "Installe BOYGAM sur ton téléphone.";
+      txt.textContent = "Installe BOYGAMES sur ton téléphone.";
       btn.hidden = false;
       box.hidden = false;
     } else if (ios) {
@@ -1373,7 +1373,7 @@ body.ingame #g-exit { display: inline-block; position: fixed; z-index: 30; left:
         var blob = new Blob([JSON.stringify(ex.data)], { type: "application/json" });
         var a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = "boygam-sauvegarde-" + new Date().toISOString().slice(0, 10) + ".json";
+        a.download = "boygames-sauvegarde-" + new Date().toISOString().slice(0, 10) + ".json";
         document.body.append(a);
         a.click();
         a.remove();

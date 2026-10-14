@@ -1,4 +1,4 @@
-// Serveur de jeu BOYGAM (Cloudflare Workers + Durable Objects).
+// Serveur de jeu BOYGAMES (Cloudflare Workers + Durable Objects).
 // Une "salle" par code (ex. K7P2Q). Le serveur décide de tout : les téléphones n'envoient que des directions.
 // Aucun secret ici : la connexion est vérifiée avec la clé PUBLIQUE de Supabase (JWKS).
 
@@ -85,7 +85,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const m = url.pathname.match(/^\/play\/([SPB][A-Z0-9]{3,7})$/);
-    if (!m) return new Response("BOYGAM arena server v2 (revanche)", { status: 200 });
+    if (!m) return new Response("BOYGAMES arena server v2 (revanche)", { status: 200 });
     if (request.headers.get("Upgrade") !== "websocket") return new Response("Expected websocket", { status: 426 });
     const allowed = String(env.ALLOWED_ORIGINS || "").split(",").map((s) => s.trim()).filter(Boolean);
     const origin = request.headers.get("Origin");
