@@ -418,7 +418,7 @@ input, select {
       var email = $("in-email").value.trim();
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { setMsg(msg, "Adresse e-mail invalide.", true); return; }
       setMsg(msg, "Envoi du code…");
-      var r = await sb.auth.signInWithOtp({ email: email, options: { shouldCreateUser: true } });
+      var r = await sb.auth.signInWithOtp({ email: email, options: { shouldCreateUser: true, emailRedirectTo: location.origin + location.pathname.replace(/index\.html$/, "") } });
       if (r.error) {
         setMsg(msg, r.error.status === 429 ? "Trop de demandes. Réessaie dans quelques minutes." : "Impossible d'envoyer l'e-mail. Vérifie l'adresse et réessaie.", true);
         return;
