@@ -395,7 +395,7 @@ input, select {
       return;
     }
     if (!session) {
-      if (accStep === "code") renderCodeForm(); else renderEmailForm();
+      renderAuthForm();
     } else if (!profile) {
       renderProfileForm();
     } else {
@@ -404,56 +404,57 @@ input, select {
     if (accNotice) { setMsg(msg, accNotice); accNotice = ""; }
   }
 
-  function renderEmailForm() {
-    var body = $("acc-body"), msg = $("acc-msg");
-    body.innerHTML =
-      "<p>Crée un compte ou connecte-toi avec ton adresse e-mail. Tu recevras un e-mail de connexion, pas de mot de passe à retenir.</p>" +
-      "<form id=\"f-email\" novalidate>" +
-      "<label for=\"in-email\">ADRESSE E-MAIL</label>" +
-      "<input id=\"in-email\" type=\"email\" inputmode=\"email\" autocomplete=\"email\" autocapitalize=\"off\" required>" +
-      "<div class=\"row\" style=\"margin-top:12px\"><button class=\"btn\" type=\"submit\">ME CONNECTER</button></div>" +
-      "</form>";
-    $("f-email").addEventListener("submit", async function (e) {
-      e.preventDefault();
-      var email = $("in-email").value.trim();
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { setMsg(msg, "Adresse e-mail invalide.", true); return; }
-      setMsg(msg, "Envoi du code…");
-      var r = await sb.auth.signInWithOtp({ email: email, options: { shouldCreateUser: true, emailRedirectTo: location.origin + location.pathname.replace(/index\.html$/, "") } });
-      if (r.error) {
-        setMsg(msg, r.error.status === 429 ? "Trop de demandes. Réessaie dans quelques minutes." : "Impossible d'envoyer l'e-mail. Vérifie l'adresse et réessaie.", true);
-        return;
-      }
-      accEmail = email;
-      accStep = "code";
-      accNotice = "E-mail envoyé. Regarde aussi dans tes courriers indésirables.";
-      renderAccount();
-    });
+  var authMode = "signup";
+
+  function authError(err, isSignup) {
+    var m = String(err && err.message || "").toLowerCase();
+    if (err && err.status === 429) return "Trop d'essais. Réessaie dans quelques minutes.";
+    if (m.indexOf("already registered") >= 0) return "Cette adresse a déjà un compte. Choisis « Se connecter ».";
+    if (m.indexOf("invalid login") >= 0) return "E-mail ou mot de passe incorrect.";
+    if (m.indexOf("not confirmed") >= 0) return "Ce compte demande encore une confirmation par e-mail. Préviens le créateur du site.";
+    if (m.indexOf("password") >= 0) return "Mot de passe refusé : choisis-en un plus long ou plus compliqué.";
+    return isSignup ? "Impossible de créer le compte. Réessaie." : "Connexion impossible. Réessaie.";
   }
 
-  function renderCodeForm() {
+  function renderAuthForm() {
     var body = $("acc-body"), msg = $("acc-msg");
+    var isSignup = authMode === "signup";
     body.innerHTML =
-      "<p>Un e-mail de connexion vient d'être envoyé à :</p>" +
-      "<p id=\"acc-mail\" style=\"word-break:break-all\"></p>" +
-      "<form id=\"f-code\" novalidate>" +
-      "<p class=\"hint\">Touche le lien dans cet e-mail pour te connecter. Si l'e-mail contient un code, entre-le ici.</p>" +
-      "<label for=\"in-code\">CODE (SI TU EN AS UN)</label>" +
-      "<input id=\"in-code\" inputmode=\"numeric\" autocomplete=\"one-time-code\" maxlength=\"10\" required>" +
-      "<div class=\"row\" style=\"margin-top:12px\">" +
-      "<button class=\"btn\" type=\"submit\">VALIDER</button>" +
-      "<button class=\"btn alt\" type=\"button\" id=\"b-back\">CHANGER D'ADRESSE</button></div>" +
+      "<div class=\"tabs\" role=\"group\" aria-label=\"Mode\" style=\"margin-bottom:14px\">" +
+      "<button class=\"tab\" type=\"button\" id=\"m-signup\" aria-pressed=\"" + isSignup + "\">CRÉER UN COMPTE</button>" +
+      "<button class=\"tab\" type=\"button\" id=\"m-signin\" aria-pressed=\"" + !isSignup + "\">SE CONNECTER</button></div>" +
+      "<form id=\"f-auth\" novalidate>" +
+      "<label for=\"in-email\">ADRESSE E-MAIL</label>" +
+      "<input id=\"in-email\" type=\"email\" inputmode=\"email\" autocomplete=\"email\" autocapitalize=\"off\" required>" +
+      "<label for=\"in-pass\" style=\"margin-top:10px\">MOT DE PASSE</label>" +
+      "<input id=\"in-pass\" type=\"password\" autocomplete=\"" + (isSignup ? "new-password" : "current-password") + "\" minlength=\"8\" required>" +
+      (isSignup ? "<p class=\"hint\">8 caractères minimum. Note-le bien : si tu l'oublies, ton compte est perdu et personne ne peut le retrouver.</p>" : "") +
+      "<div class=\"row\" style=\"margin-top:12px\"><button class=\"btn\" type=\"submit\">" + (isSignup ? "CRÉER MON COMPTE" : "ME CONNECTER") + "</button></div>" +
       "</form>";
-    $("acc-mail").textContent = accEmail;
-    $("b-back").addEventListener("click", function () { accStep = "email"; renderAccount(); });
-    $("f-code").addEventListener("submit", async function (e) {
+    $("m-signup").addEventListener("click", function () { authMode = "signup"; renderAccount(); });
+    $("m-signin").addEventListener("click", function () { authMode = "signin"; renderAccount(); });
+    $("f-auth").addEventListener("submit", async function (e) {
       e.preventDefault();
-      var code = $("in-code").value.replace(/\s+/g, "");
-      if (code.length < 6) { setMsg(msg, "Entre le code complet.", true); return; }
-      setMsg(msg, "Vérification…");
-      var r = await sb.auth.verifyOtp({ email: accEmail, token: code, type: "email" });
-      if (r.error) { setMsg(msg, "Code incorrect ou expiré.", true); return; }
-      accStep = "email";
-      accNotice = "Connecté.";
+      var email = $("in-email").value.trim();
+      var pass = $("in-pass").value;
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { setMsg(msg, "Adresse e-mail invalide.", true); return; }
+      if (pass.length < 8) { setMsg(msg, "Le mot de passe doit faire au moins 8 caractères.", true); return; }
+      setMsg(msg, isSignup ? "Création du compte…" : "Connexion…");
+      var r;
+      if (isSignup) {
+        r = await sb.auth.signUp({ email: email, password: pass });
+        if (!r.error && r.data && r.data.user && r.data.user.identities && r.data.user.identities.length === 0) {
+          setMsg(msg, "Cette adresse a déjà un compte. Choisis « Se connecter ».", true);
+          return;
+        }
+        if (!r.error && !(r.data && r.data.session)) {
+          r = await sb.auth.signInWithPassword({ email: email, password: pass });
+        }
+      } else {
+        r = await sb.auth.signInWithPassword({ email: email, password: pass });
+      }
+      if (r.error) { setMsg(msg, authError(r.error, isSignup), true); return; }
+      accNotice = isSignup ? "Compte créé." : "Connecté.";
     });
   }
 
