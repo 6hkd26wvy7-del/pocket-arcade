@@ -1,0 +1,864 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pocket Arcade</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#8bac0f">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+<style>
+/* Layout: one narrow column styled as a green handheld LCD. Top bar with three tabs, then one screen at a time: games, scores, account, Snake. One look in both themes. */
+:root {
+  --page: #8bac0f;
+  --lcd: #9bbc0f;
+  --field: #a9c91a;
+  --mid: #306230;
+  --ink: #0f380f;
+  --err: #7a1f1f;
+  --pixel: "Press Start 2P", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html { background: var(--page); }
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--pixel);
+  font-size: 9px;
+  line-height: 1.9;
+}
+[hidden] { display: none !important; }
+.wrap {
+  max-width: 460px;
+  margin: 0 auto;
+  padding-block: 14px 28px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+a { color: var(--ink); }
+h2 { font-size: 11px; letter-spacing: 0.05em; margin: 0 0 14px; font-weight: normal; }
+p { margin: 0 0 12px; }
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 14px;
+  flex-wrap: wrap;
+  padding-bottom: 10px;
+  border-bottom: 3px solid var(--ink);
+  margin-bottom: 18px;
+}
+.logo { font-size: 11px; letter-spacing: 0.06em; color: var(--ink); text-decoration: none; }
+.nav { display: flex; gap: 14px; min-width: 0; }
+.nav a {
+  font-size: 8px;
+  color: var(--ink);
+  text-decoration: none;
+  padding: 10px 2px;
+  border-bottom: 2px solid transparent;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nav a.on { border-bottom-color: var(--ink); }
+
+.panel {
+  background: var(--lcd);
+  border: 3px solid var(--ink);
+  padding: 14px;
+  margin-bottom: 14px;
+}
+.btn {
+  display: inline-block;
+  background: var(--ink);
+  color: var(--lcd);
+  border: 3px solid var(--ink);
+  border-radius: 4px;
+  padding: 12px 14px;
+  font-family: var(--pixel);
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn:active { background: var(--mid); border-color: var(--mid); }
+.btn.alt { background: transparent; color: var(--ink); }
+.btn.alt:active { background: var(--field); border-color: var(--ink); }
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+.tabs { display: flex; gap: 8px; margin-bottom: 4px; }
+.tab {
+  background: transparent;
+  color: var(--ink);
+  border: 3px solid var(--ink);
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-family: var(--pixel);
+  font-size: 8px;
+  cursor: pointer;
+}
+.tab[aria-pressed="true"] { background: var(--ink); color: var(--lcd); }
+
+label { display: block; margin-bottom: 6px; font-size: 8px; }
+input, select {
+  width: 100%;
+  font: 16px var(--mono);
+  color: var(--ink);
+  padding: 11px;
+  border: 3px solid var(--ink);
+  border-radius: 0;
+  background: var(--field);
+  margin-bottom: 4px;
+}
+.hint { font-size: 8px; color: var(--mid); margin: 0 0 12px; }
+.msg { min-height: 1.9em; margin: 10px 0 0; font-size: 8px; }
+.msg.err { color: var(--err); }
+.sep { border: 0; border-top: 2px dotted var(--mid); margin: 18px 0; }
+
+.game { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.game h3 { margin: 0 0 6px; font-size: 11px; font-weight: normal; letter-spacing: 0.05em; }
+.game p { margin: 0; font-size: 8px; }
+.game > div { min-width: 0; }
+
+.lb { list-style: none; margin: 8px 0 0; padding: 0; }
+.lb li {
+  display: grid;
+  grid-template-columns: 3.4em minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 6px;
+  border-bottom: 2px dotted var(--mid);
+}
+.lb li.me { background: var(--ink); color: var(--lcd); border-bottom-color: var(--ink); }
+.lb .ps { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+#view-snake {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  min-height: calc(100vh - 100px);
+  min-height: calc(100dvh - 100px);
+}
+.stage { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.screen {
+  display: block;
+  width: min(100%, 420px, max(160px, calc((100vh - 230px) * 144 / 208)));
+  width: min(100%, 420px, max(160px, calc((100dvh - 230px) * 144 / 208)));
+  max-width: 100%;
+  aspect-ratio: 144 / 208;
+  background: var(--lcd);
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  border: 4px solid var(--ink);
+  touch-action: none;
+}
+.stage .msg { text-align: center; margin: 0; }
+.foot { margin-top: 26px; font-size: 7px; text-align: center; }
+.btn:focus-visible, .tab:focus-visible, .nav a:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, .screen:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="bar">
+    <a class="logo" href="#menu">POCKET ARCADE</a>
+    <nav class="nav" aria-label="Navigation">
+      <a href="#menu" data-nav="menu">JEUX</a>
+      <a href="#scores" data-nav="scores">SCORES</a>
+      <a href="#compte" data-nav="compte" id="nav-account">COMPTE</a>
+    </nav>
+  </header>
+
+  <div id="offline" class="panel" hidden>
+    <p style="margin:0">Mode hors ligne : les comptes et le classement sont désactivés tant que le site n'est pas relié à sa base de données. Les jeux fonctionnent normalement.</p>
+  </div>
+
+  <main>
+    <section id="view-menu" hidden>
+      <div class="panel"><p id="menu-status" style="margin:0"></p></div>
+      <h2>CHOISIS UN JEU</h2>
+      <div id="game-list"></div>
+    </section>
+
+    <section id="view-scores" hidden>
+      <h2>CLASSEMENT</h2>
+      <label for="lb-game">JEU</label>
+      <select id="lb-game"></select>
+      <div class="tabs" role="group" aria-label="Portée du classement" style="margin-top:10px">
+        <button class="tab" id="tab-all" type="button" aria-pressed="true">MONDE</button>
+        <button class="tab" id="tab-fr" type="button" aria-pressed="false">FRANCE</button>
+      </div>
+      <p id="lb-note" class="msg" role="status"></p>
+      <p id="lb-me" class="msg"></p>
+      <ol id="lb-list" class="lb"></ol>
+    </section>
+
+    <section id="view-compte" hidden>
+      <h2>MON COMPTE</h2>
+      <div id="acc-body" class="panel"></div>
+      <p id="acc-msg" class="msg" role="status"></p>
+    </section>
+
+    <section id="view-snake" hidden>
+      <div class="stage">
+        <canvas id="screen" class="screen" width="144" height="208" tabindex="0" aria-label="Écran du jeu Snake. Glisse un doigt pour tourner."></canvas>
+        <p id="snake-msg" class="msg" role="status"></p>
+        <div class="row">
+          <button class="btn" id="b-pause" type="button">PAUSE</button>
+          <button class="btn" id="b-sound" type="button" aria-pressed="true">SON</button>
+          <button class="btn alt" id="b-restart" type="button">REJOUER</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot"><a href="privacy.html">CONFIDENTIALITÉ</a></footer>
+
+  <!-- Emplacement publicité : colle ici le code de ta régie pub, puis retire l'attribut hidden. -->
+  <aside id="ad-slot" hidden aria-label="Publicité"></aside>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.0/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* To add a game: add it here, add its score cap in schema.sql, and build its own screen. */
+  var GAMES = [
+    { id: "snake", name: "SNAKE", desc: "Mange, grandis, ne touche ni les murs ni ta queue." }
+  ];
+
+  var cfg = window.ARCADE_CONFIG || {};
+  var online = !!(window.supabase && cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && String(cfg.SUPABASE_URL).indexOf("VOTRE") === -1);
+  var sb = null;
+  if (online) {
+    try { sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY); } catch (e) { online = false; }
+  }
+
+  var session = null, profile = null, onlineBest = 0, current = null;
+  var accStep = "email", accEmail = "", accNotice = "";
+
+  function $(id) { return document.getElementById(id); }
+  function setMsg(el, text, isErr) { el.textContent = text || ""; el.classList.toggle("err", !!isErr); }
+  function localBest(game) {
+    try { return parseInt(localStorage.getItem("arcade-best-" + game) || "0", 10) || 0; } catch (e) { return 0; }
+  }
+  function saveLocalBest(game, v) {
+    try { localStorage.setItem("arcade-best-" + game, String(v)); } catch (e) { /* ignore */ }
+  }
+
+  /* ---------- Account data ---------- */
+  async function loadProfile() {
+    profile = null;
+    if (!sb || !session) return;
+    var r = await sb.from("profiles").select("pseudo,country").eq("id", session.user.id).maybeSingle();
+    if (!r.error && r.data) profile = r.data;
+  }
+
+  async function syncBest() {
+    onlineBest = 0;
+    if (!sb || !session || !profile) return;
+    var r = await sb.rpc("my_standing", { p_game: "snake", p_country: null });
+    if (!r.error && r.data && r.data.length) onlineBest = r.data[0].score || 0;
+  }
+
+  async function refreshAuth(s) {
+    session = s;
+    await loadProfile();
+    await syncBest();
+    renderNav();
+    if (session && !profile && current !== "compte") { location.hash = "#compte"; return; }
+    if (current === "compte") renderAccount();
+    if (current === "menu") renderMenu();
+  }
+
+  function renderNav() {
+    var a = $("nav-account");
+    a.textContent = profile ? profile.pseudo.toUpperCase() : "COMPTE";
+  }
+
+  /* ---------- Menu ---------- */
+  function renderMenu() {
+    var st = $("menu-status");
+    st.textContent = "";
+    if (!online) {
+      st.textContent = "Tu joues sans compte. Ton score reste sur cet appareil.";
+    } else if (profile) {
+      st.textContent = "Salut " + profile.pseudo + " ! Tes scores sont gardés sur ton compte.";
+    } else {
+      st.append("Tu joues sans compte. ");
+      var a = document.createElement("a");
+      a.href = "#compte";
+      a.textContent = "Crée un compte";
+      st.append(a, " pour garder tes scores.");
+    }
+    var list = $("game-list");
+    list.textContent = "";
+    GAMES.forEach(function (g) {
+      var card = document.createElement("div");
+      card.className = "panel game";
+      var info = document.createElement("div");
+      var h = document.createElement("h3");
+      h.textContent = g.name;
+      var p = document.createElement("p");
+      p.textContent = g.desc;
+      info.append(h, p);
+      var go = document.createElement("a");
+      go.className = "btn";
+      go.href = "#" + g.id;
+      go.textContent = "JOUER";
+      card.append(info, go);
+      list.append(card);
+    });
+  }
+
+  /* ---------- Scores ---------- */
+  var scoreScope = "ALL", scoreGame = GAMES[0].id, scoreToken = 0;
+
+  function buildGameSelect() {
+    var sel = $("lb-game");
+    GAMES.forEach(function (g) {
+      var o = document.createElement("option");
+      o.value = g.id;
+      o.textContent = g.name;
+      sel.append(o);
+    });
+    sel.addEventListener("change", function () { scoreGame = sel.value; loadScores(); });
+    $("tab-all").addEventListener("click", function () { setScope("ALL"); });
+    $("tab-fr").addEventListener("click", function () { setScope("FR"); });
+  }
+
+  function setScope(s) {
+    scoreScope = s;
+    $("tab-all").setAttribute("aria-pressed", String(s === "ALL"));
+    $("tab-fr").setAttribute("aria-pressed", String(s === "FR"));
+    loadScores();
+  }
+
+  async function loadScores() {
+    var token = ++scoreToken;
+    var list = $("lb-list"), note = $("lb-note"), me = $("lb-me");
+    list.textContent = "";
+    setMsg(me, "");
+    if (!online) {
+      setMsg(note, "Classement indisponible hors ligne. Ton meilleur score sur cet appareil : " + localBest(scoreGame) + ".");
+      return;
+    }
+    setMsg(note, "Chargement…");
+    var country = scoreScope === "FR" ? "FR" : null;
+    var r = await sb.rpc("leaderboard", { p_game: scoreGame, p_country: country, p_limit: 50 });
+    if (token !== scoreToken) return;
+    if (r.error) { setMsg(note, "Impossible de charger le classement. Réessaie plus tard.", true); return; }
+    setMsg(note, r.data.length ? "" : "Personne n'est encore classé. Sois le premier !");
+    r.data.forEach(function (row) {
+      var li = document.createElement("li");
+      if (row.moi) li.className = "me";
+      var rk = document.createElement("span");
+      rk.textContent = "N°" + row.rang;
+      var ps = document.createElement("span");
+      ps.className = "ps";
+      ps.textContent = row.pseudo;
+      var sc = document.createElement("span");
+      sc.textContent = String(row.score);
+      li.append(rk, ps, sc);
+      list.append(li);
+    });
+    if (session && profile) {
+      var m = await sb.rpc("my_standing", { p_game: scoreGame, p_country: country });
+      if (token !== scoreToken) return;
+      if (!m.error && m.data && m.data.length) {
+        setMsg(me, "Ton rang : n°" + m.data[0].rang + " avec " + m.data[0].score + " points.");
+      } else {
+        setMsg(me, "Joue une partie pour entrer au classement.");
+      }
+    } else {
+      setMsg(me, "Connecte-toi pour apparaître dans le classement.");
+    }
+  }
+
+  /* ---------- Account screen ---------- */
+  function renderAccount() {
+    var body = $("acc-body"), msg = $("acc-msg");
+    setMsg(msg, "");
+    if (!online) {
+      body.innerHTML = "<p style=\"margin:0\">Les comptes sont désactivés dans cet aperçu. Ils fonctionneront une fois le site relié à sa base de données.</p>";
+      return;
+    }
+    if (!session) {
+      if (accStep === "code") renderCodeForm(); else renderEmailForm();
+    } else if (!profile) {
+      renderProfileForm();
+    } else {
+      renderMe();
+    }
+    if (accNotice) { setMsg(msg, accNotice); accNotice = ""; }
+  }
+
+  function renderEmailForm() {
+    var body = $("acc-body"), msg = $("acc-msg");
+    body.innerHTML =
+      "<p>Crée un compte ou connecte-toi avec ton adresse e-mail. Tu recevras un e-mail de connexion, pas de mot de passe à retenir.</p>" +
+      "<form id=\"f-email\" novalidate>" +
+      "<label for=\"in-email\">ADRESSE E-MAIL</label>" +
+      "<input id=\"in-email\" type=\"email\" inputmode=\"email\" autocomplete=\"email\" autocapitalize=\"off\" required>" +
+      "<div class=\"row\" style=\"margin-top:12px\"><button class=\"btn\" type=\"submit\">ME CONNECTER</button></div>" +
+      "</form>";
+    $("f-email").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      var email = $("in-email").value.trim();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { setMsg(msg, "Adresse e-mail invalide.", true); return; }
+      setMsg(msg, "Envoi du code…");
+      var r = await sb.auth.signInWithOtp({ email: email, options: { shouldCreateUser: true } });
+      if (r.error) {
+        setMsg(msg, r.error.status === 429 ? "Trop de demandes. Réessaie dans quelques minutes." : "Impossible d'envoyer l'e-mail. Vérifie l'adresse et réessaie.", true);
+        return;
+      }
+      accEmail = email;
+      accStep = "code";
+      accNotice = "E-mail envoyé. Regarde aussi dans tes courriers indésirables.";
+      renderAccount();
+    });
+  }
+
+  function renderCodeForm() {
+    var body = $("acc-body"), msg = $("acc-msg");
+    body.innerHTML =
+      "<p>Un e-mail de connexion vient d'être envoyé à :</p>" +
+      "<p id=\"acc-mail\" style=\"word-break:break-all\"></p>" +
+      "<form id=\"f-code\" novalidate>" +
+      "<p class=\"hint\">Touche le lien dans cet e-mail pour te connecter. Si l'e-mail contient un code, entre-le ici.</p>" +
+      "<label for=\"in-code\">CODE (SI TU EN AS UN)</label>" +
+      "<input id=\"in-code\" inputmode=\"numeric\" autocomplete=\"one-time-code\" maxlength=\"10\" required>" +
+      "<div class=\"row\" style=\"margin-top:12px\">" +
+      "<button class=\"btn\" type=\"submit\">VALIDER</button>" +
+      "<button class=\"btn alt\" type=\"button\" id=\"b-back\">CHANGER D'ADRESSE</button></div>" +
+      "</form>";
+    $("acc-mail").textContent = accEmail;
+    $("b-back").addEventListener("click", function () { accStep = "email"; renderAccount(); });
+    $("f-code").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      var code = $("in-code").value.replace(/\s+/g, "");
+      if (code.length < 6) { setMsg(msg, "Entre le code complet.", true); return; }
+      setMsg(msg, "Vérification…");
+      var r = await sb.auth.verifyOtp({ email: accEmail, token: code, type: "email" });
+      if (r.error) { setMsg(msg, "Code incorrect ou expiré.", true); return; }
+      accStep = "email";
+      accNotice = "Connecté.";
+    });
+  }
+
+  function renderProfileForm() {
+    var body = $("acc-body"), msg = $("acc-msg");
+    body.innerHTML =
+      "<p>Dernière étape : choisis ton pseudo. Il sera visible de tous dans le classement.</p>" +
+      "<form id=\"f-profile\" novalidate>" +
+      "<label for=\"in-pseudo\">PSEUDO</label>" +
+      "<input id=\"in-pseudo\" maxlength=\"16\" autocomplete=\"off\" autocapitalize=\"off\" spellcheck=\"false\" required>" +
+      "<p class=\"hint\">3 à 16 caractères : lettres, chiffres, _ et -</p>" +
+      "<label for=\"in-country\">PAYS</label>" +
+      "<select id=\"in-country\"><option value=\"FR\">France</option><option value=\"OTHER\">Autre pays</option></select>" +
+      "<div class=\"row\" style=\"margin-top:12px\"><button class=\"btn\" type=\"submit\">CRÉER MON PROFIL</button></div>" +
+      "</form>";
+    $("f-profile").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      var pseudo = $("in-pseudo").value.trim();
+      var country = $("in-country").value;
+      if (!/^[A-Za-z0-9_-]{3,16}$/.test(pseudo)) { setMsg(msg, "Pseudo invalide : 3 à 16 lettres, chiffres, _ ou -.", true); return; }
+      setMsg(msg, "Création du profil…");
+      var r = await sb.from("profiles").insert({ id: session.user.id, pseudo: pseudo, country: country });
+      if (r.error) {
+        setMsg(msg, r.error.code === "23505" ? "Ce pseudo est déjà pris. Essaie-en un autre." : "Impossible de créer le profil. Réessaie.", true);
+        return;
+      }
+      accNotice = "Profil créé. Bienvenue !";
+      await refreshAuth(session);
+    });
+  }
+
+  function renderMe() {
+    var body = $("acc-body"), msg = $("acc-msg");
+    body.innerHTML =
+      "<p>CONNECTÉ EN TANT QUE</p>" +
+      "<p id=\"acc-pseudo\" style=\"font-size:12px\"></p>" +
+      "<p id=\"acc-mail\" style=\"word-break:break-all;font-size:8px\"></p>" +
+      "<p id=\"acc-country\" style=\"font-size:8px\"></p>" +
+      "<div class=\"row\"><button class=\"btn\" type=\"button\" id=\"b-out\">SE DÉCONNECTER</button></div>" +
+      "<hr class=\"sep\">" +
+      "<div id=\"del-ask\"><button class=\"btn alt\" type=\"button\" id=\"b-del\">SUPPRIMER MON COMPTE</button></div>" +
+      "<div id=\"del-confirm\" hidden>" +
+      "<p>Tous tes scores seront effacés pour toujours. Cette action est définitive.</p>" +
+      "<div class=\"row\"><button class=\"btn\" type=\"button\" id=\"b-del-yes\">OUI, SUPPRIMER</button>" +
+      "<button class=\"btn alt\" type=\"button\" id=\"b-del-no\">ANNULER</button></div></div>";
+    $("acc-pseudo").textContent = profile.pseudo;
+    $("acc-mail").textContent = session.user.email || "";
+    $("acc-country").textContent = profile.country === "FR" ? "PAYS : FRANCE" : "PAYS : AUTRE";
+    $("b-out").addEventListener("click", async function () {
+      await sb.auth.signOut();
+    });
+    $("b-del").addEventListener("click", function () { $("del-ask").hidden = true; $("del-confirm").hidden = false; });
+    $("b-del-no").addEventListener("click", function () { $("del-ask").hidden = false; $("del-confirm").hidden = true; });
+    $("b-del-yes").addEventListener("click", async function () {
+      setMsg(msg, "Suppression…");
+      var r = await sb.rpc("delete_my_account");
+      if (r.error) { setMsg(msg, "Impossible de supprimer le compte. Réessaie plus tard.", true); return; }
+      accNotice = "Ton compte et tes scores ont été supprimés.";
+      await sb.auth.signOut();
+    });
+  }
+
+  /* ---------- Snake ---------- */
+  var snake = (function () {
+    var W = 144, H = 208, CELL = 8, HUD = 16;
+    var COLS = W / CELL, ROWS = (H - HUD) / CELL;
+    var C0 = "#9bbc0f", C2 = "#306230", C3 = "#0f380f";
+
+    var canvas = $("screen");
+    var ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+
+    var best = localBest("snake");
+    var body, dir, queue, food, score, speed, acc, last, deathAt;
+    var state = "ready", soundOn = true, audio = null, running = false;
+
+    function reset() {
+      var cx = Math.floor(COLS / 2), cy = Math.floor(ROWS / 2);
+      body = [{ x: cx, y: cy }, { x: cx - 1, y: cy }, { x: cx - 2, y: cy }];
+      dir = { x: 1, y: 0 };
+      queue = [];
+      score = 0;
+      speed = 240;
+      acc = 0;
+      spawnFood();
+      setMsg($("snake-msg"), "");
+    }
+
+    function spawnFood() {
+      var free = [];
+      for (var y = 0; y < ROWS; y++) {
+        for (var x = 0; x < COLS; x++) {
+          var taken = false;
+          for (var i = 0; i < body.length; i++) {
+            if (body[i].x === x && body[i].y === y) { taken = true; break; }
+          }
+          if (!taken) free.push({ x: x, y: y });
+        }
+      }
+      food = free.length ? free[Math.floor(Math.random() * free.length)] : null;
+    }
+
+    function beep(freq, ms, delay) {
+      if (!soundOn) return;
+      try {
+        if (!audio) {
+          var AC = window.AudioContext || window.webkitAudioContext;
+          if (!AC) return;
+          audio = new AC();
+        }
+        if (audio.state === "suspended") audio.resume();
+        var t = audio.currentTime + (delay || 0);
+        var osc = audio.createOscillator();
+        var gain = audio.createGain();
+        osc.type = "square";
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.05, t);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + ms / 1000);
+        osc.connect(gain);
+        gain.connect(audio.destination);
+        osc.start(t);
+        osc.stop(t + ms / 1000 + 0.02);
+      } catch (e) { /* sound is optional */ }
+    }
+
+    function step() {
+      if (queue.length) dir = queue.shift();
+      var head = { x: body[0].x + dir.x, y: body[0].y + dir.y };
+      if (head.x < 0 || head.y < 0 || head.x >= COLS || head.y >= ROWS) return die();
+      var eating = food && head.x === food.x && head.y === food.y;
+      var limit = eating ? body.length : body.length - 1;
+      for (var i = 0; i < limit; i++) {
+        if (body[i].x === head.x && body[i].y === head.y) return die();
+      }
+      body.unshift(head);
+      if (eating) {
+        score++;
+        speed = Math.max(130, 240 - score * 4);
+        beep(880, 70);
+        spawnFood();
+        if (!food) win();
+      } else {
+        body.pop();
+      }
+    }
+
+    function die() {
+      state = "dying";
+      deathAt = performance.now();
+      beep(220, 140);
+      beep(165, 140, 0.15);
+      beep(110, 260, 0.3);
+    }
+
+    function win() {
+      beep(660, 100);
+      beep(880, 100, 0.12);
+      beep(1320, 200, 0.24);
+      finish();
+    }
+
+    function finish() {
+      state = "over";
+      if (score > best) { best = score; saveLocalBest("snake", best); }
+      if (score > 0) submit(score);
+    }
+
+    async function submit(value) {
+      var m = $("snake-msg");
+      if (!online) { setMsg(m, "Score gardé sur cet appareil."); return; }
+      if (!session || !profile) {
+        m.textContent = "";
+        m.append("Score non enregistré en ligne. ");
+        var a = document.createElement("a");
+        a.href = "#compte";
+        a.textContent = "Crée un compte";
+        m.append(a, " pour le garder.");
+        return;
+      }
+      setMsg(m, "Envoi du score…");
+      var r = await sb.rpc("submit_score", { p_game: "snake", p_score: value });
+      if (r.error) { setMsg(m, "Score non envoyé. Joue une autre partie pour réessayer.", true); return; }
+      if (value > onlineBest) onlineBest = value;
+      setMsg(m, "Score enregistré sur ton compte.");
+    }
+
+    function action() {
+      if (state === "ready") { state = "playing"; beep(660, 60); }
+      else if (state === "playing") { state = "paused"; }
+      else if (state === "paused") { state = "playing"; beep(660, 60); }
+      else if (state === "over") { reset(); state = "playing"; beep(660, 60); }
+    }
+
+    function togglePause() {
+      if (state === "playing") state = "paused";
+      else if (state === "paused") { state = "playing"; beep(660, 60); }
+    }
+
+    function restart() {
+      reset();
+      state = "playing";
+      beep(660, 60);
+    }
+
+    function turn(dx, dy) {
+      if (state === "dying" || state === "over" || state === "paused") return;
+      if (state === "ready") {
+        if (dx === -dir.x && dy === -dir.y) body.reverse();
+        dir = { x: dx, y: dy };
+        state = "playing";
+        beep(660, 60);
+        return;
+      }
+      var ref = queue.length ? queue[queue.length - 1] : dir;
+      if (dx === ref.x && dy === ref.y) return;
+      if (dx === -ref.x && dy === -ref.y) return;
+      if (queue.length < 3) queue.push({ x: dx, y: dy });
+    }
+
+    function text(str, x, y, color) { ctx.fillStyle = color; ctx.fillText(str, x, y); }
+    function pad(n, len) { var s = String(n); while (s.length < len) s = "0" + s; return s; }
+    function centered(str, y, color) { text(str, Math.round((W - str.length * 8) / 2), y, color); }
+
+    function panel(lines) {
+      var maxLen = 0;
+      for (var i = 0; i < lines.length; i++) maxLen = Math.max(maxLen, lines[i].length);
+      var w = maxLen * 8 + 16;
+      var h = lines.length * 12 + 12;
+      var x = Math.round((W - w) / 2);
+      var y = Math.round(HUD + (H - HUD - h) / 2);
+      ctx.fillStyle = C3;
+      ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
+      ctx.fillStyle = C0;
+      ctx.fillRect(x, y, w, h);
+      for (var j = 0; j < lines.length; j++) centered(lines[j], y + 14 + j * 12, C3);
+    }
+
+    function draw(now) {
+      ctx.fillStyle = C0;
+      ctx.fillRect(0, 0, W, H);
+      ctx.font = "8px 'Press Start 2P', monospace";
+      ctx.textBaseline = "alphabetic";
+
+      text("SCORE " + pad(score, 3), 4, 11, C3);
+      var hi = "REC " + pad(Math.max(best, onlineBest, score), 3);
+      text(hi, W - 4 - hi.length * 8, 11, C3);
+      ctx.fillStyle = C3;
+      ctx.fillRect(0, HUD - 1, W, 1);
+
+      if (food) {
+        var fx = food.x * CELL, fy = HUD + food.y * CELL;
+        ctx.fillStyle = C3;
+        ctx.fillRect(fx + 3, fy + 1, 2, 6);
+        ctx.fillRect(fx + 1, fy + 3, 6, 2);
+      }
+
+      var hidden = state === "dying" && Math.floor((now - deathAt) / 110) % 2 === 1;
+      if (!hidden) {
+        for (var i = body.length - 1; i >= 0; i--) {
+          var s = body[i];
+          var px = s.x * CELL, py = HUD + s.y * CELL;
+          if (i === 0) {
+            ctx.fillStyle = C3;
+            ctx.fillRect(px, py, CELL, CELL);
+            ctx.fillStyle = C0;
+            var ex = dir.x === 1 ? 5 : dir.x === -1 ? 1 : 2;
+            var ey = dir.y === 1 ? 5 : dir.y === -1 ? 1 : 2;
+            ctx.fillRect(px + ex, py + ey, 2, 2);
+            if (dir.x !== 0) ctx.fillRect(px + ex, py + 5 - (ey - 2), 2, 2);
+            else ctx.fillRect(px + 5 - (ex - 2), py + ey, 2, 2);
+          } else {
+            ctx.fillStyle = C2;
+            ctx.fillRect(px + 1, py + 1, CELL - 2, CELL - 2);
+            ctx.fillStyle = C3;
+            ctx.fillRect(px + 2, py + 2, CELL - 4, CELL - 4);
+          }
+        }
+      }
+
+      if (state === "ready") {
+        panel(["POCKET SNAKE", "", "GLISSE POUR", "COMMENCER"]);
+      } else if (state === "paused") {
+        panel(["PAUSE", "", "TOUCHE POUR", "REPRENDRE"]);
+      } else if (state === "over") {
+        var newBest = score > 0 && score >= Math.max(best, onlineBest);
+        var lines = [body.length >= COLS * ROWS ? "BRAVO !" : "PERDU", "SCORE " + score];
+        if (newBest) lines.push("NOUVEAU REC !");
+        lines.push("", "TOUCHE POUR", "REJOUER");
+        panel(lines);
+      }
+    }
+
+    function frame(now) {
+      if (current !== "snake") { running = false; return; }
+      if (last == null) last = now;
+      var dt = Math.min(now - last, 250);
+      last = now;
+      if (state === "playing") {
+        acc += dt;
+        while (acc >= speed && state === "playing") { acc -= speed; step(); }
+      } else if (state === "dying") {
+        if (now - deathAt > 800) finish();
+      }
+      draw(now);
+      requestAnimationFrame(frame);
+    }
+
+    function enter() {
+      last = null;
+      if (!running) { running = true; requestAnimationFrame(frame); }
+    }
+
+    function leave() {
+      if (state === "playing") state = "paused";
+    }
+
+    /* Keyboard (only while Snake is on screen) */
+    window.addEventListener("keydown", function (e) {
+      if (current !== "snake") return;
+      var k = e.key, handled = true;
+      if (k === "ArrowUp" || k === "w" || k === "W" || k === "z" || k === "Z") turn(0, -1);
+      else if (k === "ArrowDown" || k === "s" || k === "S") turn(0, 1);
+      else if (k === "ArrowLeft" || k === "a" || k === "A" || k === "q" || k === "Q") turn(-1, 0);
+      else if (k === "ArrowRight" || k === "d" || k === "D") turn(1, 0);
+      else if (k === " " || k === "Enter" || k === "p" || k === "P") action();
+      else handled = false;
+      if (handled) e.preventDefault();
+    });
+
+    $("b-pause").addEventListener("click", togglePause);
+    $("b-restart").addEventListener("click", restart);
+    var soundBtn = $("b-sound");
+    soundBtn.addEventListener("click", function () {
+      soundOn = !soundOn;
+      soundBtn.setAttribute("aria-pressed", String(soundOn));
+      soundBtn.textContent = soundOn ? "SON" : "MUET";
+      if (soundOn) beep(660, 60);
+    });
+
+    /* Swipe anywhere on the Snake screen; tap to resume or replay */
+    var area = $("view-snake");
+    var sx = 0, sy = 0, moved = false, tracking = false;
+    area.addEventListener("pointerdown", function (e) {
+      if (e.target.closest && e.target.closest("button, a")) return;
+      tracking = true; moved = false; sx = e.clientX; sy = e.clientY;
+    });
+    area.addEventListener("pointermove", function (e) {
+      if (!tracking) return;
+      var dx = e.clientX - sx, dy = e.clientY - sy;
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      moved = true;
+      if (Math.abs(dx) > Math.abs(dy)) turn(dx > 0 ? 1 : -1, 0);
+      else turn(0, dy > 0 ? 1 : -1);
+      sx = e.clientX; sy = e.clientY;
+    });
+    area.addEventListener("pointerup", function () {
+      if (tracking && !moved && state !== "ready" && state !== "playing" && state !== "dying") action();
+      tracking = false;
+    });
+    area.addEventListener("pointercancel", function () { tracking = false; });
+
+    document.addEventListener("visibilitychange", function () {
+      if (document.hidden && state === "playing") state = "paused";
+    });
+
+    reset();
+    if (document.fonts && document.fonts.load) {
+      document.fonts.load("8px 'Press Start 2P'").catch(function () { /* fallback font is fine */ });
+    }
+
+    return { enter: enter, leave: leave };
+  })();
+
+  /* ---------- Router ---------- */
+  var VIEWS = ["menu", "scores", "compte", "snake"];
+
+  function route() {
+    var h = (location.hash || "#menu").slice(1);
+    if (VIEWS.indexOf(h) < 0) h = "menu";
+    if (current === "snake" && h !== "snake") snake.leave();
+    current = h;
+    VIEWS.forEach(function (v) { $("view-" + v).hidden = v !== h; });
+    document.querySelectorAll("[data-nav]").forEach(function (a) {
+      a.classList.toggle("on", a.getAttribute("data-nav") === h);
+    });
+    if (h === "menu") renderMenu();
+    if (h === "scores") loadScores();
+    if (h === "compte") renderAccount();
+    if (h === "snake") snake.enter();
+    window.scrollTo(0, 0);
+  }
+
+  $("offline").hidden = online;
+  buildGameSelect();
+  window.addEventListener("hashchange", route);
+  route();
+  renderNav();
+
+  if (sb) {
+    sb.auth.onAuthStateChange(function (event, s) {
+      /* Deferred on purpose: calling the client inside this callback can deadlock. */
+      setTimeout(function () { refreshAuth(s); }, 0);
+    });
+  }
+})();
+</script>
+</body>
+</html>
