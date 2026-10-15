@@ -1,0 +1,20 @@
+// Vérifie le site TEST publié (vraie base boygam-test, vrai serveur de duels), en visiteur non connecté, sur iPhone (WebKit).
+import { createRequire } from 'module'; const require=createRequire(import.meta.url); const { webkit, devices } = require('playwright');
+const FT=new URL('./', import.meta.url).pathname;
+const URL_TEST='https://6hkd26wvy7-del.github.io/pocket-arcade/test/';
+const b=await webkit.launch(); const ctx=await b.newContext({...devices['iPhone 13']}); const page=await ctx.newPage();
+const errs=[], hosts=new Set(); page.on('pageerror',e=>errs.push(String(e).slice(0,200)));
+page.on('request',r=>{ try{ hosts.add(new URL(r.url()).host);}catch(e){} });
+await page.goto(URL_TEST+'#menu',{waitUntil:'networkidle'});
+console.log('jeux du menu :', (await page.$$eval('#game-list h3', e=>e.map(x=>x.textContent))).join(', '));
+await page.goto(URL_TEST+'#scores',{waitUntil:'networkidle'}); await page.waitForTimeout(1500);
+console.log('classements :', (await page.$$eval('#lb-game option', e=>e.map(x=>x.textContent))).join(', '));
+console.log('classement chargé :', !/Impossible de charger/.test(await page.innerText('body')));
+await page.screenshot({path:FT+'captures/en-ligne-scores.png'});
+await page.goto(URL_TEST+'#boyblocks',{waitUntil:'networkidle'}); await page.waitForTimeout(800);
+console.log('écran BoyBlocks présent :', await page.isVisible('#bb-screen'));
+await page.screenshot({path:FT+'captures/en-ligne-boyblocks.png'});
+await page.goto(URL_TEST+'#compte',{waitUntil:'networkidle'}); await page.waitForTimeout(800);
+console.log('formulaire de connexion :', /CRÉER UN COMPTE/.test(await page.innerText('body')));
+console.log('serveurs contactés :', [...hosts].sort().join(', '));
+console.log('errors', JSON.stringify(errs)); await b.close();
