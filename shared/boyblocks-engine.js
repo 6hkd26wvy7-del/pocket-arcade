@@ -23,7 +23,11 @@ const SHAPES = [
   var cells = [];
   s[2].forEach(function (row, r) { for (var c = 0; c < row.length; c++) if (row[c] === "#") cells.push([r, c]); });
   var h = s[2].length, w = Math.max.apply(null, s[2].map(function (r) { return r.length; }));
-  return { id: i, name: s[0], weight: s[1], cells: cells, h: h, w: w, n: cells.length };
+  var rowN = [], colN = [];   // nombre de cases de la pièce sur chacune de ses lignes / colonnes
+  for (var k = 0; k < h; k++) rowN.push(0);
+  for (var k2 = 0; k2 < w; k2++) colN.push(0);
+  cells.forEach(function (x) { rowN[x[0]]++; colN[x[1]]++; });
+  return { id: i, name: s[0], weight: s[1], cells: cells, h: h, w: w, n: cells.length, rowN: rowN, colN: colN };
 });
 export const PIECES = SHAPES;
 const TOTAL_WEIGHT = SHAPES.reduce(function (a, s) { return a + s.weight; }, 0);
@@ -64,29 +68,86 @@ export function canPlaceAnywhere(grid, shape) {
   return false;
 }
 
-// Lot de 3 pièces n° `index`. Duel : identique pour les deux joueurs (ensureFit=false).
-// Solo : on retente jusqu'à 12 fois pour qu'au moins une pièce rentre (probable, pas absolu ; reproductible donc vérifiable).
-export function dealTriple(seed, index, grid, ensureFit) {
+// Tirage d'un lot « au hasard » (règles 1) : 3 pièces et 3 couleurs à partir de (graine, numéro de lot, essai).
+function rawTriple(seed, index, salt) {
+  var r = rng(mix(seed, index, salt));
+  var t = [drawPiece(r), drawPiece(r), drawPiece(r)];
+  var colors = [1 + Math.floor(r() * 7), 1 + Math.floor(r() * 7), 1 + Math.floor(r() * 7)];
+  return t.map(function (p, i) { return { p: p, color: colors[i] }; });
+}
+
+// Règles 1 (et duels) : au hasard ; en solo on retente jusqu'à 12 fois pour qu'au moins une pièce rentre.
+function dealRandom(seed, index, grid, ensureFit) {
   var best = null;
   for (var salt = 0; salt < (ensureFit ? 12 : 1); salt++) {
-    var r = rng(mix(seed, index, salt));
-    var t = [drawPiece(r), drawPiece(r), drawPiece(r)];
-    var colors = [1 + Math.floor(r() * 7), 1 + Math.floor(r() * 7), 1 + Math.floor(r() * 7)];
-    var triple = t.map(function (p, i) { return { p: p, color: colors[i] }; });
+    var triple = rawTriple(seed, index, salt);
     best = triple;
     if (!ensureFit || triple.some(function (x) { return canPlaceAnywhere(grid, SHAPES[x.p]); })) return triple;
   }
   return best;
 }
 
+// Règles 2 (solo) : tirage « stratégique », façon mode classique de Block Blast.
+// On compare 4 lots candidats et on note chacun d'après la grille : pièces posables, lignes qu'elles peuvent
+// compléter, possibilité d'enchaîner plusieurs lignes (combo). 70 % du temps on garde le lot le plus
+// intéressant, 30 % du temps on garde le tirage au hasard : le jeu n'est jamais garanti gagnable.
+// Calculs uniquement sur des entiers : la base de données refait exactement le même choix (bb_deal2).
+export const STRATEGY = { candidates: 4, percent: 70, choiceSalt: 97 };
+function emptiesOf(grid) {
+  var re = [], ce = [];
+  for (var i = 0; i < SIZE; i++) { re.push(0); ce.push(0); }
+  for (var r = 0; r < SIZE; r++) for (var c = 0; c < SIZE; c++) if (!grid[r * SIZE + c]) { re[r]++; ce[c]++; }
+  return { re: re, ce: ce };
+}
+// [nombre de positions possibles, meilleur nombre de lignes/colonnes complétées en un coup]
+export function pieceOutlook(grid, em, shape) {
+  var fitsN = 0, best = 0;
+  for (var r = 0; r <= SIZE - shape.h; r++) for (var c = 0; c <= SIZE - shape.w; c++) {
+    if (!fits(grid, shape, r, c)) continue;
+    fitsN++;
+    var lines = 0;
+    for (var dr = 0; dr < shape.h; dr++) if (em.re[r + dr] === shape.rowN[dr]) lines++;
+    for (var dc = 0; dc < shape.w; dc++) if (em.ce[c + dc] === shape.colN[dc]) lines++;
+    if (lines > best) best = lines;
+  }
+  return [fitsN, best];
+}
+export function tripleQuality(grid, triple) {
+  var em = emptiesOf(grid), q = 0, clearing = 0;
+  triple.forEach(function (x) {
+    var o = pieceOutlook(grid, em, SHAPES[x.p]);
+    q += o[0] === 0 ? -30 : 10 + Math.min(o[0], 3);
+    q += 12 * o[1];
+    if (o[1] > 0) clearing++;
+  });
+  if (clearing >= 2) q += 8;
+  return q;
+}
+function dealStrategic(seed, index, grid) {
+  var pick = Math.floor(rng(mix(seed, index, STRATEGY.choiceSalt))() * 100);
+  if (pick >= STRATEGY.percent) return dealRandom(seed, index, grid, true);
+  var best = null, bestQ = 0;
+  for (var salt = 0; salt < STRATEGY.candidates; salt++) {
+    var t = rawTriple(seed, index, salt), q = tripleQuality(grid, t);
+    if (best === null || q > bestQ) { best = t; bestQ = q; }
+  }
+  return best;
+}
+
+// Lot de 3 pièces n° `index`. Duel : identique pour les deux joueurs (ensureFit=false, toujours au hasard).
+export function dealTriple(seed, index, grid, ensureFit, rules) {
+  if (ensureFit && rules === 2) return dealStrategic(seed, index, grid);
+  return dealRandom(seed, index, grid, ensureFit);
+}
+
 export function newGame(seed, opts) {
   opts = opts || {};
   var g = {
-    seed: seed >>> 0, ensureFit: opts.ensureFit !== false,
+    seed: seed >>> 0, ensureFit: opts.ensureFit !== false, rules: opts.rules === 2 ? 2 : 1,
     grid: emptyGrid(), score: 0, streak: 0, best_streak: 0, lines: 0, moves: 0, index: 0, over: false,
     pieces: null, log: []
   };
-  g.pieces = dealTriple(g.seed, 0, g.grid, g.ensureFit);
+  g.pieces = dealTriple(g.seed, 0, g.grid, g.ensureFit, g.rules);
   checkOver(g);
   return g;
 }
@@ -137,7 +198,7 @@ export function place(g, slot, r, c) {
   var dealt = false;
   if (g.pieces.every(function (x) { return !x; })) {
     g.index++;
-    g.pieces = dealTriple(g.seed, g.index, g.grid, g.ensureFit);
+    g.pieces = dealTriple(g.seed, g.index, g.grid, g.ensureFit, g.rules);
     dealt = true;
   }
   checkOver(g);

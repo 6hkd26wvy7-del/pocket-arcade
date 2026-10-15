@@ -25,6 +25,8 @@ try:
     for f in ["schema_v1_v4.sql", "schema_v5.sql"]: run_file(c, f"{HIST}/{f}")
     run_file(c, V6A); sql(SEED)
     run_file(c, f"{REPO}/schema_v6_v7.sql"); run_file(c, f"{REPO}/schema_v8_v9.sql")
+    old_run = as_user(c, U2, "select boyblocks_start()")[0][0]   # partie commencée AVANT la v10
+    run_file(c, f"{REPO}/schema_v10_boyblocks_regles2.sql")
     sql("update public.app_settings set value = 'false' where key = 'maintenance'") if sql("select to_regclass('public.app_settings')")[0][0] else None
     print("app_settings:", sql("select * from public.app_settings"))
 
@@ -96,6 +98,48 @@ try:
     t("tables BoyBlocks illisibles", lambda: must_fail(lambda: as_user(c, U2, "select * from boyblocks_runs"), "permission denied"))
     t("mission bb_1500 visible", lambda: [m for m in as_user(c, U2, "select code, progress from my_missions()") if m[0]=='bb_1500'])
     t("classement boyblocks", lambda: as_user(c, U2, "select * from leaderboard('boyblocks', null, 5)"))
+
+    print("== v10 : BoyBlocks règles 2 (tirage stratégique)")
+    def playout(seed, rules, limit=400):
+        mv = []
+        for _ in range(limit):
+            if sql("select over from bb_replay2(%s, %s::jsonb, true, %s)", (seed, json.dumps(mv), rules))[0][0]: break
+            nxt = None
+            for slot in range(3):
+                for rr in range(8):
+                    for cc in range(8):
+                        if sql("select ok from bb_replay2(%s, %s::jsonb, true, %s)", (seed, json.dumps(mv + [[slot, rr, cc]]), rules))[0][0]:
+                            nxt = [slot, rr, cc]; break
+                    if nxt: break
+                if nxt: break
+            if not nxt: break
+            mv.append(nxt)
+        return mv
+    r2 = as_user(c, U2, "select boyblocks_start_v2()")[0][0]
+    t("boyblocks_start_v2 donne des parties règles 2", lambda: r2["rules"])
+    mv2 = playout(r2["seed"], 2, 60)
+    sql("update boyblocks_runs set started_at = now() - interval '10 minutes' where id in (%s, %s)", (r2["run_id"], old_run["run_id"]))
+    t("fin de partie règles 2 acceptée", lambda: {k: v for k, v in as_user(c, U2, "select boyblocks_finish(%s, %s::jsonb)", (r2["run_id"], json.dumps(mv2)))[0][0].items() if k in ("score", "moves", "rules")})
+    mv1 = playout(old_run["seed"], 1, 30)
+    t("partie commencée avant la v10 : vérifiée avec l'ancien tirage", lambda: {k: v for k, v in as_user(c, U2, "select boyblocks_finish(%s, %s::jsonb)", (old_run["run_id"], json.dumps(mv1)))[0][0].items() if k in ("score", "moves", "rules")})
+    r2b = as_user(c, U2, "select boyblocks_start_v2()")[0][0]
+    mv_r1 = playout(r2b["seed"], 1, 40)        # coups joués avec l'ancien tirage sur une partie règles 2
+    same = sql("select ok from bb_replay2(%s, %s::jsonb, true, 2)", (r2b["seed"], json.dumps(mv_r1)))[0][0]
+    sql("update boyblocks_runs set started_at = now() - interval '10 minutes' where id = %s", (r2b["run_id"],))
+    if same: print("  (sauté : par hasard les deux tirages coïncident sur cette graine)")
+    else: t("coups « règles 1 » sur une partie règles 2 refusés", lambda: must_fail(lambda: as_user(c, U2, "select boyblocks_finish(%s, %s::jsonb)", (r2b["run_id"], json.dumps(mv_r1))), "invalid run"))
+    t("bb_replay2 et bb_deal2 non appelables par un joueur", lambda: must_fail(lambda: as_user(c, U2, "select * from bb_replay2(1, '[]'::jsonb, true, 2)"), "permission denied"))
+    import time, subprocess, shutil as _sh
+    node = _sh.which("node") or os.path.expanduser("~/.local/node/bin/node")
+    if os.path.exists(node):
+        js = """import * as BB from '%s';
+const g=BB.newGame(424242,{ensureFit:true,rules:2});
+function bot(){let b=null,bs=-1e9;for(let s=0;s<3;s++){if(!g.pieces[s])continue;const sh=BB.PIECES[g.pieces[s].p];for(let r=0;r<=8-sh.h;r++)for(let c=0;c<=8-sh.w;c++){if(!BB.fits(g.grid,sh,r,c))continue;const cp=JSON.parse(JSON.stringify(g));const x=BB.place(cp,s,r,c);const sc=x.gain*3+cp.grid.filter(v=>!v).length+(x.over?-500:0);if(sc>bs){bs=sc;b=[s,r,c];}}}return b;}
+while(!g.over&&g.moves<1500){const m=bot();if(!m)break;BB.place(g,m[0],m[1],m[2]);}
+console.log(JSON.stringify({moves:g.log,score:g.score}));""" % os.path.join(os.path.dirname(REPO), "shared", "boyblocks-engine.js")
+        long = json.loads(subprocess.check_output([node, "--input-type=module", "-e", js], text=True))
+        t0 = time.time(); res = sql("select ok, score from bb_replay2(424242, %s::jsonb, true, 2)", (json.dumps(long["moves"]),))[0]; dt = time.time() - t0
+        t(f"longue partie ({len(long['moves'])} coups) vérifiée en {dt:.2f} s, score identique", lambda: (res if res == (True, long["score"]) else (_ for _ in ()).throw(Exception(f"écart {res} != {long['score']}"))) and dt < 4 or (_ for _ in ()).throw(Exception(f"trop lent : {dt:.2f} s")))
 
     print("== v9 : badges à paliers")
     t("sync_tiers tintintest", lambda: as_user(c, U1, "select sync_tiers()")[0][0])

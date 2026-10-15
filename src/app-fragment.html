@@ -140,7 +140,7 @@ input, select {
 .lb li.me { background: var(--ink); color: var(--lcd); border-bottom-color: var(--ink); }
 .lb .ps { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-#view-snake, #view-arena, #view-blocks, #view-space {
+#view-snake, #view-arena, #view-blocks, #view-space, #view-boyblocks {
   touch-action: none;
   -webkit-user-select: none;
   user-select: none;
@@ -148,6 +148,11 @@ input, select {
   min-height: calc(100vh - 100px);
   min-height: calc(100dvh - 100px);
 }
+/* Pendant une partie : iOS ne doit ni sélectionner de texte, ni ouvrir de loupe ou de menu sur un appui long.
+   Les champs de saisie (signalement de bug, chat) restent utilisables. */
+body.ingame, body.ingame * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+body.ingame input, body.ingame textarea, body.ingame select, body.ingame [contenteditable="true"] { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+body.ingame .btn { touch-action: manipulation; }
 .stage { display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .screen {
   display: block;
@@ -2166,6 +2171,27 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       for (var j = 0; j < lines.length; j++) centered(lines[j], y + 14 + j * 12, C3);
     }
 
+    // pomme en pixel art dans une case de 8x8 : queue, feuille verte, reflet
+    var APPLE = [
+      "....g...",
+      "...bgg..",
+      ".rrbrrr.",
+      "rrwrrrrr",
+      "rwrrrrrr",
+      "rrrrrrrd",
+      ".rrrrrd.",
+      "..rddd..",
+    ];
+    var APPLE_COLORS = { r: "#EF4444", d: "#B91C1C", w: "#FECACA", g: "#22C55E", b: "#7C4A1E" };
+    function drawApple(x, y) {
+      for (var r = 0; r < 8; r++) for (var c = 0; c < 8; c++) {
+        var k = APPLE[r].charAt(c);
+        if (k === ".") continue;
+        ctx.fillStyle = APPLE_COLORS[k];
+        ctx.fillRect(x + c, y + r, 1, 1);
+      }
+    }
+
     function draw(now) {
       ctx.fillStyle = C0;
       ctx.fillRect(0, 0, W, H);
@@ -2178,13 +2204,15 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       ctx.fillStyle = C3;
       ctx.fillRect(0, HUD - 1, W, 1);
 
-      if (food) {
-        var fx = food.x * CELL, fy = HUD + food.y * CELL;
-        ctx.fillStyle = "#F43F5E";
-        ctx.fillRect(fx + 3, fy + 1, 2, 6);
-        ctx.fillRect(fx + 1, fy + 3, 6, 2);
-        ctx.fillRect(fx + 2, fy + 2, 4, 4);
-      }
+      // quadrillage discret : repère les cases sans encombrer le terrain
+      ctx.save();
+      ctx.globalAlpha = 0.09;
+      ctx.fillStyle = C3;
+      for (var gx = CELL; gx < W; gx += CELL) ctx.fillRect(gx, HUD, 1, H - HUD);
+      for (var gy = HUD + CELL; gy < H; gy += CELL) ctx.fillRect(0, gy, W, 1);
+      ctx.restore();
+
+      if (food) drawApple(food.x * CELL, HUD + food.y * CELL);
 
       var hidden = state === "dying" && Math.floor((now - deathAt) / 110) % 2 === 1;
       if (!hidden) {
@@ -2697,19 +2725,22 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       drag = null; fx = []; pops = []; banner = null; flashRows = []; overInfo = null; shown = 0;
       state = "loading"; g = null; runId = null; ranked = false;
       setMsg($("bb-msg"), "");
-      var seed = newSeed();
+      var seed = newSeed(), rules = 2;   // règles 2 : tirage stratégique ; parties hors ligne aussi
       if (online && sb && session && profile) {
         try {
-          var r = await sb.rpc("boyblocks_start");
+          var r = await sb.rpc("boyblocks_start_v2");
+          if (r.error && /boyblocks_start_v2|PGRST202|42883/.test(String(r.error.code) + String(r.error.message))) {
+            rules = 1; r = await sb.rpc("boyblocks_start");   // base pas encore migrée (v10) : ancien tirage
+          }
           if (token !== startToken) return;
-          if (!r.error && r.data && r.data.run_id) { seed = Number(r.data.seed); runId = r.data.run_id; ranked = true; }
+          if (!r.error && r.data && r.data.run_id) { seed = Number(r.data.seed); runId = r.data.run_id; ranked = true; rules = Number(r.data.rules) === 2 ? 2 : 1; }
           else setMsg($("bb-msg"), bbStartError(r.error), true);
         } catch (e) { if (token !== startToken) return; setMsg($("bb-msg"), "Partie hors classement (connexion impossible).", true); }
       } else if (online && !session) {
         setMsg($("bb-msg"), "Partie libre : connecte-toi pour gagner XP, BOYCOINS et classement.");
       }
       if (token !== startToken) return;
-      g = BBE.newGame(seed, { ensureFit: true });
+      g = BBE.newGame(seed, { ensureFit: true, rules: rules });
       state = g.over ? "over" : "playing";
       if (g.over) finish();
     }
@@ -3586,8 +3617,15 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
 
   /* ---------- Plein écran pendant une partie ---------- */
   var GAME_CANVAS = { snake: "screen", blocks: "bl-screen", boyblocks: "bb-screen", space: "sp-screen", arena: "ar-screen" };
+  function isEditable(t) { return !!(t && t.closest && t.closest("input, textarea, select, [contenteditable='true']")); }
+  function blockInGame(e) { if (document.body.classList.contains("ingame") && !isEditable(e.target)) e.preventDefault(); }
+  document.addEventListener("selectstart", blockInGame);
+  document.addEventListener("contextmenu", blockInGame);
+  document.addEventListener("gesturestart", blockInGame);   // pincement (zoom) d'iOS pendant une partie
+  document.addEventListener("dblclick", blockInGame);
   function updateIngame() {
     var on = !!GAME_CANVAS[current] && (current !== "arena" || !$("ar-stage").hidden);
+    if (on) { try { var sel = window.getSelection(); if (sel && !isEditable(document.activeElement)) sel.removeAllRanges(); } catch (e) { /* ignore */ } }
     document.body.classList.toggle("ingame", on);
     window.scrollTo(0, 0);
     fitGame();
