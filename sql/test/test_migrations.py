@@ -27,6 +27,7 @@ try:
     run_file(c, f"{REPO}/schema_v6_v7.sql"); run_file(c, f"{REPO}/schema_v8_v9.sql")
     old_run = as_user(c, U2, "select boyblocks_start()")[0][0]   # partie commencée AVANT la v10
     run_file(c, f"{REPO}/schema_v10_boyblocks_regles2.sql")
+    run_file(c, f"{REPO}/schema_v11_economie_reglages.sql"); run_file(c, f"{REPO}/schema_v11_economie_reglages.sql")
     sql("update public.app_settings set value = 'false' where key = 'maintenance'") if sql("select to_regclass('public.app_settings')")[0][0] else None
     print("app_settings:", sql("select * from public.app_settings"))
 
@@ -140,6 +141,23 @@ console.log(JSON.stringify({moves:g.log,score:g.score}));""" % os.path.join(os.p
         long = json.loads(subprocess.check_output([node, "--input-type=module", "-e", js], text=True))
         t0 = time.time(); res = sql("select ok, score from bb_replay2(424242, %s::jsonb, true, 2)", (json.dumps(long["moves"]),))[0]; dt = time.time() - t0
         t(f"longue partie ({len(long['moves'])} coups) vérifiée en {dt:.2f} s, score identique", lambda: (res if res == (True, long["score"]) else (_ for _ in ()).throw(Exception(f"écart {res} != {long['score']}"))) and dt < 4 or (_ for _ in ()).throw(Exception(f"trop lent : {dt:.2f} s")))
+
+    print("== v11 : réglages de l'économie (montants inchangés)")
+    t("bonus de connexion lisible par le site", lambda: as_user(c, U1, "select economy_public()")[0][0])
+    t("réglages illisibles en direct par un joueur", lambda: must_fail(lambda: as_user(c, U2, "select * from economy_settings"), "permission denied"))
+    t("staff_economy refusé à un joueur", lambda: must_fail(lambda: as_user(c, U2, "select staff_economy()"), "forbidden"))
+    t("staff_economy pour le fondateur", lambda: sorted(as_user(c, U1, "select staff_economy()")[0][0]["settings"].keys()))
+    t("valeur hors bornes refusée", lambda: must_fail(lambda: as_user(c, U1, "select staff_economy_set('game_bc_daily_cap', '99999'::jsonb)"), "invalid value"))
+    t("bonus de connexion à 7 valeurs exigé", lambda: must_fail(lambda: as_user(c, U1, "select staff_economy_set('daily_streak', '[1,2,3]'::jsonb)"), "invalid value"))
+    def cap_applies():
+        as_user(c, U1, "select staff_economy_set('game_bc_daily_cap', '2'::jsonb)")
+        sql("update scores set created_at = now() - interval '1 minute'")
+        r = as_user(c, U2, "select submit_score('space', 6000)")[0][0]["bc"]
+        as_user(c, U1, "select staff_economy_set('game_bc_daily_cap', '150'::jsonb)")
+        return r
+    t("plafond modifié appliqué aux parties (2 BC max)", lambda: cap_applies() <= 2 or (_ for _ in ()).throw(Exception("plafond non appliqué")))
+    t("changement de prix journalisé, objets achetés conservés", lambda: (as_user(c, U1, "select staff_set_price('title_rookie', 120)"), as_user(c, U1, "select staff_economy()")[0][0]["log"][0]["what"])[1])
+    t("récompense de mission modifiable", lambda: (as_user(c, U1, "select staff_set_mission_reward('play_3', 12, 20)"), sql("select reward_bc from missions where code = 'play_3'")[0][0])[1])
 
     print("== v9 : badges à paliers")
     t("sync_tiers tintintest", lambda: as_user(c, U1, "select sync_tiers()")[0][0])

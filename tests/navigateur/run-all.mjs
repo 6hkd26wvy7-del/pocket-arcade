@@ -14,6 +14,7 @@ const TESTS = {
   "ui.js": ["OFFRIR dans le chat ? false", "unblock_user", "set_avatar"],
   "ui3.js": ["Sauvegarde vérifiée et téléchargée"],
   "ui4.js": ["Sauvegarde vérifiée et téléchargée"],
+  "economie.mjs": ["panneau économie : true", "\"p_key\":\"game_bc_daily_cap\",\"p_value\":40", "bonus affiché : 5,5,10,10,15,15,40"],
   "iphone.mjs": ["envoyés identiques: true", "Score vérifié et enregistré", "protection ok", "accueil ok"],
 };
 let bad = 0;

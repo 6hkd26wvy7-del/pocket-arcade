@@ -48,3 +48,9 @@ base `rvygnqpagbmiqbdkwlfp`) n'est jamais touchée sans accord.
 - Barre de navigation fixe en bas (téléphone) : Accueil, Classements, Amis, Profil. La boutique reste accessible par
   la pastille BOYCOINS de l'en-tête, qui affiche le solde. L'onglet actif suit chaque page (jeux → Accueil, boutique → Profil).
 - Bandeau « version test » réduit à une fine pastille.
+
+## Phase 3 — réalisé (proposition en attente de décision)
+
+- Audit et proposition chiffrée : `docs/ECONOMIE-BOYCOINS.md`.
+- Migration v11 appliquée sur TEST : réglages de l'économie administrables (valeurs d'origine, aucun montant modifié),
+  panneau « Économie BOYCOINS » dans l'administration, bornes et journal des changements.

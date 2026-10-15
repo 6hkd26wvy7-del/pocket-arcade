@@ -282,6 +282,11 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-hi)
 .foot a { color: var(--muted); }
 .btn:focus-visible, .tab:focus-visible, .nav a:focus-visible, a:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 
+/* Administration : économie */
+.eco-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 0 8px; align-items: end; margin-bottom: 6px; }
+.eco-row > b { grid-column: 1 / -1; font-size: 12px; margin-top: 6px; }
+.panel h4 { font-size: 13px; margin: 14px 0 6px; color: var(--text); }
+
 /* Bandeau du site TEST : discret */
 #test-banner { padding: 6px 12px; border-radius: 999px; margin-bottom: 12px; background: rgba(245, 158, 11, .1); border-color: rgba(245, 158, 11, .4); }
 #test-banner p { font-size: 11px; font-weight: 700; letter-spacing: .04em; color: #FDE68A; text-align: center; }
@@ -622,6 +627,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
   }
 
   /* ---------- Level, coins, missions, shop (needs schema_v2.sql on the database) ---------- */
+  var econPublic = null;
   var me = null, missions = [], badgeCat = null, shopCat = null;
   var role = null, notifs = [], maint = null, friends = [], chatWith = null, chatTimer = null, access = null, seasonRows = [];
   var TITLES = { title_rookie: "RECRUE", title_legend: "LÉGENDE" };
@@ -761,6 +767,8 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
         access = ac.error ? null : ac.data;
         var sr = await sb.rpc("my_season_rewards");
         seasonRows = (!sr.error && sr.data) ? sr.data : [];
+        var ep = await sb.rpc("economy_public");
+        econPublic = ep.error ? null : ep.data;
       }
     }
     if (!me) { role = null; notifs = []; access = null; seasonRows = []; }
@@ -853,7 +861,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     var bc = el("p", "", ""); var coin = el("span", "coin"); bc.append(coin, me.bc + " BOYCOINS");
     bc.style.margin = "0 0 10px";
     box.append(head, bar, xpLine, bc);
-    var DAYR = [10, 15, 20, 25, 30, 40, 100];
+    var DAYR = (econPublic && econPublic.daily_streak && econPublic.daily_streak.length === 7) ? econPublic.daily_streak : [10, 15, 20, 25, 30, 40, 100];
     var cur = me.daily_claimed_today ? ((Math.max(me.streak, 1) - 1) % 7) : (Math.max(me.streak, 0) % 7);
     var grid = el("div", "daily");
     DAYR.forEach(function (v, i) {
@@ -1656,6 +1664,72 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       button(rowb2, "AJOUTER", false, async function () { if (await act(sb.rpc("staff_beta_add", { p_pseudo: bpseudo.value }), "Testeur ajouté.")) renderAdmin(); });
       button(rowb2, "RETIRER", true, async function () { if (await act(sb.rpc("staff_beta_remove", { p_pseudo: bpseudo.value }), "Testeur retiré.")) renderAdmin(); });
       pbeta.append(rowb2);
+
+      // Économie BOYCOINS : réglages modifiables, bornés côté base, chaque changement est journalisé.
+      var peco = panel("ÉCONOMIE BOYCOINS");
+      var eco = await sb.rpc("staff_economy");
+      if (eco.error || !eco.data) {
+        peco.append(el("p", "small", "Réglages indisponibles (migration v11 non appliquée)."));
+      } else {
+        var E = eco.data, S = E.settings || {};
+        var num = function (parent, label, value) { var i = field(parent, label); i.type = "number"; i.inputMode = "numeric"; i.value = value === null || value === undefined ? "" : value; i.style.width = "100%"; return i; };
+        var saveSetting = function (key, value, label) {
+          if (!window.confirm("Appliquer ce réglage pour tous les joueurs ?\n" + label)) return;
+          act(sb.rpc("staff_economy_set", { p_key: key, p_value: value }), "Réglage enregistré : " + label).then(function (ok) { if (ok) renderAdmin(); });
+        };
+        peco.append(el("p", "small", "Les BC déjà gagnés ne sont jamais retirés. Les objets déjà achetés restent acquis."));
+        var gb = S.game_bc || {}, gIn = {};
+        peco.append(el("h4", "", "Gains par partie : 1 + score ÷ diviseur, plafonné par partie"));
+        ["snake", "blocks", "space", "boyblocks"].forEach(function (g) {
+          var row = el("div", "eco-row"); row.append(el("b", "", g.toUpperCase()));
+          gIn[g] = { div: num(row, "diviseur", (gb[g] || {}).div), cap: num(row, "plafond / partie (vide = aucun)", (gb[g] || {}).cap) };
+          peco.append(row);
+        });
+        button(peco, "ENREGISTRER LES GAINS PAR PARTIE", false, function () {
+          var v = {}; Object.keys(gIn).forEach(function (g) { v[g] = { div: Number(gIn[g].div.value), cap: gIn[g].cap.value === "" ? null : Number(gIn[g].cap.value) }; });
+          saveSetting("game_bc", v, "gains par partie");
+        });
+        var capIn = num(peco, "Plafond de BC gagnés en jouant, par jour", S.game_bc_daily_cap);
+        button(peco, "ENREGISTRER LE PLAFOND", false, function () { saveSetting("game_bc_daily_cap", Number(capIn.value), "plafond " + capIn.value + " BC/jour"); });
+        peco.append(el("h4", "", "Bonus de connexion (jours 1 à 7)"));
+        var dRow = el("div", "eco-row"), dIn = (S.daily_streak || []).map(function (v, i) { return num(dRow, "J" + (i + 1), v); });
+        peco.append(dRow);
+        button(peco, "ENREGISTRER LE BONUS DE CONNEXION", false, function () { saveSetting("daily_streak", dIn.map(function (i) { return Number(i.value); }), "bonus de connexion"); });
+        peco.append(el("h4", "", "Récompenses de saison (par jeu, chaque mois)"));
+        var sr = S.season_rewards || {}, sRow = el("div", "eco-row"), sIn = {};
+        [["rank1", "1er"], ["rank3", "2e-3e"], ["rank10", "4e-10e"], ["other", "autres classés"]].forEach(function (x) { sIn[x[0]] = num(sRow, x[1], sr[x[0]]); });
+        peco.append(sRow);
+        button(peco, "ENREGISTRER LA SAISON", false, function () { var v = {}; Object.keys(sIn).forEach(function (k) { v[k] = Number(sIn[k].value); }); saveSetting("season_rewards", v, "récompenses de saison"); });
+        peco.append(el("h4", "", "Prix de la boutique"));
+        (E.shop || []).forEach(function (it) {
+          var row = el("div", "line"), inp = document.createElement("input");
+          inp.type = "number"; inp.value = it.price; inp.style.cssText = "width:90px;margin:0";
+          var b = el("button", "btn mini alt", "OK"); b.type = "button";
+          b.addEventListener("click", function () {
+            if (!window.confirm("Nouveau prix de « " + it.name + " » : " + inp.value + " BC ?")) return;
+            act(sb.rpc("staff_set_price", { p_code: it.code, p_price: Number(inp.value) }), "Prix enregistré.").then(function (ok) { if (ok) renderAdmin(); });
+          });
+          var right = el("span", ""); right.append(inp, b);
+          row.append(el("span", "", it.name), right); peco.append(row);
+        });
+        peco.append(el("h4", "", "Récompenses des missions (BC / XP)"));
+        (E.missions || []).forEach(function (m) {
+          var row = el("div", "line"), ib = document.createElement("input"), ix = document.createElement("input");
+          ib.type = ix.type = "number"; ib.value = m.bc; ix.value = m.xp; ib.style.cssText = ix.style.cssText = "width:64px;margin:0";
+          var b = el("button", "btn mini alt", "OK"); b.type = "button";
+          b.addEventListener("click", function () {
+            if (!window.confirm("Mission « " + m.name + " » : " + ib.value + " BC, " + ix.value + " XP ?")) return;
+            act(sb.rpc("staff_set_mission_reward", { p_code: m.code, p_bc: Number(ib.value), p_xp: Number(ix.value) }), "Mission enregistrée.").then(function (ok) { if (ok) renderAdmin(); });
+          });
+          var right = el("span", ""); right.append(ib, ix, b);
+          row.append(el("span", "", m.name), right); peco.append(row);
+        });
+        peco.append(el("h4", "", "Derniers changements"));
+        if (!(E.log || []).length) peco.append(el("p", "small", "Aucun changement pour l'instant."));
+        (E.log || []).slice(0, 10).forEach(function (l) {
+          peco.append(el("p", "small", new Date(l.at).toLocaleString("fr-FR") + " · " + (l.by || "?") + " · " + l.what + " : " + JSON.stringify(l.old) + " → " + JSON.stringify(l.new)));
+        });
+      }
 
       var pbk = panel("SAUVEGARDE");
       pbk.append(el("p", "small", "Télécharge toutes les données de jeu (profils, scores, XP, BOYCOINS, badges, amis, messages…) dans un fichier, avec un contrôle automatique. Les emails et mots de passe restent chez Supabase et ne sont pas dans ce fichier. Garde le fichier en lieu sûr."));

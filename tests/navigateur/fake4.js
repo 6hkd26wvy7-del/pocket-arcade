@@ -30,6 +30,10 @@ window.supabase = { createClient: function(){
      case 'staff_bug_list': return ok([{id:42,created_at:'2026-10-15T10:00:00Z',pseudo:'joh',category:'game',description:'Le serpent traverse le mur apres la pause, je ne comprends pas pourquoi.',page:'#snake',game:'snake',app_version:'2026.10.15-a',device:{ua:'iPhone',viewport:'390x700'},has_screenshot:true,status:'new',priority:'high',admin_note:''},{id:41,created_at:'2026-10-14T10:00:00Z',pseudo:'tintintest',category:'display',description:'Bouton sous la barre.',page:'#menu',game:'',app_version:'x',device:{},has_screenshot:false,status:'resolved',priority:'low',admin_note:'ok'}]);
      case 'staff_bug_screenshot': return ok('data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=');
      case 'staff_bug_update': window.__upd=a; return ok(null);
+     case 'staff_economy': return ok({settings:{game_bc:{snake:{div:10,cap:null},blocks:{div:200,cap:25},space:{div:100,cap:25},boyblocks:{div:400,cap:25}},game_bc_daily_cap:150,daily_streak:[10,15,20,25,30,40,100],season_rewards:{rank1:500,rank3:300,rank10:150,other:30}},shop:[{code:'title_rookie',name:'Titre : Recrue',kind:'title',price:50}],missions:[{code:'play_3',name:'Joue 3 parties',bc:20,xp:20}],log:[]});
+     case 'staff_economy_set': (window.__eco=window.__eco||[]).push(a); return ok(null);
+     case 'staff_set_price': (window.__eco=window.__eco||[]).push(a); return ok(null);
+     case 'economy_public': return ok({daily_streak:[5,5,10,10,15,15,40],game_bc_daily_cap:40});
      default: return ok(null);
     }
    }
