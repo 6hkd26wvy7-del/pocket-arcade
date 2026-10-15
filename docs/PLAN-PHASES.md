@@ -66,3 +66,10 @@ base `rvygnqpagbmiqbdkwlfp`) n'est jamais touchée sans accord.
 - Continuation par vidéo (Snake, Space Attack) : score final hors classement ; vidéo de test de 5 s.
 - Premium : badge, carte d'offre (bouton « bientôt disponible »), cosmétiques réservés, badge Pionnier à vie,
   simulation d'abonnement par l'équipe. Cadres de test activés sur TEST (désactivables dans l'administration).
+
+## Phase 5 — conception faite (`docs/MARKETING.md`)
+
+- Prototype : vidéo 9:16 en 1080x1920 fabriquée en moins d'une minute à partir d'une vraie partie (robot joueur, textes,
+  musique générée, combos, écran de fin). Workflow cloud quotidien prêt, inactif tant qu'il n'est pas sur `main`.
+- Devis ≈ 1 €/mois. Comptes à créer par Quentin : YouTube, Instagram pro + Page Facebook + Meta développeur, TikTok + développeur.
+- TikTok : publications privées tant que l'application n'est pas auditée (règle officielle).
