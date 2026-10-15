@@ -164,5 +164,19 @@ await t("duel : partie complète jouée par deux robots, résultat identique à 
   assert.equal(fin.players[1].score, mirrors[1].score);
   assert.ok(["draw", 0, 1].includes(fin.winner));
 });
+await t("duel 9x9 : mêmes pièces pour les deux, grille de 81 cases, bornes 9x9", async () => {
+  const g = D.newGame(4242, 9);
+  assert.equal(g.size, 9);
+  assert.equal(g.players[0].grid.length, 81);
+  assert.deepEqual(g.players[0].pieces.map((p) => p.p), g.players[1].pieces.map((p) => p.p));
+  const sh = BB.PIECES[g.players[0].pieces[0].p];
+  assert.equal(D.input(g, 0, { t: "place", slot: 0, r: 9 - sh.h, c: 9 - sh.w }), true);   // dernière ligne/colonne du 9x9
+  assert.equal(D.input(g, 1, { t: "place", slot: 0, r: 9, c: 0 }), false);                // hors grille
+  const st = D.snapshot(g);
+  assert.equal(st.size, 9); assert.equal(st.players[0].grid.length, 81);
+  assert.equal(D.syncLog(g, 0).size, 9);
+  const g8 = D.newGame(4242);
+  assert.equal(g8.size, 8); assert.equal(g8.players[0].grid.length, 64);
+});
 console.log(n + " tests OK");
 process.exit(0);

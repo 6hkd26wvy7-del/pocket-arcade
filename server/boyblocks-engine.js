@@ -2,9 +2,13 @@
 // Même code pour le téléphone (solo), le serveur de duels et la vérification des scores.
 // Grille 8x8, 3 pièces proposées, placement libre, lignes/colonnes complètes effacées, combos.
 
-export const SIZE = 8;
+export const SIZE = 8;              // grille classique ; la grille d'essai 9x9 est choisie par newGame(seed, { size: 9 })
+export const SIZES = [8, 9];
+function sizeOf(grid) { return grid.length === 81 ? 9 : 8; }
 
 // Formes originales décrites en "dessin" : # = case pleine. Plusieurs colorId (1..7) pour les graphismes.
+// Fréquences propres à la grille 9x9 (81 cases) : plus de grandes pièces pour garder le défi. Absent = même poids qu'en 8x8.
+const WEIGHT9 = {};
 const SHAPES = [
   // [nom, poids de tirage, dessin]
   ["dot", 3, ["#"]],
@@ -27,10 +31,11 @@ const SHAPES = [
   for (var k = 0; k < h; k++) rowN.push(0);
   for (var k2 = 0; k2 < w; k2++) colN.push(0);
   cells.forEach(function (x) { rowN[x[0]]++; colN[x[1]]++; });
-  return { id: i, name: s[0], weight: s[1], cells: cells, h: h, w: w, n: cells.length, rowN: rowN, colN: colN };
+  return { id: i, name: s[0], weight: s[1], weight9: WEIGHT9[s[0]] !== undefined ? WEIGHT9[s[0]] : s[1], cells: cells, h: h, w: w, n: cells.length, rowN: rowN, colN: colN };
 });
 export const PIECES = SHAPES;
 const TOTAL_WEIGHT = SHAPES.reduce(function (a, s) { return a + s.weight; }, 0);
+const TOTAL_WEIGHT9 = SHAPES.reduce(function (a, s) { return a + s.weight9; }, 0);
 
 // ---- hasard reproductible (mulberry32) ----
 export function rng(seed) {
@@ -48,30 +53,32 @@ function mix(seed, index, salt) { // mélange de (graine, numéro de lot, essai)
   h = Math.imul(h ^ (h >>> 16), 0x7FEB352D); h = Math.imul(h ^ (h >>> 15), 0x846CA68B);
   return (h ^ (h >>> 16)) >>> 0;
 }
-function drawPiece(r) {
-  var x = r() * TOTAL_WEIGHT;
-  for (var i = 0; i < SHAPES.length; i++) { x -= SHAPES[i].weight; if (x < 0) return i; }
+function drawPiece(r, size) {
+  var nine = size === 9, x = r() * (nine ? TOTAL_WEIGHT9 : TOTAL_WEIGHT);
+  for (var i = 0; i < SHAPES.length; i++) { x -= nine ? SHAPES[i].weight9 : SHAPES[i].weight; if (x < 0) return i; }
   return SHAPES.length - 1;
 }
 
-export function emptyGrid() { return new Array(SIZE * SIZE).fill(0); }
+export function emptyGrid(size) { size = size === 9 ? 9 : SIZE; return new Array(size * size).fill(0); }
 
 export function fits(grid, shape, r, c) {
+  var n = sizeOf(grid);
   for (var i = 0; i < shape.cells.length; i++) {
     var rr = r + shape.cells[i][0], cc = c + shape.cells[i][1];
-    if (rr < 0 || cc < 0 || rr >= SIZE || cc >= SIZE || grid[rr * SIZE + cc]) return false;
+    if (rr < 0 || cc < 0 || rr >= n || cc >= n || grid[rr * n + cc]) return false;
   }
   return true;
 }
 export function canPlaceAnywhere(grid, shape) {
-  for (var r = 0; r <= SIZE - shape.h; r++) for (var c = 0; c <= SIZE - shape.w; c++) if (fits(grid, shape, r, c)) return true;
+  var n = sizeOf(grid);
+  for (var r = 0; r <= n - shape.h; r++) for (var c = 0; c <= n - shape.w; c++) if (fits(grid, shape, r, c)) return true;
   return false;
 }
 
 // Tirage d'un lot « au hasard » (règles 1) : 3 pièces et 3 couleurs à partir de (graine, numéro de lot, essai).
-function rawTriple(seed, index, salt) {
+function rawTriple(seed, index, salt, size) {
   var r = rng(mix(seed, index, salt));
-  var t = [drawPiece(r), drawPiece(r), drawPiece(r)];
+  var t = [drawPiece(r, size), drawPiece(r, size), drawPiece(r, size)];
   var colors = [1 + Math.floor(r() * 7), 1 + Math.floor(r() * 7), 1 + Math.floor(r() * 7)];
   return t.map(function (p, i) { return { p: p, color: colors[i] }; });
 }
@@ -80,7 +87,7 @@ function rawTriple(seed, index, salt) {
 function dealRandom(seed, index, grid, ensureFit) {
   var best = null;
   for (var salt = 0; salt < (ensureFit ? 12 : 1); salt++) {
-    var triple = rawTriple(seed, index, salt);
+    var triple = rawTriple(seed, index, salt, sizeOf(grid));
     best = triple;
     if (!ensureFit || triple.some(function (x) { return canPlaceAnywhere(grid, SHAPES[x.p]); })) return triple;
   }
@@ -94,15 +101,15 @@ function dealRandom(seed, index, grid, ensureFit) {
 // Calculs uniquement sur des entiers : la base de données refait exactement le même choix (bb_deal2).
 export const STRATEGY = { candidates: 4, percent: 70, choiceSalt: 97 };
 function emptiesOf(grid) {
-  var re = [], ce = [];
-  for (var i = 0; i < SIZE; i++) { re.push(0); ce.push(0); }
-  for (var r = 0; r < SIZE; r++) for (var c = 0; c < SIZE; c++) if (!grid[r * SIZE + c]) { re[r]++; ce[c]++; }
+  var n = sizeOf(grid), re = [], ce = [];
+  for (var i = 0; i < n; i++) { re.push(0); ce.push(0); }
+  for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (!grid[r * n + c]) { re[r]++; ce[c]++; }
   return { re: re, ce: ce };
 }
 // [nombre de positions possibles, meilleur nombre de lignes/colonnes complétées en un coup]
 export function pieceOutlook(grid, em, shape) {
-  var fitsN = 0, best = 0;
-  for (var r = 0; r <= SIZE - shape.h; r++) for (var c = 0; c <= SIZE - shape.w; c++) {
+  var fitsN = 0, best = 0, n = sizeOf(grid);
+  for (var r = 0; r <= n - shape.h; r++) for (var c = 0; c <= n - shape.w; c++) {
     if (!fits(grid, shape, r, c)) continue;
     fitsN++;
     var lines = 0;
@@ -128,7 +135,7 @@ function dealStrategic(seed, index, grid) {
   if (pick >= STRATEGY.percent) return dealRandom(seed, index, grid, true);
   var best = null, bestQ = 0;
   for (var salt = 0; salt < STRATEGY.candidates; salt++) {
-    var t = rawTriple(seed, index, salt), q = tripleQuality(grid, t);
+    var t = rawTriple(seed, index, salt, sizeOf(grid)), q = tripleQuality(grid, t);
     if (best === null || q > bestQ) { best = t; bestQ = q; }
   }
   return best;
@@ -143,8 +150,8 @@ export function dealTriple(seed, index, grid, ensureFit, rules) {
 export function newGame(seed, opts) {
   opts = opts || {};
   var g = {
-    seed: seed >>> 0, ensureFit: opts.ensureFit !== false, rules: opts.rules === 2 ? 2 : 1,
-    grid: emptyGrid(), score: 0, streak: 0, best_streak: 0, lines: 0, moves: 0, index: 0, over: false,
+    seed: seed >>> 0, ensureFit: opts.ensureFit !== false, rules: opts.rules === 2 ? 2 : 1, size: opts.size === 9 ? 9 : 8,
+    grid: emptyGrid(opts.size), score: 0, streak: 0, best_streak: 0, lines: 0, moves: 0, index: 0, over: false,
     pieces: null, log: []
   };
   g.pieces = dealTriple(g.seed, 0, g.grid, g.ensureFit, g.rules);
@@ -168,19 +175,20 @@ export function place(g, slot, r, c) {
   var piece = g.pieces[slot], shape = SHAPES[piece.p];
   if (!fits(g.grid, shape, r, c)) return { ok: false, err: "fit" };
 
-  shape.cells.forEach(function (x) { g.grid[(r + x[0]) * SIZE + (c + x[1])] = piece.color; });
+  var N = g.size || SIZE;
+  shape.cells.forEach(function (x) { g.grid[(r + x[0]) * N + (c + x[1])] = piece.color; });
   var gain = shape.n;
   var rows = [], cols = [];
-  for (var i = 0; i < SIZE; i++) {
+  for (var i = 0; i < N; i++) {
     var fr = true, fc = true;
-    for (var j = 0; j < SIZE; j++) { if (!g.grid[i * SIZE + j]) fr = false; if (!g.grid[j * SIZE + i]) fc = false; }
+    for (var j = 0; j < N; j++) { if (!g.grid[i * N + j]) fr = false; if (!g.grid[j * N + i]) fc = false; }
     if (fr) rows.push(i);
     if (fc) cols.push(i);
   }
   var n = rows.length + cols.length, cleared = [];
   if (n > 0) {
-    rows.forEach(function (i) { for (var j = 0; j < SIZE; j++) cleared.push(i * SIZE + j); });
-    cols.forEach(function (j) { for (var i2 = 0; i2 < SIZE; i2++) cleared.push(i2 * SIZE + j); });
+    rows.forEach(function (i) { for (var j = 0; j < N; j++) cleared.push(i * N + j); });
+    cols.forEach(function (j) { for (var i2 = 0; i2 < N; i2++) cleared.push(i2 * N + j); });
     cleared.forEach(function (k) { g.grid[k] = 0; });
     g.streak++;
     if (g.streak > g.best_streak) g.best_streak = g.streak;

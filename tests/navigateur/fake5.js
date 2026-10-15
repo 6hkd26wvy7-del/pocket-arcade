@@ -12,6 +12,8 @@ window.supabase = { createClient: function(){
     window.__calls.push(n+(a?JSON.stringify(a):''));
     switch(n){
      case 'boyblocks_start': window.__run={seed:424242}; return ok({run_id:'r1',seed:424242});
+     case 'game_settings_public': return ok(window.__noNine ? {boyblocks9:{enabled:false}} : {boyblocks9:{enabled:true}});
+     case 'boyblocks_start_v3': window.__run={seed:515151,rules:2,size:a.p_size}; return ok({run_id:'r9',seed:515151,rules:2,size:a.p_size});
      case 'boyblocks_start_v2': window.__run={seed:424242,rules:2}; return ok({run_id:'r1',seed:424242,rules:2});
      case 'boyblocks_finish': window.__fin=a; return ok({xp:12,bc:3,level:5,level_up:false,new_badges:[],score:1});
      case 'sync_tiers': if(window.__synced) return ok([]); window.__synced=1; return ok([{game:'snake',tier:1,name:'Argent'},{game:'boyblocks',tier:5,name:'Légende'}]);

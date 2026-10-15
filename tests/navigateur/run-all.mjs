@@ -17,6 +17,8 @@ const TESTS = {
   "economie.mjs": ["panneau économie : true", "\"p_key\":\"game_bc_daily_cap\",\"p_value\":40", "bonus affiché : 5,5,10,10,15,15,40"],
   "monetisation.mjs": ["pub accueil visible : true", "vidéo de test affichée : true", "score final continué : {\"p_game\":\"snake\"", "classé envoyé de nouveau : false", "plus de 2e continuation : true", "carte Premium : true", "pub cachée : true | badge : true"],
   "marketing.mjs": ["lien marketing : true", "vidéo listée : true", "validation envoyée : validee | accroche : Combo x6 en direct | date ISO : true", "onglet actif : Profil"],
+  "duel9.mjs": ["TU AS GAGNÉ", "rejouer visible: true"],
+  "bb9.mjs": ["bouton grille : GRILLE 9×9", "\"size\":9", "envoyés identiques: true", "essai désactivé : bouton caché true"],
   "iphone.mjs": ["envoyés identiques: true", "Score vérifié et enregistré", "protection ok", "accueil ok"],
 };
 let bad = 0;

@@ -21,6 +21,10 @@ const KINDS = {
   X: { name: "boyblocks", tickMs: BBD.TICK_MS, coop: false, instant: true,
        create: (seed) => BBD.newGame(seed), input: (g, i, m) => BBD.input(g, i, m),
        step: (g, dt) => BBD.step(g, dt), snapshot: BBD.snapshot, syncLog: BBD.syncLog },
+  // grille 9x9 d'essai : mêmes règles, salle à part
+  Y: { name: "boyblocks", tickMs: BBD.TICK_MS, coop: false, instant: true,
+       create: (seed) => BBD.newGame(seed, 9), input: (g, i, m) => BBD.input(g, i, m),
+       step: (g, dt) => BBD.step(g, dt), snapshot: BBD.snapshot, syncLog: BBD.syncLog },
 };
 const snapshot = (g, kind) => kind.snapshot(g);
 
@@ -110,8 +114,8 @@ async function checkAccess(token, env, fetchFn) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    const m = url.pathname.match(/^\/play\/([SPBX][A-Z0-9]{3,7})$/);
-    if (!m) return new Response("BOYGAMES arena server v4 (duel BoyBlocks)", { status: 200 });
+    const m = url.pathname.match(/^\/play\/([SPBXY][A-Z0-9]{3,7})$/);
+    if (!m) return new Response("BOYGAMES arena server v5 (duel BoyBlocks 8x8 et 9x9)", { status: 200 });
     if (request.headers.get("Upgrade") !== "websocket") return new Response("Expected websocket", { status: 426 });
     const allowed = String(env.ALLOWED_ORIGINS || "").split(",").map((s) => s.trim()).filter(Boolean);
     const origin = request.headers.get("Origin");

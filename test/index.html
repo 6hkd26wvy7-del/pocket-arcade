@@ -307,6 +307,10 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-hi)
 
 label.chk { display: block; text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--text); margin: 4px 0; }
 
+/* BoyBlocks : boutons sur une seule ligne (son, grille, rejouer) */
+#view-boyblocks .row { flex-wrap: nowrap; gap: 8px; }
+#view-boyblocks .row .btn { padding: 10px 12px; font-size: 13px; white-space: nowrap; }
+
 /* Marketing */
 .mk-video { display: block; width: min(100%, 280px); aspect-ratio: 9 / 16; background: #000; border-radius: 12px; margin: 10px auto; }
 .mk-card label { display: block; }
@@ -546,6 +550,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
           <button class="btn" id="ar-create-P" type="button">SPACE ATTACK (ÉQUIPE)</button>
           <button class="btn" id="ar-create-B" type="button">BLOCK DROP (DUEL)</button>
           <button class="btn" id="ar-create-X" type="button">BOYBLOCKS (DUEL 2 MIN)</button>
+          <button class="btn alt" id="ar-create-Y" type="button" hidden>BOYBLOCKS 9×9 (ESSAI)</button>
         </div>
         <hr class="sep">
         <label for="ar-code">OU ENTRE LE CODE D'UN AMI</label>
@@ -578,6 +583,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
         <p id="bb-msg" class="msg" role="status"></p>
         <div class="row">
           <button class="btn" id="bb-sound" type="button" aria-pressed="true">SON</button>
+          <button class="btn alt" id="bb-size" type="button" hidden>GRILLE 8×8</button>
           <button class="btn alt" id="bb-restart" type="button">REJOUER</button>
         </div>
       </div>
@@ -905,7 +911,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     d.innerHTML = '<svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" fill="' + a[0] + '"/>' + a[1] + '</svg>';
     return d;
   }
-  var GAME_LABEL = { snake: "SNAKE", blocks: "BLOCK DROP", boyblocks: "BOYBLOCKS", space: "SPACE ATTACK" };
+  var GAME_LABEL = { snake: "SNAKE", blocks: "BLOCK DROP", boyblocks: "BOYBLOCKS", boyblocks9: "BOYBLOCKS 9×9", space: "SPACE ATTACK" };
 
   function rewardError(err) {
     var m = String(err && err.message || "");
@@ -1179,9 +1185,27 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
   async function loadMonet() {
     monet = null;
     if (sb) { try { var r = await sb.rpc("monetization_public"); if (!r.error) monet = r.data; } catch (e) { /* ignore */ } }
+    if (sb) { try { var gs = await sb.rpc("game_settings_public"); gameCfg = gs.error ? null : gs.data; } catch (e) { gameCfg = null; } }
+    updateBbSizeButton();
     renderAds();
   }
   // Emplacements publicitaires : seulement hors partie (les écrans de jeu ne les contiennent pas), jamais pour un Premium.
+  // BoyBlocks 9x9 (essai) : proposé seulement si l'équipe l'a activé ; le joueur choisit sa grille (mémorisée).
+  var gameCfg = null;
+  function bb9Enabled() { return !!(gameCfg && gameCfg.boyblocks9 && gameCfg.boyblocks9.enabled); }
+  function bbWantedSize() {
+    var v = null; try { v = localStorage.getItem("boygames-bb-size"); } catch (e) { /* ignore */ }
+    return bb9Enabled() && v === "9" ? 9 : 8;
+  }
+  function updateBbSizeButton() {
+    var b = $("bb-size"); if (!b) return;
+    b.hidden = !bb9Enabled();
+    b.textContent = bbWantedSize() === 9 ? "GRILLE 9×9" : "GRILLE 8×8";
+    b.title = "Changer de grille (9×9 en essai, classement séparé)";
+    var y = $("ar-create-Y"); if (y) y.hidden = !bb9Enabled();
+    var o = $("lb-game") && $("lb-game").querySelector('option[value="boyblocks9"]');
+    if (bb9Enabled() && $("lb-game") && !o) { var op = document.createElement("option"); op.value = "boyblocks9"; op.textContent = "BOYBLOCKS 9×9 (ESSAI)"; $("lb-game").append(op); }
+  }
   function renderAds() {
     var a = monet && monet.ads, prem = !!(me && me.premium);
     document.querySelectorAll(".ad-slot").forEach(function (slot) {
@@ -1905,6 +1929,16 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       button(rowb2, "AJOUTER", false, async function () { if (await act(sb.rpc("staff_beta_add", { p_pseudo: bpseudo.value }), "Testeur ajouté.")) renderAdmin(); });
       button(rowb2, "RETIRER", true, async function () { if (await act(sb.rpc("staff_beta_remove", { p_pseudo: bpseudo.value }), "Testeur retiré.")) renderAdmin(); });
       pbeta.append(rowb2);
+
+      var p9 = panel("BOYBLOCKS 9×9 (ESSAI)");
+      p9.append(el("p", "small", "Grille 9×9 proposée aux joueurs (solo et duels), avec son propre classement. Désactiver = retour au 8×8 pour tous ; les scores 9×9 sont conservés."));
+      var b9 = el("button", "btn mini" + (bb9Enabled() ? " alt" : ""), bb9Enabled() ? "DÉSACTIVER LE 9×9 (RETOUR AU 8×8)" : "ACTIVER LE 9×9"); b9.type = "button";
+      b9.addEventListener("click", function () {
+        var on = !bb9Enabled();
+        if (!window.confirm(on ? "Proposer la grille 9×9 à tous les joueurs ?" : "Revenir au 8×8 pour tous les joueurs ?")) return;
+        act(sb.rpc("staff_game_settings_set", { p_key: "boyblocks9", p_value: { enabled: on } }), on ? "9×9 activé." : "Retour au 8×8 : le 9×9 n'est plus proposé.").then(function (ok) { if (ok) loadMonet().then(renderAdmin); });
+      });
+      p9.append(b9);
 
       var pmk = panel("MARKETING");
       pmk.append(el("p", "small", "Vidéos fabriquées chaque jour à partir de vraies parties : aperçu, validation, calendrier. Rien n'est publié sans validation."));
@@ -3139,9 +3173,13 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
 // Même code pour le téléphone (solo), le serveur de duels et la vérification des scores.
 // Grille 8x8, 3 pièces proposées, placement libre, lignes/colonnes complètes effacées, combos.
 
-const SIZE = 8;
+const SIZE = 8;              // grille classique ; la grille d'essai 9x9 est choisie par newGame(seed, { size: 9 })
+const SIZES = [8, 9];
+function sizeOf(grid) { return grid.length === 81 ? 9 : 8; }
 
 // Formes originales décrites en "dessin" : # = case pleine. Plusieurs colorId (1..7) pour les graphismes.
+// Fréquences propres à la grille 9x9 (81 cases) : plus de grandes pièces pour garder le défi. Absent = même poids qu'en 8x8.
+const WEIGHT9 = {};
 const SHAPES = [
   // [nom, poids de tirage, dessin]
   ["dot", 3, ["#"]],
@@ -3164,10 +3202,11 @@ const SHAPES = [
   for (var k = 0; k < h; k++) rowN.push(0);
   for (var k2 = 0; k2 < w; k2++) colN.push(0);
   cells.forEach(function (x) { rowN[x[0]]++; colN[x[1]]++; });
-  return { id: i, name: s[0], weight: s[1], cells: cells, h: h, w: w, n: cells.length, rowN: rowN, colN: colN };
+  return { id: i, name: s[0], weight: s[1], weight9: WEIGHT9[s[0]] !== undefined ? WEIGHT9[s[0]] : s[1], cells: cells, h: h, w: w, n: cells.length, rowN: rowN, colN: colN };
 });
 const PIECES = SHAPES;
 const TOTAL_WEIGHT = SHAPES.reduce(function (a, s) { return a + s.weight; }, 0);
+const TOTAL_WEIGHT9 = SHAPES.reduce(function (a, s) { return a + s.weight9; }, 0);
 
 // ---- hasard reproductible (mulberry32) ----
 function rng(seed) {
@@ -3185,30 +3224,32 @@ function mix(seed, index, salt) { // mélange de (graine, numéro de lot, essai)
   h = Math.imul(h ^ (h >>> 16), 0x7FEB352D); h = Math.imul(h ^ (h >>> 15), 0x846CA68B);
   return (h ^ (h >>> 16)) >>> 0;
 }
-function drawPiece(r) {
-  var x = r() * TOTAL_WEIGHT;
-  for (var i = 0; i < SHAPES.length; i++) { x -= SHAPES[i].weight; if (x < 0) return i; }
+function drawPiece(r, size) {
+  var nine = size === 9, x = r() * (nine ? TOTAL_WEIGHT9 : TOTAL_WEIGHT);
+  for (var i = 0; i < SHAPES.length; i++) { x -= nine ? SHAPES[i].weight9 : SHAPES[i].weight; if (x < 0) return i; }
   return SHAPES.length - 1;
 }
 
-function emptyGrid() { return new Array(SIZE * SIZE).fill(0); }
+function emptyGrid(size) { size = size === 9 ? 9 : SIZE; return new Array(size * size).fill(0); }
 
 function fits(grid, shape, r, c) {
+  var n = sizeOf(grid);
   for (var i = 0; i < shape.cells.length; i++) {
     var rr = r + shape.cells[i][0], cc = c + shape.cells[i][1];
-    if (rr < 0 || cc < 0 || rr >= SIZE || cc >= SIZE || grid[rr * SIZE + cc]) return false;
+    if (rr < 0 || cc < 0 || rr >= n || cc >= n || grid[rr * n + cc]) return false;
   }
   return true;
 }
 function canPlaceAnywhere(grid, shape) {
-  for (var r = 0; r <= SIZE - shape.h; r++) for (var c = 0; c <= SIZE - shape.w; c++) if (fits(grid, shape, r, c)) return true;
+  var n = sizeOf(grid);
+  for (var r = 0; r <= n - shape.h; r++) for (var c = 0; c <= n - shape.w; c++) if (fits(grid, shape, r, c)) return true;
   return false;
 }
 
 // Tirage d'un lot « au hasard » (règles 1) : 3 pièces et 3 couleurs à partir de (graine, numéro de lot, essai).
-function rawTriple(seed, index, salt) {
+function rawTriple(seed, index, salt, size) {
   var r = rng(mix(seed, index, salt));
-  var t = [drawPiece(r), drawPiece(r), drawPiece(r)];
+  var t = [drawPiece(r, size), drawPiece(r, size), drawPiece(r, size)];
   var colors = [1 + Math.floor(r() * 7), 1 + Math.floor(r() * 7), 1 + Math.floor(r() * 7)];
   return t.map(function (p, i) { return { p: p, color: colors[i] }; });
 }
@@ -3217,7 +3258,7 @@ function rawTriple(seed, index, salt) {
 function dealRandom(seed, index, grid, ensureFit) {
   var best = null;
   for (var salt = 0; salt < (ensureFit ? 12 : 1); salt++) {
-    var triple = rawTriple(seed, index, salt);
+    var triple = rawTriple(seed, index, salt, sizeOf(grid));
     best = triple;
     if (!ensureFit || triple.some(function (x) { return canPlaceAnywhere(grid, SHAPES[x.p]); })) return triple;
   }
@@ -3231,15 +3272,15 @@ function dealRandom(seed, index, grid, ensureFit) {
 // Calculs uniquement sur des entiers : la base de données refait exactement le même choix (bb_deal2).
 const STRATEGY = { candidates: 4, percent: 70, choiceSalt: 97 };
 function emptiesOf(grid) {
-  var re = [], ce = [];
-  for (var i = 0; i < SIZE; i++) { re.push(0); ce.push(0); }
-  for (var r = 0; r < SIZE; r++) for (var c = 0; c < SIZE; c++) if (!grid[r * SIZE + c]) { re[r]++; ce[c]++; }
+  var n = sizeOf(grid), re = [], ce = [];
+  for (var i = 0; i < n; i++) { re.push(0); ce.push(0); }
+  for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (!grid[r * n + c]) { re[r]++; ce[c]++; }
   return { re: re, ce: ce };
 }
 // [nombre de positions possibles, meilleur nombre de lignes/colonnes complétées en un coup]
 function pieceOutlook(grid, em, shape) {
-  var fitsN = 0, best = 0;
-  for (var r = 0; r <= SIZE - shape.h; r++) for (var c = 0; c <= SIZE - shape.w; c++) {
+  var fitsN = 0, best = 0, n = sizeOf(grid);
+  for (var r = 0; r <= n - shape.h; r++) for (var c = 0; c <= n - shape.w; c++) {
     if (!fits(grid, shape, r, c)) continue;
     fitsN++;
     var lines = 0;
@@ -3265,7 +3306,7 @@ function dealStrategic(seed, index, grid) {
   if (pick >= STRATEGY.percent) return dealRandom(seed, index, grid, true);
   var best = null, bestQ = 0;
   for (var salt = 0; salt < STRATEGY.candidates; salt++) {
-    var t = rawTriple(seed, index, salt), q = tripleQuality(grid, t);
+    var t = rawTriple(seed, index, salt, sizeOf(grid)), q = tripleQuality(grid, t);
     if (best === null || q > bestQ) { best = t; bestQ = q; }
   }
   return best;
@@ -3280,8 +3321,8 @@ function dealTriple(seed, index, grid, ensureFit, rules) {
 function newGame(seed, opts) {
   opts = opts || {};
   var g = {
-    seed: seed >>> 0, ensureFit: opts.ensureFit !== false, rules: opts.rules === 2 ? 2 : 1,
-    grid: emptyGrid(), score: 0, streak: 0, best_streak: 0, lines: 0, moves: 0, index: 0, over: false,
+    seed: seed >>> 0, ensureFit: opts.ensureFit !== false, rules: opts.rules === 2 ? 2 : 1, size: opts.size === 9 ? 9 : 8,
+    grid: emptyGrid(opts.size), score: 0, streak: 0, best_streak: 0, lines: 0, moves: 0, index: 0, over: false,
     pieces: null, log: []
   };
   g.pieces = dealTriple(g.seed, 0, g.grid, g.ensureFit, g.rules);
@@ -3305,19 +3346,20 @@ function place(g, slot, r, c) {
   var piece = g.pieces[slot], shape = SHAPES[piece.p];
   if (!fits(g.grid, shape, r, c)) return { ok: false, err: "fit" };
 
-  shape.cells.forEach(function (x) { g.grid[(r + x[0]) * SIZE + (c + x[1])] = piece.color; });
+  var N = g.size || SIZE;
+  shape.cells.forEach(function (x) { g.grid[(r + x[0]) * N + (c + x[1])] = piece.color; });
   var gain = shape.n;
   var rows = [], cols = [];
-  for (var i = 0; i < SIZE; i++) {
+  for (var i = 0; i < N; i++) {
     var fr = true, fc = true;
-    for (var j = 0; j < SIZE; j++) { if (!g.grid[i * SIZE + j]) fr = false; if (!g.grid[j * SIZE + i]) fc = false; }
+    for (var j = 0; j < N; j++) { if (!g.grid[i * N + j]) fr = false; if (!g.grid[j * N + i]) fc = false; }
     if (fr) rows.push(i);
     if (fc) cols.push(i);
   }
   var n = rows.length + cols.length, cleared = [];
   if (n > 0) {
-    rows.forEach(function (i) { for (var j = 0; j < SIZE; j++) cleared.push(i * SIZE + j); });
-    cols.forEach(function (j) { for (var i2 = 0; i2 < SIZE; i2++) cleared.push(i2 * SIZE + j); });
+    rows.forEach(function (i) { for (var j = 0; j < N; j++) cleared.push(i * N + j); });
+    cols.forEach(function (j) { for (var i2 = 0; i2 < N; i2++) cleared.push(i2 * N + j); });
     cleared.forEach(function (k) { g.grid[k] = 0; });
     g.streak++;
     if (g.streak > g.best_streak) g.best_streak = g.streak;
@@ -3356,13 +3398,15 @@ function replay(seed, moves, opts) {
 // Plafond théorique par coup (borne anti-triche simple quand on ne rejoue pas la partie).
 const MAX_GAIN_PER_MOVE = 25 + Math.round(lineBase(8 + 8) * 4) + 300;
 
-return {SIZE: SIZE, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid, fits: fits, canPlaceAnywhere: canPlaceAnywhere, STRATEGY: STRATEGY, pieceOutlook: pieceOutlook, tripleQuality: tripleQuality, dealTriple: dealTriple, newGame: newGame, lineBase: lineBase, comboMult: comboMult, place: place, replay: replay, MAX_GAIN_PER_MOVE: MAX_GAIN_PER_MOVE};
+return {SIZE: SIZE, SIZES: SIZES, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid, fits: fits, canPlaceAnywhere: canPlaceAnywhere, STRATEGY: STRATEGY, pieceOutlook: pieceOutlook, tripleQuality: tripleQuality, dealTriple: dealTriple, newGame: newGame, lineBase: lineBase, comboMult: comboMult, place: place, replay: replay, MAX_GAIN_PER_MOVE: MAX_GAIN_PER_MOVE};
 })();
 
   /* ---------- BOYBLOCKS (solo) : 8x8, 3 pièces, glisser-déposer ---------- */
   function makeBoyBlocks(canvasId, duel) {
     var canvas = $(canvasId), ctx = canvas.getContext("2d");
-    var W = 720, H = 1040, CELL = 78, BX = 48, BY = 148, TRAY_Y = 818, TRAY_CELL = 40, LIFT = 170, overAt = 0;
+    var W = 720, H = 1040, CELL = 78, BX = 48, BY = 148, TRAY_Y = 818, TRAY_CELL = 40, LIFT = 170, overAt = 0, N = 8;
+    // grille 8x8 (cases de 78) ou 9x9 d'essai (cases de 69) : même largeur totale, la zone des pièces ne bouge pas
+    function setGrid(n) { N = n === 9 ? 9 : 8; CELL = N === 9 ? 69 : 78; BX = (W - N * CELL) / 2; }
     var COLORS = ["", "#22D3EE", "#E879F9", "#FBBF24", "#34D399", "#F87171", "#60A5FA", "#A78BFA"];
     var g = null, state = "ready", ranked = false, runId = null, running = false, best = localBest("boyblocks");
     var drag = null, fx = [], pops = [], banner = null, shake = 0, shown = 0, flashRows = [], lastT = 0;
@@ -3390,9 +3434,10 @@ return {SIZE: SIZE, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid, fits: fits, 
       state = "loading"; g = null; runId = null; ranked = false;
       setMsg($("bb-msg"), "");
       var seed = newSeed(), rules = 2;   // règles 2 : tirage stratégique ; parties hors ligne aussi
+      var size = bbWantedSize(); setGrid(size); best = localBest(size === 9 ? "boyblocks9" : "boyblocks");
       if (online && sb && session && profile) {
         try {
-          var r = await sb.rpc("boyblocks_start_v2");
+          var r = size === 9 ? await sb.rpc("boyblocks_start_v3", { p_size: 9 }) : await sb.rpc("boyblocks_start_v2");
           if (r.error && /boyblocks_start_v2|PGRST202|42883/.test(String(r.error.code) + String(r.error.message))) {
             rules = 1; r = await sb.rpc("boyblocks_start");   // base pas encore migrée (v10) : ancien tirage
           }
@@ -3404,7 +3449,7 @@ return {SIZE: SIZE, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid, fits: fits, 
         setMsg($("bb-msg"), "Partie libre : connecte-toi pour gagner XP, BOYCOINS et classement.");
       }
       if (token !== startToken) return;
-      g = BBE.newGame(seed, { ensureFit: true, rules: rules });
+      g = BBE.newGame(seed, { ensureFit: true, rules: rules, size: size });
       state = g.over ? "over" : "playing";
       if (g.over) finish();
     }
@@ -3414,13 +3459,14 @@ return {SIZE: SIZE, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid, fits: fits, 
       if (m.indexOf("beta") >= 0) return "Bêta privée : ton compte n'est pas encore ajouté, partie hors classement.";
       if (m.indexOf("banned") >= 0) return "Ton compte est suspendu : partie hors classement.";
       if (m.indexOf("too many") >= 0) return "Trop de parties ouvertes : partie hors classement.";
+      if (m.indexOf("grid disabled") >= 0) return "La grille 9x9 n'est plus en essai : partie hors classement.";
       return "Partie hors classement (serveur indisponible).";
     }
 
     async function finish() {
       state = "over"; overAt = Date.now();
       var sc = g.score;
-      if (sc > best) { best = sc; saveLocalBest("boyblocks", best); }
+      if (sc > best) { best = sc; saveLocalBest(g.size === 9 ? "boyblocks9" : "boyblocks", best); }
       overInfo = { score: sc, lines: g.lines, streak: g.best_streak, record: sc >= best && sc > 0 };
       beep(220, 260, 0, "sawtooth", 0.05); beep(165, 360, 0.2, "sawtooth", 0.05); buzz(60);
       if (!ranked || !runId) { if (online && session) setMsg($("bb-msg"), "Partie hors classement : rien n'est enregistré sur ton compte."); return; }
@@ -3446,10 +3492,19 @@ return {SIZE: SIZE, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid, fits: fits, 
       var rc = canvas.getBoundingClientRect();
       return { x: (e.clientX - rc.left) * W / rc.width, y: (e.clientY - rc.top) * H / rc.height };
     }
+    // Position visée ; si elle ne rentre pas, la pièce est « aimantée » vers la place valide la plus proche
+    // (à moins d'une case) : utile sur iPhone, surtout avec les cases plus petites du 9x9.
     function dropCell(d) {
       var s = BBE.PIECES[g.pieces[d.slot].p];
       var x = d.x - s.w * CELL / 2, y = d.y - LIFT - s.h * CELL / 2;
-      return { r: Math.round((y - BY) / CELL), c: Math.round((x - BX) / CELL) };
+      var fr = (y - BY) / CELL, fc = (x - BX) / CELL, r = Math.round(fr), c = Math.round(fc);
+      if (BBE.fits(g.grid, s, r, c)) return { r: r, c: c };
+      var best2 = null, bd = 1.0001;
+      for (var dr = -1; dr <= 1; dr++) for (var dc = -1; dc <= 1; dc++) {
+        var rr = r + dr, cc = c + dc, dist = (rr - fr) * (rr - fr) + (cc - fc) * (cc - fc);
+        if (dist < bd && BBE.fits(g.grid, s, rr, cc)) { bd = dist; best2 = { r: rr, c: cc }; }
+      }
+      return best2 || { r: r, c: c };
     }
 
     /* ----- entrées ----- */
@@ -3482,14 +3537,14 @@ return {SIZE: SIZE, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid, fits: fits, 
       var res = BBE.place(g, d.slot, cell.r, cell.c);
       if (!res.ok) { beep(140, 90, 0, "square", 0.03); return; }
       if (duel) duel.send({ t: "place", slot: d.slot, r: cell.r, c: cell.c });
-      shape.cells.forEach(function (x) { before[(cell.r + x[0]) * 8 + cell.c + x[1]] = piece.color; });
+      shape.cells.forEach(function (x) { before[(cell.r + x[0]) * N + cell.c + x[1]] = piece.color; });
       buzz(res.lines ? 25 : 8);
       beep(330 + shape.n * 20, 70, 0, "triangle", 0.06);
       var cx = BX + (cell.c + shape.w / 2) * CELL, cy = BY + (cell.r + shape.h / 2) * CELL;
       pops.push({ t: "+" + shape.n, x: cx, y: cy, life: 0.7, max: 0.7, c: "#F8FAFC", s: 40 });
       if (res.lines) {
         res.cleared.forEach(function (k) {
-          var col = COLORS[before[k]] || "#fff", px = BX + (k % 8) * CELL + CELL / 2, py = BY + Math.floor(k / 8) * CELL + CELL / 2;
+          var col = COLORS[before[k]] || "#fff", px = BX + (k % N) * CELL + CELL / 2, py = BY + Math.floor(k / N) * CELL + CELL / 2;
           for (var n = 0; n < 5; n++) fx.push({ x: px, y: py, vx: (Math.random() - 0.5) * 700, vy: (Math.random() - 0.7) * 700, life: 0.6 + Math.random() * 0.3, max: 0.9, c: col, s: 8 + Math.random() * 10 });
         });
         var pts = res.gain - shape.n - (res.allClear ? 300 : 0);
@@ -3545,29 +3600,29 @@ return {SIZE: SIZE, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid, fits: fits, 
         ctx.fillText("COMBO ×" + BBE.comboMult(g.streak + 1).toFixed(1).replace(".0", "") + " SI TU ENCHAÎNES", W / 2, 140);
       }
       // plateau
-      ctx.fillStyle = "#111A2E"; roundRect(BX - 10, BY - 10, 8 * CELL + 20, 8 * CELL + 20, 22); ctx.fill();
+      ctx.fillStyle = "#111A2E"; roundRect(BX - 10, BY - 10, N * CELL + 20, N * CELL + 20, 22); ctx.fill();
       ctx.strokeStyle = "#7E22CE"; ctx.lineWidth = 3; ctx.stroke();
-      for (var i = 0; i < 64; i++) {
-        var x = BX + (i % 8) * CELL, y = BY + Math.floor(i / 8) * CELL;
-        ctx.fillStyle = ((i % 8 + Math.floor(i / 8)) & 1) ? "#16213A" : "#131D34"; roundRect(x + 3, y + 3, CELL - 6, CELL - 6, 10); ctx.fill();
+      for (var i = 0; i < N * N; i++) {
+        var x = BX + (i % N) * CELL, y = BY + Math.floor(i / N) * CELL;
+        ctx.fillStyle = ((i % N + Math.floor(i / N)) & 1) ? "#16213A" : "#131D34"; roundRect(x + 3, y + 3, CELL - 6, CELL - 6, 10); ctx.fill();
       }
       if (g) {
-        for (var k = 0; k < 64; k++) if (g.grid[k]) block(BX + (k % 8) * CELL, BY + Math.floor(k / 8) * CELL, CELL, COLORS[g.grid[k]]);
+        for (var k = 0; k < N * N; k++) if (g.grid[k]) block(BX + (k % N) * CELL, BY + Math.floor(k / N) * CELL, CELL, COLORS[g.grid[k]]);
         // aperçu du dépôt
         if (drag && g.pieces[drag.slot]) {
           var pc = g.pieces[drag.slot], sh = BBE.PIECES[pc.p], cl = dropCell(drag);
           if (BBE.fits(g.grid, sh, cl.r, cl.c)) {
             var tmp = g.grid.slice();
-            sh.cells.forEach(function (c) { tmp[(cl.r + c[0]) * 8 + cl.c + c[1]] = 9; });
+            sh.cells.forEach(function (c) { tmp[(cl.r + c[0]) * N + cl.c + c[1]] = 9; });
             var fullR = [], fullC = [];
-            for (var a = 0; a < 8; a++) {
+            for (var a = 0; a < N; a++) {
               var fr = true, fc = true;
-              for (var b = 0; b < 8; b++) { if (!tmp[a * 8 + b]) fr = false; if (!tmp[b * 8 + a]) fc = false; }
+              for (var b = 0; b < N; b++) { if (!tmp[a * N + b]) fr = false; if (!tmp[b * N + a]) fc = false; }
               if (fr) fullR.push(a); if (fc) fullC.push(a);
             }
             ctx.fillStyle = "rgba(251,191,36,.22)";
-            fullR.forEach(function (r) { roundRect(BX, BY + r * CELL, 8 * CELL, CELL, 10); ctx.fill(); });
-            fullC.forEach(function (c) { roundRect(BX + c * CELL, BY, CELL, 8 * CELL, 10); ctx.fill(); });
+            fullR.forEach(function (r) { roundRect(BX, BY + r * CELL, N * CELL, CELL, 10); ctx.fill(); });
+            fullC.forEach(function (c) { roundRect(BX + c * CELL, BY, CELL, N * CELL, 10); ctx.fill(); });
             drawPiece(pc, BX + cl.c * CELL, BY + cl.r * CELL, CELL, 0.45);
           }
         }
@@ -3599,7 +3654,7 @@ return {SIZE: SIZE, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid, fits: fits, 
         if (banner.life <= 0) banner = null;
         else {
           var k2 = 1 - banner.life / banner.max, sc = 0.6 + Math.min(1, k2 * 6) * 0.5;
-          ctx.save(); ctx.translate(W / 2, BY + 4 * CELL); ctx.scale(sc, sc); ctx.globalAlpha = Math.min(1, banner.life * 3);
+          ctx.save(); ctx.translate(W / 2, BY + N * CELL / 2); ctx.scale(sc, sc); ctx.globalAlpha = Math.min(1, banner.life * 3);
           ctx.fillStyle = "rgba(11,18,32,.7)"; roundRect(-300, -50, 600, 100, 24); ctx.fill();
           ctx.fillStyle = banner.c; ctx.font = "800 62px system-ui, sans-serif"; ctx.textBaseline = "middle"; ctx.fillText(banner.t, 0, 4);
           ctx.restore(); ctx.textBaseline = "alphabetic";
@@ -3640,8 +3695,8 @@ return {SIZE: SIZE, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid, fits: fits, 
       ctx.fillText(Math.floor(sec / 60) + ":" + (sec % 60 < 10 ? "0" : "") + (sec % 60), W / 2 - 10, 92);
       if (opp) {
         var mx = W - BX - 96, my = 26, cs = 12;
-        ctx.fillStyle = "#111A2E"; ctx.fillRect(mx - 4, my - 4, 8 * cs + 8, 8 * cs + 8);
-        for (var i = 0; i < 64; i++) { var v = +opp.grid.charAt(i); if (v) { ctx.fillStyle = COLORS[v]; ctx.fillRect(mx + (i % 8) * cs, my + Math.floor(i / 8) * cs, cs - 1, cs - 1); } }
+        ctx.fillStyle = "#111A2E"; ctx.fillRect(mx - 4, my - 4, N * cs + 8, N * cs + 8);
+        for (var i = 0; i < N * N; i++) { var v = +opp.grid.charAt(i); if (v) { ctx.fillStyle = COLORS[v]; ctx.fillRect(mx + (i % N) * cs, my + Math.floor(i / N) * cs, cs - 1, cs - 1); } }
         ctx.textAlign = "right"; ctx.fillStyle = "#E879F9"; ctx.font = "700 22px system-ui, sans-serif"; ctx.fillText(String(duelNames[1 - duelYou] || "ADVERSAIRE").slice(0, 10).toUpperCase(), mx - 18, 44);
         ctx.fillStyle = "#F8FAFC"; ctx.font = "800 46px system-ui, sans-serif"; ctx.fillText(String(opp.score), mx - 18, 96);
         if (me && opp.score > me.score) { ctx.fillStyle = "#F87171"; ctx.font = "700 22px system-ui, sans-serif"; ctx.fillText("+" + (opp.score - me.score) + " devant", mx - 18, 124); }
@@ -3663,14 +3718,14 @@ return {SIZE: SIZE, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid, fits: fits, 
     function duelStop() { duelRun = false; running = false; drag = null; }
     function duelSync(log) {
       if (!duelSt) return;
-      g = BBE.newGame(duelSt.seed, { ensureFit: false });
+      g = BBE.newGame(duelSt.seed, { ensureFit: false, size: duelSt.size || 8 }); setGrid(duelSt.size || 8);
       for (var i = 0; i < log.length; i++) BBE.place(g, log[i][0], log[i][1], log[i][2]);
       shown = g.score; state = g.over ? "blocked" : "playing";
     }
     function duelOnState(st, you, names) {
       duelYou = you; duelNames = names; duelSt = st; duelAt = Date.now();
-      if (!g || g.seed !== st.seed) {
-        g = BBE.newGame(st.seed, { ensureFit: false }); shown = 0; state = "playing"; duelFinal = null; fx = []; pops = []; banner = null;
+      if (!g || g.seed !== st.seed || (g.size || 8) !== (st.size || 8)) {
+        setGrid(st.size || 8); g = BBE.newGame(st.seed, { ensureFit: false, size: st.size || 8 }); shown = 0; state = "playing"; duelFinal = null; fx = []; pops = []; banner = null;
         if (st.players[you].moves > 0) duel.send({ t: "sync" });
       } else if (st.players[you].moves > g.moves) duel.send({ t: "sync" });
       else if (st.players[you].moves === g.moves && st.players[you].score !== g.score) duel.send({ t: "sync" });
@@ -3688,7 +3743,8 @@ return {SIZE: SIZE, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid, fits: fits, 
     }
     function enter() {
       $("bb-sound").setAttribute("aria-pressed", String(soundOn));
-      if (!g || state === "over") { reset(); }
+      updateBbSizeButton();
+      if (!g || state === "over" || (!duel && (g.size || 8) !== bbWantedSize())) { reset(); }
       if (!running) { running = true; lastT = performance.now(); requestAnimationFrame(loop); }
     }
     function leave() { running = false; drag = null; }
@@ -3697,6 +3753,11 @@ return {SIZE: SIZE, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid, fits: fits, 
     if (!duel) {
       canvas.addEventListener("click", function () { if (state === "over" && Date.now() - overAt > 900) reset(); });
       $("bb-restart").addEventListener("click", function () { reset(); });
+      $("bb-size").addEventListener("click", function () {
+        var next = bbWantedSize() === 9 ? 8 : 9;
+        try { localStorage.setItem("boygames-bb-size", String(next)); } catch (e) { /* ignore */ }
+        updateBbSizeButton(); reset();
+      });
       $("bb-sound").addEventListener("click", function () {
         soundOn = !soundOn; $("bb-sound").setAttribute("aria-pressed", String(soundOn));
         try { localStorage.setItem("boygames-bb-sound", soundOn ? "1" : "0"); } catch (e) { /* ignore */ }
@@ -3946,7 +4007,7 @@ return {SIZE: SIZE, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid, fits: fits, 
     function say(id, txt, err) { setMsg($(id), txt, err); }
     function css(name) { return getComputedStyle($("view-arena")).getPropertyValue(name).trim(); }
     function show(inGame) { $("ar-lobby").hidden = inGame; $("ar-stage").hidden = !inGame; updateIngame(); }
-    function kindOf(c) { return c.charAt(0) === "P" ? "space" : c.charAt(0) === "B" ? "blocks" : c.charAt(0) === "X" ? "boyblocks" : "snake"; }
+    function kindOf(c) { var k = c.charAt(0); return k === "P" ? "space" : k === "B" ? "blocks" : (k === "X" || k === "Y") ? "boyblocks" : "snake"; }
 
     function resize() {
       var sz = SIZES[kind];
@@ -4208,12 +4269,12 @@ return {SIZE: SIZE, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid, fits: fits, 
     }
     function start(c) { code = c; phase = "lobby"; st = null; you = -1; names = ["", ""]; retries = 0; spaceX = 72; startSpaceKeys(); connect(); }
 
-    ["S", "P", "B", "X"].forEach(function (k) {
+    ["S", "P", "B", "X", "Y"].forEach(function (k) {
       $("ar-create-" + k).addEventListener("click", function () { say("ar-note", ""); start(newCode(k)); });
     });
     $("ar-join").addEventListener("click", function () {
       var c = $("ar-code").value.trim().toUpperCase();
-      if (!/^[SPBX][A-Z0-9]{3,7}$/.test(c)) { say("ar-note", "Code invalide.", true); return; }
+      if (!/^[SPBXY][A-Z0-9]{3,7}$/.test(c)) { say("ar-note", "Code invalide.", true); return; }
       say("ar-note", ""); start(c);
     });
     $("ar-leave").addEventListener("click", function () { $("ar-again").hidden = true; leave(); show(false); });

@@ -97,7 +97,7 @@ await t("code sans lettre de jeu valide: refus au niveau du routeur", async () =
 });
 await t("routeur: les codes S, P, B et X (BoyBlocks) ouvrent bien une salle", async () => {
   const { default: worker } = await import("../worker.js");
-  for (const code of ["SABCD", "PABCD", "BABCD", "XABCD"]) {
+  for (const code of ["SABCD", "PABCD", "BABCD", "XABCD", "YABCD"]) {
     let reached = null;
     const ARENA = { idFromName: (n) => n, get: (id) => ({ fetch: () => { reached = id; return new Response("salle", { status: 200 }); } }) };
     await worker.fetch({ url: "https://x/play/" + code, headers: { get: (h) => (h === "Upgrade" ? "websocket" : null) } }, { ARENA });

@@ -30,6 +30,7 @@ try:
     run_file(c, f"{REPO}/schema_v11_economie_reglages.sql"); run_file(c, f"{REPO}/schema_v11_economie_reglages.sql")
     run_file(c, f"{REPO}/schema_v12_monetisation.sql"); run_file(c, f"{REPO}/schema_v12_monetisation.sql")
     run_file(c, f"{REPO}/schema_v13_marketing.sql"); run_file(c, f"{REPO}/schema_v13_marketing.sql")
+    run_file(c, f"{REPO}/schema_v14_boyblocks_9x9.sql"); run_file(c, f"{REPO}/schema_v14_boyblocks_9x9.sql")
     sql("update public.app_settings set value = 'false' where key = 'maintenance'") if sql("select to_regclass('public.app_settings')")[0][0] else None
     print("app_settings:", sql("select * from public.app_settings"))
 
@@ -206,6 +207,44 @@ console.log(JSON.stringify({moves:g.log,score:g.score}));""" % os.path.join(os.p
     t("refus", lambda: (as_user(c, U1, "select staff_marketing_review(%s, 'refusee', null, null, null, null, 'trop sombre')", (vid,)), as_user(c, U1, "select staff_marketing('refusee')")[0][0]["counts"])[1])
     t("mode auto : plateforme inconnue refusée", lambda: must_fail(lambda: as_user(c, U1, """select staff_marketing_settings('{"enabled": true, "per_day": 1, "hour": 18, "platforms": ["myspace"]}'::jsonb)"""), "invalid platform"))
     t("mode auto reste désactivé par défaut", lambda: as_user(c, U1, "select staff_marketing(null)")[0][0]["settings"]["auto"]["enabled"] is False or (_ for _ in ()).throw(Exception("activé")))
+
+    print("== v14 : BoyBlocks 9x9 (essai)")
+    def playout9(seed, limit=40):
+        mv = []
+        for _ in range(limit):
+            if sql("select over from bb_replay_n(%s, %s::jsonb, true, 2, 9)", (seed, json.dumps(mv)))[0][0]: break
+            nxt = None
+            for slot in range(3):
+                for rr in range(9):
+                    for cc in range(9):
+                        if sql("select ok from bb_replay_n(%s, %s::jsonb, true, 2, 9)", (seed, json.dumps(mv + [[slot, rr, cc]])))[0][0]:
+                            nxt = [slot, rr, cc]; break
+                    if nxt: break
+                if nxt: break
+            if not nxt: break
+            mv.append(nxt)
+        return mv
+    t("réglage lisible par un visiteur (9x9 activé)", lambda: as_user(c, None, "select game_settings_public()")[0][0])
+    lb8 = sql("select count(*) from leaderboard('boyblocks', null, 50)")[0][0]
+    r9 = as_user(c, U2, "select boyblocks_start_v3(9)")[0][0]
+    t("partie 9x9 classée créée", lambda: {k: r9[k] for k in ("size", "rules")})
+    mv9 = playout9(r9["seed"], 30)
+    sql("update boyblocks_runs set started_at = now() - interval '10 minutes' where id = %s", (r9["run_id"],))
+    t("fin de partie 9x9 vérifiée par la base", lambda: {k: v for k, v in as_user(c, U2, "select boyblocks_finish(%s, %s::jsonb)", (r9["run_id"], json.dumps(mv9)))[0][0].items() if k in ("score", "moves", "size")})
+    t("score 9x9 rangé à part (« boyblocks9 »)", lambda: sql("select game, count(*) from scores where game like 'boyblocks%%' group by game order by game"))
+    t("classement 8x8 inchangé", lambda: (lb8, sql("select count(*) from leaderboard('boyblocks', null, 50)")[0][0]) if lb8 == sql("select count(*) from leaderboard('boyblocks', null, 50)")[0][0] else (_ for _ in ()).throw(Exception("modifié")))
+    t("classement 9x9 séparé", lambda: as_user(c, U2, "select pseudo, score from leaderboard('boyblocks9', null, 10)"))
+    r9b = as_user(c, U2, "select boyblocks_start_v3(9)")[0][0]
+    sql("update boyblocks_runs set started_at = now() - interval '10 minutes' where id = %s", (r9b["run_id"],))
+    t("coup impossible sur la grille 9x9 refusé", lambda: must_fail(lambda: as_user(c, U2, "select boyblocks_finish(%s, '[[0,9,9]]'::jsonb)", (r9b["run_id"],)), "invalid run"))
+    t("interrupteur refusé à un joueur", lambda: must_fail(lambda: as_user(c, U2, """select staff_game_settings_set('boyblocks9', '{"enabled": false}'::jsonb)"""), "forbidden"))
+    as_user(c, U1, """select staff_game_settings_set('boyblocks9', '{"enabled": false}'::jsonb)""")
+    t("retour au 8x8 : nouvelle partie 9x9 refusée", lambda: must_fail(lambda: as_user(c, U2, "select boyblocks_start_v3(9)"), "grid disabled"))
+    t("retour au 8x8 : partie 8x8 toujours possible", lambda: as_user(c, U2, "select boyblocks_start_v3(8)->>'size'")[0][0])
+    t("scores 9x9 conservés après le retour au 8x8", lambda: sql("select count(*) from scores where game = 'boyblocks9'")[0][0])
+    as_user(c, U1, """select staff_game_settings_set('boyblocks9', '{"enabled": true}'::jsonb)""")
+    t("paliers 9x9 définis", lambda: sql("select count(*) from badge_tracks where game = 'boyblocks9'")[0][0])
+    t("favori « boyblocks9 » accepté s'il est débloqué", lambda: (as_user(c, U2, "select sync_tiers()"), sql("insert into user_tiers (user_id, game, tier) values (%s, 'boyblocks9', 0) on conflict do nothing", (U2,)), as_user(c, U2, "select set_favorites(array['boyblocks9:0'])"), sql("select favorites from profiles where id = %s", (U2,))[0][0])[3])
 
     print("== v9 : badges à paliers")
     t("sync_tiers tintintest", lambda: as_user(c, U1, "select sync_tiers()")[0][0])

@@ -6,12 +6,13 @@ export const TICK_MS = 250;
 export const DURATION_MS = 120000;
 const MIN_MOVE_MS = 150; // un humain ne pose pas plus de ~6 pièces par seconde
 
-export function newGame(seed) {
-  const s = seed >>> 0;
+// size : 8 (classique) ou 9 (grille d'essai, salles « Y »)
+export function newGame(seed, size = 8) {
+  const s = seed >>> 0, n = size === 9 ? 9 : 8;
   return {
-    seed: s, ms: 0, over: false, winner: null, reason: null,
+    seed: s, size: n, ms: 0, over: false, winner: null, reason: null,
     // ensureFit=false : aucun joueur n'est avantagé par des pièces "arrangées" selon sa grille
-    players: [BB.newGame(s, { ensureFit: false }), BB.newGame(s, { ensureFit: false })],
+    players: [BB.newGame(s, { ensureFit: false, size: n }), BB.newGame(s, { ensureFit: false, size: n })],
   };
 }
 
@@ -50,15 +51,15 @@ export function step(g, dt) {
   checkEnd(g);
 }
 
-export function syncLog(g, i) { return { t: "sync", seed: g.seed, log: g.players[i].log.slice() }; }
+export function syncLog(g, i) { return { t: "sync", seed: g.seed, size: g.size || 8, log: g.players[i].log.slice() }; }
 
 export function snapshot(g) {
   return {
     t: "state", kind: "boyblocks", over: g.over, winner: g.winner, reason: g.reason,
-    seed: g.seed, msLeft: Math.max(0, DURATION_MS - g.ms), total: DURATION_MS,
+    seed: g.seed, size: g.size || 8, msLeft: Math.max(0, DURATION_MS - g.ms), total: DURATION_MS,
     players: g.players.map((p) => ({
       score: p.score, lines: p.lines, streak: p.streak, moves: p.moves, blocked: p.over,
-      grid: p.grid.join(""), // 64 chiffres 0-7
+      grid: p.grid.join(""), // 64 (8x8) ou 81 (9x9) chiffres 0-7
     })),
   };
 }
