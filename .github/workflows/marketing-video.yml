@@ -1,0 +1,44 @@
+# Machine marketing BOYGAMES : fabrique chaque jour une vidéo 9:16 à partir d'une vraie partie, dans le cloud (GitHub
+# Actions, gratuit pour un dépôt public), même Mac éteint. Elle NE PUBLIE RIEN : la vidéo est déposée comme « artefact »
+# (gardé 14 jours) pour être validée. La publication sera une étape séparée, après accord (voir docs/MARKETING.md).
+# Ne s'exécute automatiquement que depuis la branche par défaut (main) : rien ne tourne tant qu'il n'est pas fusionné.
+name: Vidéo marketing du jour
+on:
+  schedule:
+    - cron: "17 5 * * *"          # chaque jour vers 7 h (heure de Paris en été)
+  workflow_dispatch: {}           # lancement à la main depuis l'onglet Actions
+permissions:
+  contents: read
+concurrency:
+  group: marketing-video
+  cancel-in-progress: false
+jobs:
+  video:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Outils (ffmpeg, navigateur)
+        working-directory: marketing
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q ffmpeg fonts-dejavu-core
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Site assemblé depuis les sources
+        run: python3 -I build.py
+      - name: Fabrication de la vidéo
+        working-directory: marketing
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}   # facultatif : sans clé, textes par modèles
+          FFMPEG: /usr/bin/ffmpeg
+        run: node fabriquer-video.mjs "${{ github.run_number }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: video-${{ github.run_number }}
+          path: |
+            marketing/sortie/*/video.mp4
+            marketing/sortie/*/infos.json
+          retention-days: 14

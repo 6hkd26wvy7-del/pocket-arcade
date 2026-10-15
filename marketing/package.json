@@ -1,0 +1,14 @@
+{
+  "name": "boygames-marketing",
+  "private": true,
+  "description": "Machine marketing BOYGAMES : capture de vraies parties, montage 9:16, file de publication.",
+  "type": "module",
+  "scripts": {
+    "video": "node fabriquer-video.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.134.0",
+    "ffmpeg-static": "5.2.0",
+    "playwright": "1.56.1"
+  }
+}
