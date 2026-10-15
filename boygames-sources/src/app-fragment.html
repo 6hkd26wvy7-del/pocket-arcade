@@ -1,0 +1,3664 @@
+<title>BOYGAMES</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#0F172A">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="BOYGAMES">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rubik:wght@600;700;800&family=Manrope:wght@500;600;700&display=swap">
+<style>
+/* Layout: one narrow column styled as a green handheld LCD. Top bar with three tabs, then one screen at a time: games, scores, account, Snake. One look in both themes. */
+:root {
+  --page: #8bac0f;
+  --lcd: #9bbc0f;
+  --field: #a9c91a;
+  --mid: #306230;
+  --ink: #0f380f;
+  --err: #7a1f1f;
+  --pixel: "Press Start 2P", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html { background: var(--page); }
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--pixel);
+  font-size: 9px;
+  line-height: 1.9;
+}
+[hidden] { display: none !important; }
+.wrap {
+  max-width: 460px;
+  margin: 0 auto;
+  padding-top: calc(14px + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+a { color: var(--ink); }
+h2 { font-size: 11px; letter-spacing: 0.05em; margin: 0 0 14px; font-weight: normal; }
+p { margin: 0 0 12px; }
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 14px;
+  flex-wrap: wrap;
+  padding-bottom: 10px;
+  border-bottom: 3px solid var(--ink);
+  margin-bottom: 18px;
+}
+.logo { font-size: 11px; letter-spacing: 0.06em; color: var(--ink); text-decoration: none; }
+.nav { display: flex; flex-wrap: wrap; gap: 4px 14px; min-width: 0; }
+.nav a {
+  font-size: 8px;
+  color: var(--ink);
+  text-decoration: none;
+  padding: 10px 2px;
+  border-bottom: 2px solid transparent;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nav a.on { border-bottom-color: var(--ink); }
+
+.panel {
+  background: var(--lcd);
+  border: 3px solid var(--ink);
+  padding: 14px;
+  margin-bottom: 14px;
+}
+.btn {
+  display: inline-block;
+  background: var(--ink);
+  color: var(--lcd);
+  border: 3px solid var(--ink);
+  border-radius: 4px;
+  padding: 12px 14px;
+  font-family: var(--pixel);
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn:active { background: var(--mid); border-color: var(--mid); }
+.btn.alt { background: transparent; color: var(--ink); }
+.btn.alt:active { background: var(--field); border-color: var(--ink); }
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+.tab {
+  background: transparent;
+  color: var(--ink);
+  border: 3px solid var(--ink);
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-family: var(--pixel);
+  font-size: 8px;
+  cursor: pointer;
+}
+.tab[aria-pressed="true"] { background: var(--ink); color: var(--lcd); }
+
+label { display: block; margin-bottom: 6px; font-size: 8px; }
+input, select {
+  width: 100%;
+  font: 16px var(--mono);
+  color: var(--ink);
+  padding: 11px;
+  border: 3px solid var(--ink);
+  border-radius: 0;
+  background: var(--field);
+  margin-bottom: 4px;
+}
+.hint { font-size: 8px; color: var(--mid); margin: 0 0 12px; }
+.msg { min-height: 1.9em; margin: 10px 0 0; font-size: 8px; }
+.msg.err { color: var(--err); }
+.sep { border: 0; border-top: 2px dotted var(--mid); margin: 18px 0; }
+
+.game { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.game h3 { margin: 0 0 6px; font-size: 11px; font-weight: normal; letter-spacing: 0.05em; }
+.game p { margin: 0; font-size: 8px; }
+.game > div { min-width: 0; }
+
+.lb { list-style: none; margin: 8px 0 0; padding: 0; }
+.lb li {
+  display: grid;
+  grid-template-columns: 3.4em minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 6px;
+  border-bottom: 2px dotted var(--mid);
+}
+.lb li.me { background: var(--ink); color: var(--lcd); border-bottom-color: var(--ink); }
+.lb .ps { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+#view-snake, #view-arena, #view-blocks, #view-space {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  min-height: calc(100vh - 100px);
+  min-height: calc(100dvh - 100px);
+}
+.stage { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.screen {
+  display: block;
+  width: min(100%, 420px, max(160px, calc((100vh - 300px) * 144 / 208)));
+  width: min(100%, 420px, max(160px, calc((100dvh - 300px) * 144 / 208)));
+  max-width: 100%;
+  aspect-ratio: 144 / 208;
+  background: var(--lcd);
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  border: 4px solid var(--ink);
+  touch-action: none;
+}
+.stage .msg { text-align: center; margin: 0; }
+.xpbar { height: 14px; border: 3px solid var(--ink); background: var(--field); margin: 6px 0 8px; }
+.xpbar > i { display: block; height: 100%; background: var(--ink); }
+.line { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 2px dotted var(--mid); }
+.line:last-child { border-bottom: 0; }
+.line > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin: 8px 0 0; }
+.badge { border: 3px solid var(--ink); padding: 8px; font-size: 7px; }
+.badge.off { opacity: .35; border-style: dashed; }
+.badge b { display: block; font-weight: normal; font-size: 8px; margin-bottom: 4px; }
+.small { font-size: 7px; }
+.chat { max-height: 240px; overflow-y: auto; border: 3px solid var(--ink); background: var(--field); padding: 8px; margin: 8px 0; }
+.chat p { margin: 0 0 8px; font-size: 8px; overflow-wrap: anywhere; }
+.chat p.mine { text-align: right; }
+.chat p.mine span { background: var(--ink); color: var(--lcd); padding: 2px 5px; }
+.btn.mini { padding: 8px 10px; font-size: 7px; }
+textarea { width: 100%; font: 16px var(--mono); color: var(--ink); padding: 11px; border: 3px solid var(--ink); border-radius: 0; background: var(--field); margin-bottom: 4px; }
+.foot { margin-top: 26px; font-size: 7px; text-align: center; }
+.btn:focus-visible, .tab:focus-visible, .nav a:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, .screen:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+}
+
+/* ===== NOUVEAU LOOK BOYGAMES (palette bleu nuit / violet). Les écrans de jeu gardent leurs couleurs LCD. ===== */
+:root {
+  --bg: #0F172A;
+  --card: #1E293B;
+  --card-hi: #26344B;
+  --line: #334155;
+  --text: #F8FAFC;
+  --muted: #94A3B8;
+  --primary: #7C3AED;
+  --primary-hi: #8B5CF6;
+  --cyan: #22D3EE;
+  --green: #10B981;
+  --orange: #F59E0B;
+  --red: #F43F5E;
+  --display: "Rubik", "Segoe UI", system-ui, sans-serif;
+  --body: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+html, body { background: var(--bg); }
+body {
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.wrap { max-width: 980px; padding-block: 12px 100px; }
+a { color: var(--cyan); }
+h2 { font-family: var(--display); font-size: 22px; font-weight: 700; letter-spacing: 0; margin: 4px 0 14px; color: var(--text); }
+p { margin: 0 0 10px; }
+
+.bar { border-bottom: 1px solid var(--line); padding-bottom: 12px; margin-bottom: 16px; flex-wrap: nowrap; }
+.logo {
+  font-family: var(--display); font-weight: 800; font-size: 26px; letter-spacing: 0.02em; text-decoration: none;
+  background: linear-gradient(90deg, #F8FAFC 0%, var(--primary-hi) 45%, var(--cyan) 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.nav { gap: 6px; flex-wrap: nowrap; }
+.nav a {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--body); font-weight: 600; font-size: 14px; color: var(--muted);
+  padding: 9px 14px; border: 0; border-radius: 12px; max-width: none; text-decoration: none;
+}
+.nav a svg { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.nav a:hover { color: var(--text); }
+.nav a.on { color: var(--text); background: rgba(124, 58, 237, .25); box-shadow: inset 0 0 0 1px rgba(139, 92, 246, .6); }
+@media (max-width: 720px) {
+  .nav {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; justify-content: space-around; gap: 0;
+    background: rgba(15, 23, 42, .96); border-top: 1px solid var(--line);
+    padding: 6px max(8px, env(safe-area-inset-left, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-right, 0px));
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  }
+  .wrap { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+  .nav a { flex-direction: column; gap: 2px; font-size: 11px; padding: 6px 4px; flex: 1; min-width: 0; border-radius: 10px; }
+  .nav a.on { box-shadow: none; background: transparent; color: var(--primary-hi); }
+}
+
+.panel { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 16px; margin-bottom: 14px; }
+.panel h3 { font-family: var(--display) !important; font-size: 16px !important; font-weight: 600 !important; margin: 0 0 8px !important; }
+.btn {
+  background: linear-gradient(180deg, var(--primary-hi), var(--primary)); color: #fff; border: 0; border-radius: 12px;
+  padding: 12px 18px; font-family: var(--body); font-weight: 700; font-size: 14px; letter-spacing: 0.02em;
+  box-shadow: 0 4px 14px rgba(124, 58, 237, .35);
+}
+.btn:active { background: var(--primary); transform: translateY(1px); }
+.btn.alt { background: transparent; color: var(--text); box-shadow: inset 0 0 0 1px var(--line); }
+.btn.alt:active { background: var(--card-hi); }
+.btn.mini { padding: 8px 12px; font-size: 12px; }
+.tab { background: var(--card); color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px; font-family: var(--body); font-weight: 600; font-size: 13px; }
+.tab[aria-pressed="true"] { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+label { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+input, select, textarea { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 12px; font-family: var(--body); margin-bottom: 8px; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-hi); outline-offset: 1px; }
+.hint, .small { color: var(--muted); font-size: 12px; }
+.msg { font-size: 13px; color: var(--muted); }
+.msg.err { color: var(--red); }
+.sep { border-top: 1px solid var(--line); }
+.line { border-bottom: 1px solid var(--line); font-size: 14px; }
+.lb li { border-bottom: 1px solid var(--line); font-size: 14px; }
+.lb li.me { background: rgba(124, 58, 237, .25); color: var(--text); border-radius: 10px; border-bottom-color: transparent; }
+.xpbar { height: 10px; border: 0; border-radius: 999px; background: var(--bg); overflow: hidden; }
+.xpbar > i { background: linear-gradient(90deg, var(--primary-hi), var(--cyan)); border-radius: 999px; }
+.badge { border: 1px solid var(--line); border-radius: 12px; font-size: 12px; background: var(--bg); }
+.badge b { font-size: 13px; }
+.badge.off { border-style: dashed; }
+.chat { border: 1px solid var(--line); background: var(--bg); border-radius: 12px; }
+.chat p { font-size: 14px; }
+.chat p.mine span { background: var(--primary); color: #fff; border-radius: 8px; padding: 3px 8px; }
+.foot { font-size: 12px; color: var(--muted); }
+.foot a { color: var(--muted); }
+.btn:focus-visible, .tab:focus-visible, .nav a:focus-visible, a:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+/* Bandeau d'accueil */
+.hero {
+  position: relative; overflow: hidden; border-radius: 22px; padding: 22px 20px; margin-bottom: 18px;
+  background: radial-gradient(120% 140% at 100% 0%, rgba(124, 58, 237, .55), transparent 60%), linear-gradient(135deg, #1E1B4B, #0F172A 70%);
+  border: 1px solid rgba(139, 92, 246, .45);
+  display: grid; grid-template-columns: minmax(0, 1fr) 120px; gap: 10px; align-items: center;
+}
+.hero small { font-weight: 800; letter-spacing: .16em; font-size: 11px; color: var(--cyan); }
+.hero h1 { font-family: var(--display); font-weight: 800; font-size: clamp(28px, 7.4vw, 52px); line-height: 1; margin: 6px 0 8px; letter-spacing: .01em; }
+.hero .btn { white-space: nowrap; padding: 12px 16px; }
+.hero p { color: #CBD5E1; margin: 0 0 14px; font-size: 14px; }
+.hero svg { width: 100%; height: auto; }
+
+/* Cartes des jeux */
+#game-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+#game-list .panel.game { margin: 0; padding: 0; display: block; overflow: hidden; border: 1px solid rgba(255,255,255,.08); position: relative; min-height: 150px; background: var(--g1); }
+#game-list .panel.game[data-game="snake"] { --g1: linear-gradient(135deg, #065F46, #022C22); --gc: var(--green); }
+#game-list .panel.game[data-game="space"] { --g1: linear-gradient(135deg, #4C1D95, #1E1B4B); --gc: var(--primary-hi); }
+#game-list .panel.game[data-game="boyblocks"] { --g1: linear-gradient(135deg, #86198F, #1E1B4B); --gc: #E879F9; }
+#game-list .panel.game[data-game="blocks"] { --g1: linear-gradient(135deg, #92400E, #451A03); --gc: var(--orange); }
+#game-list .panel.game[data-game="arena"] { --g1: linear-gradient(135deg, #155E75, #0F172A); --gc: var(--cyan); }
+.game .art { position: absolute; right: 0; top: 0; bottom: 0; width: 46%; opacity: .95; }
+.game .art svg { width: 100%; height: 100%; }
+.game .txt { position: relative; padding: 16px; max-width: 62%; display: flex; flex-direction: column; gap: 6px; height: 100%; }
+.game h3 { font-family: var(--display); font-weight: 800; font-size: 22px; line-height: 1.05; margin: 0; letter-spacing: .01em; }
+.game p { font-size: 12px; color: rgba(248, 250, 252, .78); margin: 0 0 6px; }
+.game .btn { background: var(--gc); color: #0F172A; box-shadow: none; align-self: flex-start; margin-top: auto; padding: 9px 22px; }
+.tag { font-size: 11px; font-weight: 700; color: rgba(248, 250, 252, .8); }
+
+/* Bonus de connexion */
+.daily { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin: 10px 0; }
+.daily div { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 6px 2px; text-align: center; font-size: 11px; color: var(--muted); }
+.daily div b { display: block; color: var(--text); font-size: 13px; font-family: var(--display); }
+.daily div.done { border-color: var(--green); color: var(--green); }
+.daily div.next { border-color: var(--primary-hi); box-shadow: 0 0 0 1px var(--primary-hi) inset; color: var(--text); }
+.coin { display: inline-block; width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #FDE68A, var(--orange)); vertical-align: -2px; margin-right: 4px; }
+
+/* Écrans de jeu : une couleur néon par jeu sur fond bleu nuit */
+#view-snake, #view-arena[data-kind="snake"] { --lcd: #0F172A; --ink: #34D399; --mid: #047857; --field: #0B1220; }
+#view-boyblocks { --lcd: #0F172A; --ink: #E879F9; --mid: #7E22CE; --field: #0B1220; }
+#view-blocks, #view-arena[data-kind="blocks"] { --lcd: #0F172A; --ink: #FBBF24; --mid: #B45309; --field: #0B1220; }
+#view-space, #view-arena[data-kind="space"] { --lcd: #0F172A; --ink: #22D3EE; --mid: #F59E0B; --field: #0B1220; }
+#view-arena { --lcd: #0F172A; --ink: #F8FAFC; --mid: #64748B; }
+#view-arena[data-kind="snake"] { --ink: #34D399; --mid: #047857; }
+#view-arena[data-kind="blocks"] { --ink: #FBBF24; --mid: #B45309; }
+#view-arena[data-kind="boyblocks"] { --ink: #E879F9; --mid: #7E22CE; }
+#view-arena[data-kind="space"] { --ink: #22D3EE; --mid: #F59E0B; }
+.screen { border: 3px solid var(--mid); border-radius: 14px; box-shadow: 0 0 0 1px var(--ink), 0 8px 30px rgba(0, 0, 0, .45); }
+#view-snake .btn, #view-blocks .btn, #view-boyblocks .btn, #view-space .btn, #view-arena .btn { background: var(--card-hi); box-shadow: inset 0 0 0 1px var(--line); }
+.stage .msg { color: var(--muted); }
+
+/* Pendant une partie : le jeu prend tout l'écran, la page ne défile plus */
+#g-exit { display: none; }
+body.ingame { position: fixed; inset: 0; width: 100%; overflow: hidden; overscroll-behavior: none; }
+body.ingame .bar, body.ingame .foot, body.ingame #test-banner, body.ingame #maint-box, body.ingame #offline { display: none !important; }
+body.ingame .wrap { max-width: none; height: 100dvh; padding-block: calc(env(safe-area-inset-top, 0px) + 46px) calc(env(safe-area-inset-bottom, 0px) + 8px); }
+body.ingame main, body.ingame main > section:not([hidden]) { height: 100%; min-height: 0; }
+body.ingame main > section:not([hidden]) .stage { height: 100%; justify-content: center; }
+body.ingame #g-exit { display: inline-block; position: fixed; z-index: 30; left: max(12px, env(safe-area-inset-left, 0px)); top: calc(env(safe-area-inset-top, 0px) + 8px); }
+.av { display: inline-block; flex: none; border-radius: 12px; overflow: hidden; vertical-align: middle; }
+.av svg { display: block; width: 100%; height: 100%; }
+.who { display: inline-flex; align-items: center; gap: 10px; background: none; border: 0; padding: 4px 0; color: inherit; font: inherit; text-align: left; cursor: pointer; min-height: 44px; }
+.avgrid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin: 8px 0 12px; }
+.avgrid button { background: none; border: 2px solid transparent; border-radius: 14px; padding: 2px; cursor: pointer; min-height: 44px; }
+.avgrid button.on { border-color: var(--primary-hi); }
+.avgrid .av { width: 100% !important; height: auto !important; aspect-ratio: 1; }
+.pf-head { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+.emb-row { display: flex; gap: 4px; flex-wrap: wrap; margin: 6px 0; }
+.emb { width: 44px; height: 44px; padding: 0; border: 2px solid transparent; border-radius: 12px; background: none; cursor: pointer; }
+.emb svg { width: 100%; height: 100%; display: block; }
+.emb.locked { filter: grayscale(1) brightness(.6); opacity: .3; cursor: default; }
+.emb.fav { border-color: var(--primary-hi); box-shadow: 0 0 12px rgba(167, 139, 250, .6); }
+.favs { display: flex; gap: 10px; margin: 8px 0 14px; }
+.favs .slot { width: 64px; height: 64px; border: 2px dashed var(--line); border-radius: 16px; display: grid; place-items: center; color: var(--muted); font-size: 11px; }
+.favs .slot svg { width: 100%; height: 100%; }
+.tierbar { height: 8px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); overflow: hidden; margin: 3px 0 6px; }
+.tierbar i { display: block; height: 100%; background: linear-gradient(90deg, #22D3EE, #E879F9); }
+.trk { margin: 12px 0; padding: 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); }
+.trk h4 { margin: 0 0 4px; font-family: var(--display); font-size: 14px; }
+#unlock { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; background: rgba(5, 8, 20, .88); text-align: center; padding: 24px; }
+#unlock[hidden] { display: none; }
+#unlock .big { width: min(62vw, 240px); height: min(62vw, 240px); margin: 0 auto 10px; animation: unl-pop .9s cubic-bezier(.2, 1.4, .4, 1) both, unl-glow 2s ease-in-out .9s infinite; }
+#unlock .big svg { width: 100%; height: 100%; }
+#unlock h2 { font-family: var(--display); font-size: 26px; margin: 8px 0 2px; letter-spacing: .02em; }
+#unlock p { color: var(--muted); margin: 0 0 16px; font-size: 13px; }
+@keyframes unl-pop { 0% { transform: scale(.1) rotate(-25deg); opacity: 0; } 70% { transform: scale(1.12) rotate(4deg); opacity: 1; } 100% { transform: scale(1) rotate(0); } }
+@keyframes unl-glow { 0%, 100% { filter: drop-shadow(0 0 10px rgba(232, 121, 249, .5)); } 50% { filter: drop-shadow(0 0 26px rgba(34, 211, 238, .9)); } }
+@media (prefers-reduced-motion: reduce) { #unlock .big { animation: none; } }
+.pf-badge { display: inline-block; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--primary-hi); font-size: 11px; margin-top: 6px; }
+.pf-games { width: 100%; border-collapse: collapse; font-size: 12px; margin: 8px 0; }
+.pf-games td, .pf-games th { text-align: left; padding: 6px 4px; border-bottom: 1px dotted var(--mid); font-weight: normal; }
+.badge.excl { box-shadow: inset 0 0 0 2px #FBBF24; }
+.badge.pick { cursor: pointer; }
+.badge.sel { outline: 2px solid var(--primary-hi); }
+#bug-fab { position: fixed; z-index: 40; right: max(12px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 76px);
+  width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: rgba(30, 41, 59, .92); color: var(--text); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; padding: 0; box-shadow: 0 4px 14px rgba(0, 0, 0, .4); }
+#bug-fab svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+@media (min-width: 721px) { #bug-fab { bottom: 20px; } }
+body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: auto; width: 38px; height: 38px; opacity: .7; }
+#bug-modal { position: fixed; inset: 0; z-index: 100; background: rgba(2, 6, 23, .78); display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) max(12px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 12px) max(12px, env(safe-area-inset-left, 0px)); }
+#bug-modal[hidden] { display: none; }
+#bug-card { width: 100%; max-width: 460px; background: var(--card, #1E293B); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin: auto 0; font-family: var(--body); font-size: 14px; line-height: 1.5; }
+#bug-card h3 { margin: 0 0 8px; font-size: 16px; font-family: var(--body); }
+#bug-card label { display: block; font-size: 11px; letter-spacing: .06em; margin: 8px 0 4px; opacity: .8; }
+#bug-card select, #bug-card textarea { width: 100%; box-sizing: border-box; font-size: 16px; }
+#bug-card textarea { min-height: 110px; resize: vertical; }
+#bug-card details { margin: 10px 0; font-size: 12px; opacity: .85; }
+#bug-card pre { white-space: pre-wrap; word-break: break-word; font-size: 11px; margin: 6px 0 0; }
+#bug-card img.shot { max-width: 100%; max-height: 160px; border-radius: 8px; margin-top: 6px; display: block; }
+.bugrow { display: block; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px dotted var(--mid); color: inherit; font: inherit; font-size: 12px; padding: 10px 0; cursor: pointer; min-height: 44px; }
+.bugdet { padding: 6px 0 12px; font-size: 12px; }
+.bugdet pre { white-space: pre-wrap; word-break: break-word; font-size: 11px; }
+.pill { display: inline-block; padding: 1px 7px; border-radius: 99px; font-size: 10px; border: 1px solid var(--line); margin-right: 4px; }
+.pill.blocker { border-color: #F43F5E; color: #FB7185; } .pill.high { border-color: #F59E0B; color: #FBBF24; }
+</style>
+<!--BODY-->
+<button class="btn alt mini" id="g-exit" type="button">&larr; QUITTER</button>
+<div class="wrap">
+  <header class="bar">
+    <a class="logo" href="#menu">BOYGAMES</a>
+    <nav class="nav" aria-label="Navigation">
+      <a href="#menu" data-nav="menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg><span>Accueil</span></a>
+      <a href="#scores" data-nav="scores"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8v5a4 4 0 01-8 0V4z"/><path d="M8 6H4v2a3 3 0 003 3M16 6h4v2a3 3 0 01-3 3"/><path d="M12 13v4M8 20h8"/></svg><span>Classement</span></a>
+      <a href="#amis" data-nav="amis"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0113 0"/><path d="M16 5a3.5 3.5 0 010 7M18 14.5a6.5 6.5 0 013.5 5.5"/></svg><span>Amis</span></a>
+      <a href="#boutique" data-nav="boutique"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.2 11h10.6L20 7H6"/><circle cx="9" cy="19.5" r="1.4"/><circle cx="17" cy="19.5" r="1.4"/></svg><span>Boutique</span></a>
+      <a href="#compte" data-nav="compte" id="nav-account"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg><span>Profil</span></a>
+    </nav>
+  </header>
+
+  <div id="test-banner" class="panel" hidden><p style="margin:0">MODE TEST : base de données de test. Rien ici n'est réel.</p></div>
+
+  <div id="maint-box" class="panel" hidden><p id="maint-text" style="margin:0"></p></div>
+
+  <div id="offline" class="panel" hidden>
+    <p style="margin:0">Mode hors ligne : les comptes et le classement sont désactivés tant que le site n'est pas relié à sa base de données. Les jeux fonctionnent normalement.</p>
+  </div>
+
+  <main>
+    <section id="view-menu" hidden>
+      <div class="hero">
+        <div>
+          <small>BIENVENUE SUR</small>
+          <h1>BOYGAMES</h1>
+          <p>Une plateforme de jeux pour tous les joueurs.</p>
+          <a class="btn" href="#game-list" id="hero-play">JOUER MAINTENANT</a>
+        </div>
+        <svg viewBox="0 0 120 120" aria-hidden="true">
+          <rect x="14" y="30" width="92" height="62" rx="26" fill="#312E81" stroke="#8B5CF6" stroke-width="3"/>
+          <path d="M38 52v16M30 60h16" stroke="#C4B5FD" stroke-width="6" stroke-linecap="round"/>
+          <circle cx="82" cy="54" r="5" fill="#22D3EE"/><circle cx="92" cy="66" r="5" fill="#F43F5E"/>
+          <path d="M20 14l10 16H10z" fill="none" stroke="#10B981" stroke-width="4" stroke-linejoin="round"/>
+          <circle cx="98" cy="18" r="8" fill="none" stroke="#22D3EE" stroke-width="4"/>
+          <rect x="88" y="96" width="16" height="16" rx="3" fill="none" stroke="#F43F5E" stroke-width="4"/>
+        </svg>
+      </div>
+      <div class="panel"><p id="menu-status" style="margin:0"></p></div>
+      <div id="install-hint" class="panel" hidden>
+        <p id="install-text" style="margin:0 0 10px"></p>
+        <button class="btn" id="b-install" type="button" hidden>INSTALLER L'APPLI</button>
+      </div>
+      <div id="news-box" class="panel" hidden></div>
+      <div id="me-card" class="panel" hidden></div>
+      <div id="season-box" class="panel" hidden></div>
+      <div id="missions-box" class="panel" hidden></div>
+      <h2 id="games-title">Nos jeux</h2>
+      <div id="game-list"></div>
+    </section>
+
+    <section id="view-scores" hidden>
+      <h2>CLASSEMENT</h2>
+      <label for="lb-game">JEU</label>
+      <select id="lb-game"></select>
+      <div class="tabs" role="group" aria-label="Portée du classement" style="margin-top:10px">
+        <button class="tab" id="tab-all" type="button" aria-pressed="true">MONDE</button>
+        <button class="tab" id="tab-fr" type="button" aria-pressed="false">FRANCE</button>
+        <button class="tab" id="tab-friends" type="button" aria-pressed="false">AMIS</button>
+        <button class="tab" id="tab-season" type="button" aria-pressed="false">SAISON</button>
+      </div>
+      <p id="lb-note" class="msg" role="status"></p>
+      <p id="lb-me" class="msg"></p>
+      <ol id="lb-list" class="lb"></ol>
+    </section>
+
+    <section id="view-amis" hidden>
+      <h2>AMIS</h2>
+      <div id="fr-info" class="panel"></div>
+      <div id="fr-notifs" class="panel" hidden></div>
+      <div id="fr-add" class="panel" hidden></div>
+      <div id="fr-list" class="panel" hidden></div>
+      <div id="fr-profile" class="panel" hidden></div>
+      <div id="fr-chat" class="panel" hidden></div>
+      <p id="fr-msg" class="msg" role="status"></p>
+    </section>
+
+    <section id="view-admin" hidden>
+      <h2>ADMINISTRATION</h2>
+      <div id="adm-body"></div>
+      <p id="adm-msg" class="msg" role="status"></p>
+    </section>
+
+    <section id="view-boutique" hidden>
+      <h2>BOUTIQUE</h2>
+      <div id="shop-body" class="panel"></div>
+      <p id="shop-msg" class="msg" role="status"></p>
+    </section>
+
+    <section id="view-compte" hidden>
+      <h2>MON COMPTE</h2>
+      <div id="acc-body" class="panel"></div>
+      <p id="acc-msg" class="msg" role="status"></p>
+    </section>
+
+    <div id="unlock" role="dialog" aria-modal="true" aria-label="Nouveau badge" hidden>
+      <div><div class="big" id="unlock-emb"></div><h2 id="unlock-title"></h2><p id="unlock-sub"></p><button class="btn" id="unlock-ok" type="button">SUPER !</button></div>
+    </div>
+
+    <section id="view-arena" hidden>
+      <div id="ar-lobby" class="panel">
+        <h3 style="margin:0 0 8px;font-size:11px;font-weight:normal">JOUER EN LIGNE</h3>
+        <p>À deux, en direct. Choisis un jeu, crée une salle, puis donne le code à un ami.</p>
+        <div class="row" style="flex-direction:column">
+          <button class="btn" id="ar-create-S" type="button">SNAKE ARENA (DUEL)</button>
+          <button class="btn" id="ar-create-P" type="button">SPACE ATTACK (ÉQUIPE)</button>
+          <button class="btn" id="ar-create-B" type="button">BLOCK DROP (DUEL)</button>
+          <button class="btn" id="ar-create-X" type="button">BOYBLOCKS (DUEL 2 MIN)</button>
+        </div>
+        <hr class="sep">
+        <label for="ar-code">OU ENTRE LE CODE D'UN AMI</label>
+        <input id="ar-code" maxlength="8" autocomplete="off" autocapitalize="characters" spellcheck="false">
+        <div class="row" style="margin-top:10px"><button class="btn alt" id="ar-join" type="button">REJOINDRE</button></div>
+      </div>
+      <div class="stage" id="ar-stage" hidden>
+        <p id="ar-top" class="msg" role="status"></p>
+        <canvas id="ar-screen" class="screen" width="240" height="264" style="aspect-ratio:240/264;width:min(100%,420px)" tabindex="0" aria-label="Jeu en ligne. Glisse un doigt pour jouer."></canvas>
+        <p id="ar-msg" class="msg" role="status"></p>
+        <div class="row"><button class="btn" id="ar-again" type="button" hidden>REJOUER</button><button class="btn alt" id="ar-leave" type="button">QUITTER</button></div>
+      </div>
+      <p id="ar-note" class="msg" role="status"></p>
+    </section>
+
+    <section id="view-blocks" hidden>
+      <div class="stage">
+        <canvas id="bl-screen" class="screen" width="144" height="232" style="aspect-ratio:144/232;width:min(100%,360px)" tabindex="0" aria-label="Block Drop. Glisse pour déplacer, touche pour tourner."></canvas>
+        <p id="bl-msg" class="msg" role="status"></p>
+        <div class="row">
+          <button class="btn" id="bl-pause" type="button">PAUSE</button>
+          <button class="btn alt" id="bl-restart" type="button">REJOUER</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-boyblocks" hidden>
+      <div class="stage">
+        <canvas id="bb-screen" class="screen" width="720" height="1040" style="touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none" tabindex="0" aria-label="BoyBlocks. Glisse une pièce sur la grille de 8 par 8 pour compléter des lignes."></canvas>
+        <p id="bb-msg" class="msg" role="status"></p>
+        <div class="row">
+          <button class="btn" id="bb-sound" type="button" aria-pressed="true">SON</button>
+          <button class="btn alt" id="bb-restart" type="button">REJOUER</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-space" hidden>
+      <div class="stage">
+        <canvas id="sp-screen" class="screen" width="144" height="208" tabindex="0" aria-label="Space Attack. Glisse le doigt pour déplacer ton vaisseau, il tire tout seul."></canvas>
+        <p id="sp-msg" class="msg" role="status"></p>
+        <div class="row">
+          <button class="btn" id="sp-pause" type="button">PAUSE</button>
+          <button class="btn alt" id="sp-restart" type="button">REJOUER</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-snake" hidden>
+      <div class="stage">
+        <canvas id="screen" class="screen" width="144" height="208" tabindex="0" aria-label="Écran du jeu Snake. Glisse un doigt pour tourner."></canvas>
+        <p id="snake-msg" class="msg" role="status"></p>
+        <div class="row">
+          <button class="btn" id="b-pause" type="button">PAUSE</button>
+          <button class="btn" id="b-sound" type="button" aria-pressed="true">SON</button>
+          <button class="btn alt" id="b-restart" type="button">REJOUER</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <button id="bug-fab" type="button" aria-label="Signaler un bug" title="Signaler un bug"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8a4 4 0 018 0v6a4 4 0 01-8 0z"/><path d="M12 10v8M4 13h4M16 13h4M5 7l3 2M19 7l-3 2M5 20l3-2M19 20l-3-2M9 4l1.5 1.5M15 4l-1.5 1.5"/></svg></button>
+  <div id="bug-modal" hidden role="dialog" aria-modal="true" aria-label="Signaler un bug"><div id="bug-card"></div></div>
+
+  <footer class="foot"><a href="privacy.html">CONFIDENTIALITÉ</a> &middot; <a href="cgu.html">CONDITIONS</a></footer>
+
+  <!-- Emplacement publicité : colle ici le code de ta régie pub, puis retire l'attribut hidden. -->
+  <aside id="ad-slot" hidden aria-label="Publicité"></aside>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.0/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script>if (/[?&]env=test/.test(location.search)) { document.write('<script src="config.test.js"><\/script>'); }</script>
+<script>
+(function () {
+  "use strict";
+
+  /* To add a game: add it here, add its score cap in schema.sql, and build its own screen. */
+  var GAMES = [
+    { id: "snake", name: "SNAKE", tag: "Solo & Duel", desc: "Mange, grandis, ne touche ni les murs ni ta queue." },
+    { id: "boyblocks", name: "BOYBLOCKS", tag: "Solo", desc: "Pose des pièces sur la grille, efface lignes et colonnes, enchaîne les combos. Sans chrono." },
+    { id: "blocks", name: "BLOCK DROP", tag: "Solo & Duel", desc: "Empile les blocs qui tombent, complète des lignes. Glisse pour bouger, touche pour tourner." },
+    { id: "space", name: "SPACE ATTACK", tag: "Solo & Coop", desc: "Détruis les envahisseurs. Glisse ton doigt, ton vaisseau tire tout seul." }
+  ];
+  var MULTI = [
+    { id: "arena", name: "EN LIGNE", tag: "À deux", desc: "Snake, Space Attack ou Block Drop à deux, en direct avec un ami." }
+  ];
+
+  var cfg = window.ARCADE_CONFIG || {};
+  var online = !!(window.supabase && cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && String(cfg.SUPABASE_URL).indexOf("VOTRE") === -1);
+  var sb = null;
+  if (online) {
+    try { sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY); } catch (e) { online = false; }
+  }
+
+  var session = null, profile = null, onlineBest = 0, current = null;
+  var accStep = "email", accEmail = "", accNotice = "";
+
+  function $(id) { return document.getElementById(id); }
+  function setMsg(el, text, isErr) { el.textContent = text || ""; el.classList.toggle("err", !!isErr); }
+  function localBest(game) {
+    try { return parseInt(localStorage.getItem("arcade-best-" + game) || "0", 10) || 0; } catch (e) { return 0; }
+  }
+  function saveLocalBest(game, v) {
+    try { localStorage.setItem("arcade-best-" + game, String(v)); } catch (e) { /* ignore */ }
+  }
+
+  /* ---------- Account data ---------- */
+  async function loadProfile() {
+    profile = null;
+    if (!sb || !session) return;
+    var r = await sb.from("profiles").select("pseudo,country").eq("id", session.user.id).maybeSingle();
+    if (!r.error && r.data) profile = r.data;
+  }
+
+  /* ---------- Level, coins, missions, shop (needs schema_v2.sql on the database) ---------- */
+  var me = null, missions = [], badgeCat = null, shopCat = null;
+  var role = null, notifs = [], maint = null, friends = [], chatWith = null, chatTimer = null, access = null, seasonRows = [];
+  var TITLES = { title_rookie: "RECRUE", title_legend: "LÉGENDE" };
+  var DEFAULT_LOOK = { page: "#0F172A", lcd: "#0F172A", field: "#0B1220", mid: "#64748B", ink: "#F8FAFC" };
+  var THEMES = {
+    theme_night: { page: "#0f1f0f", lcd: "#1e3a1e", field: "#274927", mid: "#8bac0f", ink: "#cfe8a0" },
+    theme_sunset: { page: "#c4623a", lcd: "#e8a15a", field: "#efb97a", mid: "#7a3b2a", ink: "#3a1410" }
+  };
+  var SKINS = { skin_neon: "#d400a8", skin_gold: "#a67c00" };
+  var isTest = /[?&]env=test/.test(location.search);
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+
+  /* ---------- Badges à paliers ---------- */
+  /*BG-BADGES*/
+  var TIER_NAMES = ["Recrue", "Argent", "Or", "Platine", "Diamant", "Légende"];
+  var tierData = null, unlockQueue = [], lastTierSync = 0;
+  function emblem(game, tier, size, cls, uid) {
+    var d = el("span", cls || "");
+    try { d.innerHTML = window.BG_BADGES.badge(game, tier, size, uid || (game + tier + Math.random().toString(36).slice(2, 5))); } catch (e) { d.textContent = "★"; }
+    return d;
+  }
+  function showUnlocks(list) {
+    list.forEach(function (u) { unlockQueue.push(u); });
+    if ($("unlock").hidden) nextUnlock();
+  }
+  function nextUnlock() {
+    var u = unlockQueue.shift();
+    if (!u) { $("unlock").hidden = true; return; }
+    var box = $("unlock-emb"); box.textContent = "";
+    box.append(emblem(u.game, u.tier, 240, "", "unl"));
+    $("unlock-title").textContent = "PALIER " + String(TIER_NAMES[u.tier] || u.name).toUpperCase();
+    $("unlock-sub").textContent = (GAME_LABEL[u.game] || u.game) + " · nouveau badge débloqué" + (u.tier === 5 ? " : tu es une légende !" : "");
+    $("unlock").hidden = false;
+    $("unlock-ok").focus();
+  }
+  $("unlock-ok").addEventListener("click", nextUnlock);
+  async function syncTiers(force) {
+    if (!sb || !session || !profile) return;
+    if (!force && Date.now() - lastTierSync < 4000) return;
+    lastTierSync = Date.now();
+    try {
+      var r = await sb.rpc("sync_tiers");
+      if (!r.error && r.data && r.data.length) { tierData = null; showUnlocks(r.data); }
+    } catch (e) { /* migration pas encore appliquée : on ignore */ }
+  }
+  function renderTiers(box, msg) {
+    sb.rpc("my_tiers").then(function (r) {
+      if (r.error || !r.data) return;
+      tierData = r.data;
+      var favs = tierData.favorites || [];
+      box.append(el("p", "", "MES BADGES DE JEU"));
+      box.append(el("p", "small", "6 paliers par jeu. Touche un badge obtenu pour l'ajouter à tes 3 favoris (visibles par tes amis)."));
+      var fr = el("div", "favs");
+      for (var k = 0; k < 3; k++) {
+        var slot = el("div", "slot");
+        var f = favs[k];
+        if (f) slot.append(emblem(f.split(":")[0], parseInt(f.split(":")[1], 10), 64)); else slot.textContent = "+";
+        fr.append(slot);
+      }
+      box.append(fr);
+      (tierData.games || []).forEach(function (g) {
+        var card = el("div", "trk");
+        var cur = g.tier === null || g.tier === undefined ? -1 : g.tier;
+        card.append(el("h4", "", (GAME_LABEL[g.game] || g.game) + (cur >= 0 ? " · " + TIER_NAMES[cur] : "")));
+        var row = el("div", "emb-row");
+        for (var t = 0; t < 6; t++) (function (t) {
+          var b = el("button", "emb" + (t > cur ? " locked" : "") + (favs.indexOf(g.game + ":" + t) >= 0 ? " fav" : ""));
+          b.type = "button"; b.setAttribute("aria-label", TIER_NAMES[t] + (t > cur ? " (verrouillé)" : ""));
+          b.append(emblem(g.game, t, 48, "", "a" + g.game + t));
+          if (t <= cur) b.addEventListener("click", async function () {
+            var key = g.game + ":" + t, list = favs.slice(), at = list.indexOf(key);
+            if (at >= 0) list.splice(at, 1); else { if (list.length >= 3) list.shift(); list.push(key); }
+            var res = await sb.rpc("set_favorites", { p_list: list });
+            if (res.error) { setMsg(msg, "Impossible de changer tes favoris.", true); return; }
+            route();
+          });
+          row.append(b);
+        })(t);
+        card.append(row);
+        if (g.next) {
+          var pctS = Math.min(100, Math.round(100 * g.best / g.next.min_score)), pctP = Math.min(100, Math.round(100 * g.plays / g.next.min_plays));
+          card.append(el("div", "small", "Prochain : " + g.next.name.toUpperCase()));
+          card.append(el("div", "small", "Record " + g.best + " / " + g.next.min_score));
+          var b1 = el("div", "tierbar"); b1.append(el("i")); b1.firstChild.style.width = pctS + "%"; card.append(b1);
+          card.append(el("div", "small", "Parties " + g.plays + " / " + g.next.min_plays));
+          var b2 = el("div", "tierbar"); b2.append(el("i")); b2.firstChild.style.width = pctP + "%"; card.append(b2);
+        } else card.append(el("div", "small", "Palier maximum atteint !"));
+        box.append(card);
+      });
+    });
+  }
+
+  function equippedCode(prefix) {
+    if (!me || !me.items) return null;
+    for (var i = 0; i < me.items.length; i++) {
+      if (me.items[i].equipped && me.items[i].code.indexOf(prefix) === 0) return me.items[i].code;
+    }
+    return null;
+  }
+
+  function applyCosmetics() {
+    var look = DEFAULT_LOOK; /* les thèmes de la boutique seront refaits pour le nouveau design */
+    var root = document.documentElement.style;
+    root.setProperty("--page", look.page);
+    root.setProperty("--lcd", look.lcd);
+    root.setProperty("--field", look.field);
+    root.setProperty("--mid", look.mid);
+    root.setProperty("--ink", look.ink);
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", look.page);
+    var sv = getComputedStyle($("view-snake"));
+    snake.setLook(sv.getPropertyValue("--lcd").trim() || look.lcd, sv.getPropertyValue("--mid").trim() || look.mid, sv.getPropertyValue("--ink").trim() || look.ink, SKINS[equippedCode("skin_")]);
+  }
+
+  async function loadMe() {
+    me = null;
+    missions = [];
+    if (sb && session && profile) {
+      var r = await sb.rpc("me");
+      if (!r.error && r.data) me = r.data;
+      if (me) {
+        var m = await sb.rpc("my_missions");
+        if (!m.error && m.data) missions = m.data;
+        var rr = await sb.rpc("my_role");
+        role = rr.error ? null : rr.data;
+        var nn = await sb.rpc("my_notifications", { p_limit: 30 });
+        notifs = (!nn.error && nn.data) ? nn.data : [];
+        var ac = await sb.rpc("my_access");
+        access = ac.error ? null : ac.data;
+        var sr = await sb.rpc("my_season_rewards");
+        seasonRows = (!sr.error && sr.data) ? sr.data : [];
+      }
+    }
+    if (!me) { role = null; notifs = []; access = null; seasonRows = []; }
+    applyCosmetics();
+    syncTiers(false);
+  }
+
+  async function loadBadgeCat() {
+    if (badgeCat || !sb) return badgeCat;
+    var r = await sb.from("badges").select("code,name,description,exclusive").order("sort");
+    if (!r.error && r.data) badgeCat = r.data;
+    return badgeCat;
+  }
+
+  function badgeName(code) {
+    var list = badgeCat || [];
+    for (var i = 0; i < list.length; i++) if (list[i].code === code) return list[i].name;
+    return code;
+  }
+
+
+  /* ---------- Avatars prédéfinis (le code vient de la base : table avatars) ---------- */
+  var AVATARS = {
+    av_01: ["#7C3AED", '<rect x="9" y="9" width="6" height="6" fill="#fff"/><rect x="17" y="9" width="6" height="6" fill="#fff"/><rect x="9" y="19" width="14" height="4" fill="#fff"/>'],
+    av_02: ["#0EA5E9", '<path d="M8 25V14a8 8 0 0116 0v11l-3-2-2.7 2-2.3-2-2.3 2L11 23z" fill="#fff"/><circle cx="13" cy="14" r="2" fill="#0EA5E9"/><circle cx="19" cy="14" r="2" fill="#0EA5E9"/>'],
+    av_03: ["#64748B", '<rect x="8" y="10" width="16" height="13" rx="3" fill="#E2E8F0"/><rect x="15" y="5" width="2" height="5" fill="#E2E8F0"/><circle cx="16" cy="5" r="2" fill="#F43F5E"/><circle cx="12.5" cy="16" r="2" fill="#0F172A"/><circle cx="19.5" cy="16" r="2" fill="#0F172A"/>'],
+    av_04: ["#F59E0B", '<path d="M7 8l5 4h8l5-4v10a9 9 0 01-18 0z" fill="#fff"/><circle cx="12.5" cy="17" r="1.6" fill="#0F172A"/><circle cx="19.5" cy="17" r="1.6" fill="#0F172A"/><path d="M14.5 21h3l-1.5 1.8z" fill="#F43F5E"/>'],
+    av_05: ["#EA580C", '<path d="M6 7l7 5h6l7-5-1 12-9 7-9-7z" fill="#FED7AA"/><circle cx="12.5" cy="17" r="1.6" fill="#0F172A"/><circle cx="19.5" cy="17" r="1.6" fill="#0F172A"/><path d="M14 21h4l-2 2.4z" fill="#0F172A"/>'],
+    av_06: ["#16A34A", '<ellipse cx="16" cy="16" rx="9" ry="11" fill="#BBF7D0"/><ellipse cx="12.5" cy="15" rx="2.5" ry="3.6" fill="#0F172A" transform="rotate(-18 12.5 15)"/><ellipse cx="19.5" cy="15" rx="2.5" ry="3.6" fill="#0F172A" transform="rotate(18 19.5 15)"/>'],
+    av_07: ["#1D4ED8", '<path d="M16 4c5 4 6 10 5 17h-10c-1-7 0-13 5-17z" fill="#fff"/><circle cx="16" cy="12" r="2.4" fill="#1D4ED8"/><path d="M11 21l-3 5 5-2zM21 21l3 5-5-2z" fill="#F43F5E"/><path d="M14 22h4l-2 6z" fill="#FBBF24"/>'],
+    av_08: ["#B45309", '<path d="M6 24l-1-13 6 5 5-9 5 9 6-5-1 13z" fill="#FBBF24"/><rect x="6" y="24" width="20" height="3" fill="#F59E0B"/>'],
+    av_09: ["#4F46E5", '<path d="M18 3L8 18h7l-2 11 11-16h-7z" fill="#FDE047"/>'],
+    av_10: ["#0F172A", '<circle cx="16" cy="16" r="8" fill="#F472B6"/><ellipse cx="16" cy="16" rx="14" ry="3.5" fill="none" stroke="#FDE047" stroke-width="2" transform="rotate(-20 16 16)"/>'],
+    av_11: ["#B91C1C", '<path d="M5 22l5-12 4 4 2-6 2 6 4-4 5 12-9 4z" fill="#FCA5A5"/><circle cx="13" cy="19" r="1.6" fill="#0F172A"/><circle cx="19" cy="19" r="1.6" fill="#0F172A"/>'],
+    av_12: ["#0D9488", '<circle cx="16" cy="10" r="4" fill="#F43F5E"/><rect x="15" y="12" width="2" height="9" fill="#E2E8F0"/><rect x="8" y="21" width="16" height="6" rx="3" fill="#E2E8F0"/>']
+  };
+  function avatarEl(code, size) {
+    var a = AVATARS[code] || AVATARS.av_01;
+    var d = el("span", "av");
+    d.style.width = d.style.height = size + "px";
+    d.innerHTML = '<svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" fill="' + a[0] + '"/>' + a[1] + '</svg>';
+    return d;
+  }
+  var GAME_LABEL = { snake: "SNAKE", blocks: "BLOCK DROP", boyblocks: "BOYBLOCKS", space: "SPACE ATTACK" };
+
+  function rewardError(err) {
+    var m = String(err && err.message || "");
+    if (m.indexOf("already claimed") >= 0) return "Déjà récupéré aujourd'hui.";
+    if (m.indexOf("not done") >= 0) return "Mission pas encore terminée.";
+    if (m.indexOf("not enough") >= 0) return "Pas assez de BOYCOINS.";
+    if (m.indexOf("already owned") >= 0) return "Tu as déjà cet objet.";
+    if (m.indexOf("unknown player") >= 0) return "Joueur introuvable.";
+    if (m.indexOf("cannot add yourself") >= 0 || m.indexOf("cannot gift yourself") >= 0) return "Tu ne peux pas faire ça avec toi-même.";
+    if (m.indexOf("already friends") >= 0) return "Vous êtes déjà amis.";
+    if (m.indexOf("already requested") >= 0) return "Demande déjà envoyée.";
+    if (m.indexOf("too many") >= 0) return "Trop de demandes. Réessaie plus tard.";
+    if (m.indexOf("not friends") >= 0) return "Il faut être amis pour faire ça.";
+    if (m.indexOf("message refused") >= 0) return "Message refusé par le filtre.";
+    if (m.indexOf("too fast") >= 0) return "Doucement, réessaie dans quelques secondes.";
+    if (m.indexOf("too many reports") >= 0) return "Trop de signalements récemment. Réessaie plus tard.";
+    if (m.indexOf("invalid description") >= 0) return "Décris le problème en au moins 10 caractères.";
+    if (m.indexOf("blocked") >= 0) return "Impossible : un blocage existe entre vous.";
+    if (m.indexOf("not owned") >= 0 || m.indexOf("unknown avatar") >= 0) return "Tu ne possèdes pas cet élément.";
+    if (m.indexOf("beta") >= 0) return "Bêta privée : ton compte n'est pas encore ajouté.";
+    if (m.indexOf("banned") >= 0) return "Ton compte est suspendu.";
+    if (m.indexOf("maintenance") >= 0) return "Maintenance en cours, réessaie plus tard.";
+    if (m.indexOf("forbidden") >= 0) return "Accès refusé.";
+    return "Impossible pour le moment. Réessaie plus tard.";
+  }
+
+  function renderMeCard() {
+    var box = $("me-card");
+    if (!me) { box.hidden = true; return; }
+    box.hidden = false;
+    box.textContent = "";
+    var title = TITLES[equippedCode("title_")];
+    var head = el("div", "line");
+    var meWho = el("span", "who");
+    meWho.append(avatarEl(me.avatar, 40), el("span", "", profile.pseudo + (title ? " · " + title : "")));
+    head.append(meWho, el("span", "", "NIV " + me.level));
+    var bar = el("div", "xpbar");
+    var fill = document.createElement("i");
+    var span = Math.max(1, me.next_level_xp - me.level_start_xp);
+    fill.style.width = Math.max(0, Math.min(100, ((me.xp - me.level_start_xp) / span) * 100)) + "%";
+    bar.append(fill);
+    var xpLine = el("p", "small", me.xp + " / " + me.next_level_xp + " XP");
+    xpLine.style.margin = "0 0 8px";
+    var bc = el("p", "", ""); var coin = el("span", "coin"); bc.append(coin, me.bc + " BOYCOINS");
+    bc.style.margin = "0 0 10px";
+    box.append(head, bar, xpLine, bc);
+    var DAYR = [10, 15, 20, 25, 30, 40, 100];
+    var cur = me.daily_claimed_today ? ((Math.max(me.streak, 1) - 1) % 7) : (Math.max(me.streak, 0) % 7);
+    var grid = el("div", "daily");
+    DAYR.forEach(function (v, i) {
+      var d = el("div", me.daily_claimed_today ? (i <= cur ? "done" : "") : (i < cur ? "done" : (i === cur ? "next" : "")));
+      var bb = document.createElement("b");
+      bb.textContent = String(v);
+      d.append("J" + (i + 1), bb);
+      grid.append(d);
+    });
+    box.append(grid);
+    if (me.daily_claimed_today) {
+      var done = el("p", "small", "Récompense du jour récupérée. Série : " + me.streak + " jour" + (me.streak > 1 ? "s" : "") + ".");
+      done.style.margin = "0";
+      box.append(done);
+    } else {
+      var b = el("button", "btn", "RÉCOMPENSE DU JOUR");
+      b.type = "button";
+      b.addEventListener("click", claimDaily);
+      box.append(b);
+    }
+    var unread = notifs.filter(function (n) { return !n.read; }).length;
+    if (unread) {
+      var nl = el("p", "small", "");
+      nl.style.margin = "10px 0 0";
+      var na = el("a", "", unread + " nouvelle" + (unread > 1 ? "s" : "") + " notification" + (unread > 1 ? "s" : "") + " : voir");
+      na.href = "#amis";
+      nl.append(na);
+      box.append(nl);
+    }
+    if (access && access.beta_on && !access.allowed) {
+      var bn = el("p", "small", "Bêta privée en cours : ton compte n'a pas encore été ajouté. Demande au créateur du site.");
+      bn.style.margin = "10px 0 0";
+      box.append(bn);
+    }
+    var note = el("p", "msg", "");
+    note.id = "me-msg";
+    note.setAttribute("role", "status");
+    box.append(note);
+  }
+
+  async function claimDaily() {
+    var note = $("me-msg");
+    setMsg(note, "…");
+    var r = await sb.rpc("claim_daily");
+    if (r.error) { setMsg(note, rewardError(r.error), true); return; }
+    var d = r.data || {};
+    await loadBadgeCat();
+    var txt = "Jour " + d.day + " sur 7 : +" + d.bc + " BOYCOINS.";
+    if (d.new_badges && d.new_badges.length) txt += " Badge : " + d.new_badges.map(badgeName).join(", ") + ".";
+    await loadMe();
+    renderMeCard();
+    renderMissions();
+    setMsg($("me-msg"), txt);
+  }
+
+  function renderMissions() {
+    var box = $("missions-box");
+    if (!me || !missions.length) { box.hidden = true; return; }
+    box.hidden = false;
+    box.textContent = "";
+    box.append(el("h3", "", "MISSIONS DU JOUR"));
+    box.firstChild.style.cssText = "margin:0 0 6px;font-size:10px;font-weight:normal";
+    missions.forEach(function (m) {
+      var row = el("div", "line");
+      var left = el("span", "", m.name + " (" + m.progress + "/" + m.goal + ") +" + m.reward_bc + " BC");
+      row.append(left);
+      if (m.claimed) {
+        row.append(el("span", "small", "FAIT"));
+      } else if (m.progress >= m.goal) {
+        var b = el("button", "btn", "RÉCUPÉRER");
+        b.type = "button";
+        b.addEventListener("click", function () { claimMission(m.code); });
+        row.append(b);
+      } else {
+        row.append(el("span", "small", "…"));
+      }
+      box.append(row);
+    });
+    var note = el("p", "msg", "");
+    note.id = "mission-msg";
+    note.setAttribute("role", "status");
+    box.append(note);
+  }
+
+  async function claimMission(code) {
+    var r = await sb.rpc("claim_mission", { p_code: code });
+    if (r.error) { setMsg($("mission-msg"), rewardError(r.error), true); return; }
+    var d = r.data || {};
+    await loadBadgeCat();
+    var txt = "Mission réussie : +" + (d.bc || 0) + " BOYCOINS, +" + (d.xp || 0) + " XP.";
+    if (d.new_badges && d.new_badges.length) txt += " Badge : " + d.new_badges.map(badgeName).join(", ") + ".";
+    await loadMe();
+    renderMeCard();
+    renderMissions();
+    setMsg($("mission-msg"), txt);
+  }
+
+  /* ---------- Récompenses de fin de saison ---------- */
+  var GAME_NAMES = { snake: "Snake", blocks: "Block Drop", boyblocks: "BoyBlocks", space: "Space Attack" };
+  function renderSeason() {
+    var box = $("season-box");
+    var todo = seasonRows.filter(function (r) { return !r.claimed; });
+    if (!me || !todo.length) { box.hidden = true; return; }
+    box.hidden = false;
+    box.textContent = "";
+    var h = el("h3", "", "RÉCOMPENSE DE SAISON " + todo[0].season);
+    h.style.cssText = "margin:0 0 6px;font-size:10px;font-weight:normal";
+    box.append(h);
+    var total = 0;
+    todo.forEach(function (r) {
+      total += r.reward;
+      var row = el("div", "line");
+      row.append(el("span", "", (GAME_NAMES[r.game] || r.game) + " : n°" + r.rang), el("span", "", "+" + r.reward + " BC"));
+      box.append(row);
+    });
+    var b = el("button", "btn", "RÉCUPÉRER " + total + " BC");
+    b.type = "button";
+    b.style.marginTop = "10px";
+    b.addEventListener("click", async function () {
+      var r = await sb.rpc("claim_season_rewards");
+      if (r.error) { setMsg($("season-msg"), rewardError(r.error), true); return; }
+      await loadMe();
+      renderMeCard();
+      renderSeason();
+    });
+    box.append(b);
+    var note = el("p", "msg", "");
+    note.id = "season-msg";
+    box.append(note);
+  }
+
+  /* ---------- Maintenance, news ---------- */
+  async function loadMaint() {
+    if (!sb) return;
+    var r = await sb.rpc("get_maintenance");
+    maint = (!r.error && r.data) ? r.data : null;
+    var box = $("maint-box");
+    if (maint && maint.on) {
+      $("maint-text").textContent = "MAINTENANCE : " + (maint.message || "le site est en pause, reviens bientôt.") + (role ? " (Équipe : tu peux jouer.)" : "");
+      box.hidden = false;
+    } else {
+      box.hidden = true;
+    }
+  }
+
+  async function renderNews() {
+    var box = $("news-box");
+    box.hidden = true;
+    if (!sb) return;
+    var r = await sb.from("news").select("id,title,body,created_at").order("id", { ascending: false }).limit(3);
+    if (r.error || !r.data || !r.data.length) return;
+    box.textContent = "";
+    var h = el("h3", "", "ACTUALITÉS");
+    h.style.cssText = "margin:0 0 6px;font-size:10px;font-weight:normal";
+    box.append(h);
+    r.data.forEach(function (n) {
+      var row = el("div", "line");
+      row.style.display = "block";
+      var t = el("p", "", n.title);
+      t.style.margin = "0 0 4px";
+      row.append(t, el("p", "small", n.body));
+      row.lastChild.style.margin = "0";
+      box.append(row);
+    });
+    box.hidden = false;
+  }
+
+  /* ---------- Shop ---------- */
+  async function renderShop() {
+    var body = $("shop-body"), msg = $("shop-msg");
+    setMsg(msg, "");
+    body.textContent = "";
+    if (!online) { body.append(el("p", "", "La boutique demande un compte. Elle sera disponible une fois le site relié à sa base de données.")); return; }
+    if (!session || !profile) {
+      var p = el("p", "", "Connecte-toi pour utiliser la boutique. ");
+      var a = el("a", "", "Mon compte");
+      a.href = "#compte";
+      p.append(a);
+      body.append(p);
+      return;
+    }
+    if (!me) { body.append(el("p", "", "La boutique n'est pas encore disponible.")); return; }
+    if (!shopCat) {
+      var r = await sb.from("shop_items").select("code,kind,name,price").order("sort");
+      if (r.error) { body.append(el("p", "", "Impossible de charger la boutique. Réessaie plus tard.")); return; }
+      shopCat = r.data;
+    }
+    body.textContent = "";
+    var bal = el("p", "", "TES BOYCOINS : " + me.bc);
+    body.append(bal);
+    shopCat.forEach(function (it) {
+      var owned = null;
+      me.items.forEach(function (x) { if (x.code === it.code) owned = x; });
+      var row = el("div", "line");
+      row.append(el("span", "", it.name + (owned ? "" : " (" + it.price + " BC)")));
+      var b = el("button", owned ? "btn alt" : "btn", owned ? (owned.equipped ? "ENLEVER" : "METTRE") : "ACHETER");
+      b.type = "button";
+      b.addEventListener("click", async function () {
+        setMsg(msg, "…");
+        var res = owned ? await sb.rpc("equip_item", { p_code: it.code, p_on: !owned.equipped }) : await sb.rpc("buy_item", { p_code: it.code });
+        if (res.error) { setMsg(msg, rewardError(res.error), true); return; }
+        await loadMe();
+        await renderShop();
+        setMsg($("shop-msg"), owned ? "C'est fait." : "Acheté ! Tu peux le mettre.");
+      });
+      row.append(b);
+      body.append(row);
+    });
+  }
+
+  async function syncBest() {
+    onlineBest = 0;
+    if (!sb || !session || !profile) return;
+    var r = await sb.rpc("my_standing", { p_game: "snake", p_country: null });
+    if (!r.error && r.data && r.data.length) onlineBest = r.data[0].score || 0;
+  }
+
+  async function refreshAuth(s) {
+    session = s;
+    await loadProfile();
+    await syncBest();
+    await loadMe();
+    renderNav();
+    if (session && !profile && current !== "compte") { location.hash = "#compte"; return; }
+    if (current === "compte") renderAccount();
+    if (current === "menu") renderMenu();
+    if (current === "boutique") renderShop();
+    if (current === "amis") renderFriends();
+    if (current === "admin") renderAdmin();
+    loadMaint();
+  }
+
+  function renderNav() {
+    var a = $("nav-account");
+    var sp = a.querySelector("span");
+    if (sp) sp.textContent = "Profil";
+    a.title = profile ? profile.pseudo : "Compte";
+  }
+
+  /* ---------- Install on the home screen ---------- */
+  var deferredInstall = null;
+
+  function isStandalone() {
+    return window.navigator.standalone === true ||
+      (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+  }
+
+  function setupInstall() {
+    var box = $("install-hint"), txt = $("install-text"), btn = $("b-install");
+    if (isStandalone()) { box.hidden = true; return; }
+    var ua = window.navigator.userAgent || "";
+    var ios = /iphone|ipad|ipod/i.test(ua) || (window.navigator.platform === "MacIntel" && window.navigator.maxTouchPoints > 1);
+    if (deferredInstall) {
+      txt.textContent = "Installe BOYGAMES sur ton téléphone.";
+      btn.hidden = false;
+      box.hidden = false;
+    } else if (ios) {
+      txt.textContent = "Installe l'appli : dans Safari, touche Partager (le carré avec la flèche), puis « Sur l'écran d'accueil ».";
+      btn.hidden = true;
+      box.hidden = false;
+    } else {
+      box.hidden = true;
+    }
+  }
+
+  window.addEventListener("beforeinstallprompt", function (e) {
+    e.preventDefault();
+    deferredInstall = e;
+    setupInstall();
+  });
+  $("b-install").addEventListener("click", function () {
+    if (!deferredInstall) return;
+    deferredInstall.prompt();
+    deferredInstall = null;
+    $("install-hint").hidden = true;
+  });
+
+  /* ---------- Menu ---------- */
+  var GAME_ART = {
+    boyblocks: '<svg viewBox="0 0 120 150" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><g stroke="#00000033" stroke-width="2"><rect x="58" y="22" width="24" height="24" rx="5" fill="#E879F9"/><rect x="82" y="22" width="24" height="24" rx="5" fill="#E879F9"/><rect x="82" y="46" width="24" height="24" rx="5" fill="#E879F9"/><rect x="34" y="74" width="24" height="24" rx="5" fill="#22D3EE"/><rect x="58" y="74" width="24" height="24" rx="5" fill="#22D3EE"/><rect x="58" y="98" width="24" height="24" rx="5" fill="#FBBF24"/><rect x="82" y="98" width="24" height="24" rx="5" fill="#FBBF24"/><rect x="82" y="122" width="24" height="24" rx="5" fill="#34D399"/></g></svg>',
+    snake: '<svg viewBox="0 0 120 150" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><path d="M110 150c-40 0-70-10-70-40s60-20 60-50-50-10-70-30" fill="none" stroke="#34D399" stroke-width="22" stroke-linecap="round"/><path d="M110 150c-40 0-70-10-70-40s60-20 60-50-50-10-70-30" fill="none" stroke="#10B981" stroke-width="14" stroke-linecap="round" stroke-dasharray="2 18"/><circle cx="28" cy="32" r="13" fill="#34D399"/><circle cx="25" cy="29" r="5" fill="#fff"/><circle cx="26" cy="29" r="2.4" fill="#064E3B"/><circle cx="102" cy="26" r="7" fill="#F43F5E"/></svg>',
+    space: '<svg viewBox="0 0 120 150" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><g fill="#E9D5FF"><circle cx="14" cy="20" r="1.6"/><circle cx="96" cy="12" r="1.6"/><circle cx="108" cy="70" r="1.6"/><circle cx="20" cy="110" r="1.6"/><circle cx="70" cy="140" r="1.6"/></g><path d="M64 14l16 38v38H48V52z" fill="#E2E8F0"/><path d="M64 14l16 38H48z" fill="#22D3EE"/><path d="M48 70l-18 28 18-6zM80 70l18 28-18-6z" fill="#8B5CF6"/><path d="M56 92h16l-8 28z" fill="#F59E0B"/><circle cx="64" cy="58" r="6" fill="#0F172A"/><g fill="#F43F5E"><rect x="14" y="40" width="14" height="10" rx="3"/><rect x="92" y="34" width="14" height="10" rx="3"/></g></svg>',
+    blocks: '<svg viewBox="0 0 120 150" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><g stroke="#00000033" stroke-width="2"><rect x="62" y="20" width="26" height="26" rx="4" fill="#F59E0B"/><rect x="88" y="20" width="26" height="26" rx="4" fill="#F59E0B"/><rect x="88" y="46" width="26" height="26" rx="4" fill="#F59E0B"/><rect x="36" y="72" width="26" height="26" rx="4" fill="#22D3EE"/><rect x="62" y="72" width="26" height="26" rx="4" fill="#22D3EE"/><rect x="62" y="98" width="26" height="26" rx="4" fill="#10B981"/><rect x="88" y="98" width="26" height="26" rx="4" fill="#10B981"/><rect x="10" y="98" width="26" height="26" rx="4" fill="#8B5CF6"/><rect x="36" y="124" width="26" height="26" rx="4" fill="#F43F5E"/><rect x="10" y="124" width="26" height="26" rx="4" fill="#8B5CF6"/></g></svg>',
+    arena: '<svg viewBox="0 0 120 150" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><circle cx="44" cy="62" r="20" fill="#22D3EE"/><circle cx="84" cy="88" r="20" fill="#8B5CF6"/><path d="M20 130c0-18 48-18 48 0M62 140c0-14 40-14 40 0" stroke="#F8FAFC" stroke-width="5" fill="none" stroke-linecap="round"/></svg>'
+  };
+
+  function renderMenu() {
+    setupInstall();
+    var st = $("menu-status");
+    st.textContent = "";
+    if (!online) {
+      st.textContent = "Tu joues sans compte. Ton score reste sur cet appareil.";
+    } else if (profile) {
+      st.textContent = "Salut " + profile.pseudo + " ! Tes scores sont gardés sur ton compte.";
+    } else {
+      st.append("Tu joues sans compte. ");
+      var a = document.createElement("a");
+      a.href = "#compte";
+      a.textContent = "Crée un compte";
+      st.append(a, " pour garder tes scores.");
+    }
+    renderMeCard();
+    renderSeason();
+    renderMissions();
+    renderNews();
+    var list = $("game-list");
+    list.textContent = "";
+    var shown = GAMES.concat(cfg.ARENA_URL ? MULTI : []);
+    shown.forEach(function (g) {
+      var card = document.createElement("div");
+      card.className = "panel game";
+      card.setAttribute("data-game", g.id);
+      var art = document.createElement("div");
+      art.className = "art";
+      art.innerHTML = GAME_ART[g.id] || "";
+      var txt = document.createElement("div");
+      txt.className = "txt";
+      var h = document.createElement("h3");
+      h.textContent = g.name;
+      var tg = document.createElement("span");
+      tg.className = "tag";
+      tg.textContent = g.tag || "";
+      var p = document.createElement("p");
+      p.textContent = g.desc;
+      var go = document.createElement("a");
+      go.className = "btn";
+      go.href = "#" + g.id;
+      go.textContent = "JOUER";
+      txt.append(h, tg, p, go);
+      card.append(art, txt);
+      list.append(card);
+    });
+  }
+
+  /* ---------- Scores ---------- */
+  var scoreScope = "ALL", scoreGame = GAMES[0].id, scoreToken = 0;
+
+  function buildGameSelect() {
+    var sel = $("lb-game");
+    GAMES.forEach(function (g) {
+      var o = document.createElement("option");
+      o.value = g.id;
+      o.textContent = g.name;
+      sel.append(o);
+    });
+    sel.addEventListener("change", function () { scoreGame = sel.value; loadScores(); });
+    $("tab-all").addEventListener("click", function () { setScope("ALL"); });
+    $("tab-fr").addEventListener("click", function () { setScope("FR"); });
+    $("tab-friends").addEventListener("click", function () { setScope("FRIENDS"); });
+    $("tab-season").addEventListener("click", function () { setScope("SEASON"); });
+  }
+
+  function setScope(s) {
+    scoreScope = s;
+    $("tab-all").setAttribute("aria-pressed", String(s === "ALL"));
+    $("tab-fr").setAttribute("aria-pressed", String(s === "FR"));
+    $("tab-friends").setAttribute("aria-pressed", String(s === "FRIENDS"));
+    $("tab-season").setAttribute("aria-pressed", String(s === "SEASON"));
+    loadScores();
+  }
+
+  async function loadScores() {
+    var token = ++scoreToken;
+    var list = $("lb-list"), note = $("lb-note"), me = $("lb-me");
+    list.textContent = "";
+    setMsg(me, "");
+    if (!online) {
+      setMsg(note, "Classement indisponible hors ligne. Ton meilleur score sur cet appareil : " + localBest(scoreGame) + ".");
+      return;
+    }
+    setMsg(note, "Chargement…");
+    var country = scoreScope === "FR" ? "FR" : null;
+    var fn = "leaderboard", args = { p_game: scoreGame, p_country: country, p_limit: 50 };
+    var simple = scoreScope === "ALL" || scoreScope === "FR";
+    if (scoreScope === "FRIENDS") {
+      if (!session || !profile) { setMsg(note, "Connecte-toi pour voir le classement de tes amis."); return; }
+      fn = "leaderboard_friends"; args = { p_game: scoreGame, p_limit: 50 };
+    } else if (scoreScope === "SEASON") {
+      fn = "leaderboard_season"; args = { p_game: scoreGame, p_country: null, p_limit: 50 };
+    }
+    var r = await sb.rpc(fn, args);
+    if (token !== scoreToken) return;
+    if (r.error) { setMsg(note, "Impossible de charger le classement. Réessaie plus tard.", true); return; }
+    setMsg(note, r.data.length ? "" : (scoreScope === "FRIENDS" ? "Aucun score parmi tes amis pour l'instant." : "Personne n'est encore classé. Sois le premier !"));
+    r.data.forEach(function (row) {
+      var li = document.createElement("li");
+      if (row.moi) li.className = "me";
+      var rk = document.createElement("span");
+      rk.textContent = "N°" + row.rang;
+      var ps = document.createElement("span");
+      ps.className = "ps";
+      ps.textContent = row.pseudo;
+      var sc = document.createElement("span");
+      sc.textContent = String(row.score);
+      li.append(rk, ps, sc);
+      list.append(li);
+    });
+    if (!simple) {
+      setMsg(me, scoreScope === "SEASON" ? "Classement du mois en cours : il repart de zéro chaque mois." : "");
+    } else if (session && profile) {
+      var m = await sb.rpc("my_standing", { p_game: scoreGame, p_country: country });
+      if (token !== scoreToken) return;
+      if (!m.error && m.data && m.data.length) {
+        setMsg(me, "Ton rang : n°" + m.data[0].rang + " avec " + m.data[0].score + " points.");
+      } else {
+        setMsg(me, "Joue une partie pour entrer au classement.");
+      }
+    } else {
+      setMsg(me, "Connecte-toi pour apparaître dans le classement.");
+    }
+  }
+
+  /* ---------- Friends, messages, gifts ---------- */
+  function notifText(n) {
+    if (n.kind === "friend_request") return n.body + " veut devenir ton ami.";
+    if (n.kind === "friend_accept") return n.body + " est maintenant ton ami.";
+    if (n.kind === "message") return "Nouveau message de " + n.body + ".";
+    return n.body;
+  }
+
+  function stopChatTimer() { if (chatTimer) { clearInterval(chatTimer); chatTimer = null; } }
+
+  async function renderFriends() {
+    var info = $("fr-info"), msg = $("fr-msg");
+    setMsg(msg, "");
+    ["fr-notifs", "fr-add", "fr-list", "fr-chat"].forEach(function (id) { $(id).hidden = true; });
+    info.textContent = "";
+    info.hidden = false;
+    if (!online) { info.textContent = "Les amis demandent un compte. Ils seront disponibles une fois le site relié à sa base de données."; return; }
+    if (!session || !profile) {
+      info.append("Connecte-toi pour ajouter des amis. ");
+      var a = el("a", "", "Mon compte");
+      a.href = "#compte";
+      info.append(a);
+      return;
+    }
+    if (!me) { info.textContent = "Les amis ne sont pas encore disponibles."; return; }
+    info.hidden = true;
+
+    var nb = $("fr-notifs");
+    var nlist = notifs.slice(0, 8);
+    if (nlist.length) {
+      nb.textContent = "";
+      nb.append(el("h3", "", "NOTIFICATIONS"));
+      nb.firstChild.style.cssText = "margin:0 0 6px;font-size:10px;font-weight:normal";
+      nlist.forEach(function (n) {
+        var row = el("div", "line");
+        row.append(el("span", n.read ? "small" : "", (n.read ? "" : "• ") + notifText(n)));
+        nb.append(row);
+      });
+      nb.hidden = false;
+      if (notifs.some(function (n) { return !n.read; })) {
+        sb.rpc("mark_notifications_read").then(function () {
+          notifs.forEach(function (n) { n.read = true; });
+        });
+      }
+    }
+
+    var add = $("fr-add");
+    add.textContent = "";
+    add.append(el("h3", "", "AJOUTER UN AMI"));
+    add.firstChild.style.cssText = "margin:0 0 6px;font-size:10px;font-weight:normal";
+    var form = document.createElement("form");
+    form.noValidate = true;
+    var lab = el("label", "", "PSEUDO DE TON AMI");
+    lab.setAttribute("for", "in-friend");
+    var inp = document.createElement("input");
+    inp.id = "in-friend";
+    inp.maxLength = 16;
+    inp.autocomplete = "off";
+    inp.autocapitalize = "off";
+    inp.spellcheck = false;
+    var row0 = el("div", "row");
+    row0.style.marginTop = "10px";
+    var sub = el("button", "btn", "ENVOYER LA DEMANDE");
+    sub.type = "submit";
+    row0.append(sub);
+    form.append(lab, inp, row0);
+    form.addEventListener("submit", async function (e) {
+      e.preventDefault();
+      var name = inp.value.trim();
+      if (!name) return;
+      setMsg(msg, "…");
+      var r = await sb.rpc("send_friend_request", { p_pseudo: name });
+      if (r.error) { setMsg(msg, rewardError(r.error), true); return; }
+      inp.value = "";
+      setMsg(msg, r.data === "accepted" ? "Vous êtes maintenant amis !" : "Demande envoyée.");
+      await loadFriendsList();
+    });
+    add.append(form);
+    add.hidden = false;
+
+    await loadFriendsList();
+    if (chatWith) openChat(chatWith);
+  }
+
+  async function loadFriendsList() {
+    var box = $("fr-list"), msg = $("fr-msg");
+    var r = await sb.rpc("my_friends");
+    if (r.error) { box.hidden = true; setMsg(msg, "Impossible de charger tes amis.", true); return; }
+    friends = r.data || [];
+    box.textContent = "";
+    var h = el("h3", "", "MES AMIS (" + friends.filter(function (f) { return f.relation === "friend"; }).length + ")");
+    h.style.cssText = "margin:0 0 6px;font-size:10px;font-weight:normal";
+    box.append(h);
+    if (!friends.length) box.append(el("p", "small", "Pas encore d'amis. Envoie une demande avec son pseudo."));
+    friends.forEach(function (f) {
+      var row = el("div", "line");
+      var who = el("button", "who");
+      who.type = "button";
+      who.setAttribute("aria-label", "Voir la fiche de " + f.pseudo);
+      who.append(avatarEl(f.avatar, 36), el("span", "", f.pseudo + " (NIV " + f.level + ")"));
+      who.addEventListener("click", function () { openProfile(f.pseudo); });
+      row.append(who);
+      var acts = el("span", "row");
+      function btn(label, alt, fn) {
+        var b = el("button", "btn mini" + (alt ? " alt" : ""), label);
+        b.type = "button";
+        b.addEventListener("click", fn);
+        acts.append(b);
+      }
+      if (f.relation === "incoming") {
+        btn("ACCEPTER", false, async function () { await answerFriend(f.pseudo, true); });
+        btn("REFUSER", true, async function () { await answerFriend(f.pseudo, false); });
+      } else if (f.relation === "outgoing") {
+        acts.append(el("span", "small", "EN ATTENTE"));
+      } else {
+        btn("CHAT", false, function () { openChat(f.pseudo); });
+        btn("RETIRER", true, async function () {
+          if (!window.confirm("Retirer " + f.pseudo + " de tes amis ?")) return;
+          await sb.rpc("remove_friend", { p_pseudo: f.pseudo });
+          if (chatWith === f.pseudo) { chatWith = null; stopChatTimer(); $("fr-chat").hidden = true; }
+          await loadFriendsList();
+        });
+      }
+      row.append(acts);
+      box.append(row);
+    });
+    box.hidden = false;
+    await loadBlocks();
+  }
+
+
+  async function loadBlocks() {
+    var r = await sb.rpc("my_blocks");
+    var list = (!r.error && r.data) || [];
+    var old = $("fr-blocks");
+    if (old) old.remove();
+    if (!list.length) return;
+    var d = el("div", "");
+    d.id = "fr-blocks";
+    d.style.marginTop = "12px";
+    d.append(el("p", "small", "JOUEURS BLOQUÉS"));
+    list.forEach(function (b) {
+      var row = el("div", "line");
+      row.append(el("span", "", b.pseudo));
+      var u = el("button", "btn alt mini", "DÉBLOQUER");
+      u.type = "button";
+      u.addEventListener("click", async function () {
+        var res = await sb.rpc("unblock_user", { p_pseudo: b.pseudo });
+        if (res.error) { setMsg($("fr-msg"), rewardError(res.error), true); return; }
+        await loadFriendsList();
+      });
+      row.append(u);
+      d.append(row);
+    });
+    $("fr-list").append(d);
+  }
+
+  async function openProfile(pseudo) {
+    var box = $("fr-profile"), msg = $("fr-msg");
+    var r = await sb.rpc("public_profile", { p_pseudo: pseudo });
+    if (r.error || !r.data) { setMsg(msg, rewardError(r.error), true); return; }
+    var p = r.data;
+    box.textContent = "";
+    var head = el("div", "pf-head");
+    var info = el("div", "");
+    info.append(el("b", "", p.pseudo));
+    info.append(el("div", "small", "NIVEAU " + p.level + (p.xp !== null && p.xp !== undefined ? " · " + p.xp + " XP" : "")));
+    if (p.title) info.append(el("div", "small", "Titre : " + p.title.name.replace(/^Titre\s*/i, "")));
+    if (p.featured_badge) info.append(el("div", "pf-badge", p.featured_badge.name));
+    head.append(avatarEl(p.avatar, 64), info);
+    box.append(head);
+    if (p.relation === "friend" || p.relation === "self") {
+      box.append(el("p", "small", "STATISTIQUES"));
+      var tb = document.createElement("table");
+      tb.className = "pf-games";
+      var th = document.createElement("tr");
+      ["JEU", "RECORD", "PARTIES"].forEach(function (h) { var c = document.createElement("th"); c.textContent = h; th.append(c); });
+      tb.append(th);
+      Object.keys(GAME_LABEL).forEach(function (g) {
+        var row = (p.games || []).filter(function (x) { return x.game === g; })[0];
+        var tr = document.createElement("tr");
+        [GAME_LABEL[g], row ? String(row.best) : "—", row ? String(row.plays) : "0"].forEach(function (t) { var c = document.createElement("td"); c.textContent = t; tr.append(c); });
+        tb.append(tr);
+      });
+      box.append(tb);
+      try {
+        var tr2 = await sb.rpc("public_tiers", { p_pseudo: pseudo });
+        if (!tr2.error && tr2.data) {
+          var list = (tr2.data.favorites || []).map(function (f) { return { game: f.split(":")[0], tier: parseInt(f.split(":")[1], 10) }; });
+          if (!list.length) list = (tr2.data.games || []).slice().sort(function (a, b) { return b.tier - a.tier; }).slice(0, 3);
+          if (list.length) {
+            box.append(el("p", "small", "BADGES"));
+            var er = el("div", "emb-row");
+            list.forEach(function (x) { var w = el("span", "emb"); w.append(emblem(x.game, x.tier, 48, "", "p" + x.game + x.tier)); w.setAttribute("title", (GAME_LABEL[x.game] || x.game) + " · " + TIER_NAMES[x.tier]); er.append(w); });
+            box.append(er);
+          }
+        }
+      } catch (e) { /* migration pas encore appliquée */ }
+    } else {
+      box.append(el("p", "small", "Les statistiques sont visibles par les amis."));
+    }
+    var acts = el("div", "row");
+    acts.style.marginTop = "10px";
+    function btn(label, alt, fn) {
+      var b = el("button", "btn mini" + (alt ? " alt" : ""), label);
+      b.type = "button";
+      b.addEventListener("click", fn);
+      acts.append(b);
+    }
+    if (p.relation === "friend") {
+      btn("MESSAGE", false, function () { box.hidden = true; openChat(p.pseudo); });
+      btn("RETIRER", true, async function () {
+        if (!window.confirm("Retirer " + p.pseudo + " de tes amis ?")) return;
+        await sb.rpc("remove_friend", { p_pseudo: p.pseudo });
+        box.hidden = true;
+        if (chatWith === p.pseudo) { chatWith = null; stopChatTimer(); $("fr-chat").hidden = true; }
+        await loadFriendsList();
+      });
+    }
+    if (p.relation !== "self") {
+      btn("BLOQUER", true, async function () {
+        if (!window.confirm("Bloquer " + p.pseudo + " ? Il ne pourra plus te contacter et l'amitié sera retirée.")) return;
+        var res = await sb.rpc("block_user", { p_pseudo: p.pseudo });
+        if (res.error) { setMsg(msg, rewardError(res.error), true); return; }
+        box.hidden = true;
+        if (chatWith === p.pseudo) { chatWith = null; stopChatTimer(); $("fr-chat").hidden = true; }
+        setMsg(msg, p.pseudo + " est bloqué.");
+        await loadFriendsList();
+      });
+    }
+    btn("FERMER", true, function () { box.hidden = true; });
+    box.append(acts);
+    box.hidden = false;
+    if (box.scrollIntoView) box.scrollIntoView({ block: "nearest" });
+  }
+
+  async function answerFriend(pseudo, accept) {
+    var r = await sb.rpc("respond_friend_request", { p_pseudo: pseudo, p_accept: accept });
+    if (r.error) { setMsg($("fr-msg"), rewardError(r.error), true); return; }
+    await loadFriendsList();
+  }
+
+  async function openChat(pseudo) {
+    chatWith = pseudo;
+    var box = $("fr-chat"), msg = $("fr-msg");
+    var r = await sb.rpc("conversation", { p_pseudo: pseudo, p_limit: 50 });
+    if (r.error) { setMsg(msg, rewardError(r.error), true); box.hidden = true; return; }
+    box.textContent = "";
+    var h = el("h3", "", "CHAT AVEC " + pseudo.toUpperCase());
+    h.style.cssText = "margin:0 0 6px;font-size:10px;font-weight:normal";
+    box.append(h);
+    var log = el("div", "chat");
+    if (!r.data.length) log.append(el("p", "small", "Aucun message. Dis bonjour !"));
+    r.data.forEach(function (m) {
+      var p = el("p", m.mine ? "mine" : "");
+      p.append(el("span", "", m.body));
+      log.append(p);
+    });
+    box.append(log);
+    log.scrollTop = log.scrollHeight;
+
+    var form = document.createElement("form");
+    form.noValidate = true;
+    var ta = document.createElement("textarea");
+    ta.rows = 2;
+    ta.maxLength = 300;
+    ta.setAttribute("aria-label", "Ton message");
+    var row = el("div", "row");
+    var send = el("button", "btn", "ENVOYER");
+    send.type = "submit";
+    row.append(send);
+    form.append(ta, row);
+    form.addEventListener("submit", async function (e) {
+      e.preventDefault();
+      var txt = ta.value.trim();
+      if (!txt) return;
+      var res = await sb.rpc("send_message", { p_pseudo: pseudo, p_body: txt });
+      if (res.error) { setMsg(msg, rewardError(res.error), true); return; }
+      setMsg(msg, "");
+      openChat(pseudo);
+    });
+    box.append(form);
+
+    var gifts = el("div", "row");
+    gifts.style.marginTop = "10px";
+    var rb = el("button", "btn alt mini", "SIGNALER");
+    rb.type = "button";
+    rb.addEventListener("click", async function () {
+      var why = window.prompt("Pourquoi signales-tu " + pseudo + " ?");
+      if (!why || !why.trim()) return;
+      var res = await sb.rpc("report_user", { p_pseudo: pseudo, p_reason: why.trim() });
+      setMsg(msg, res.error ? rewardError(res.error) : "Signalement envoyé à l'équipe.", !!res.error);
+    });
+    gifts.append(rb);
+    box.append(gifts);
+    box.hidden = false;
+
+    stopChatTimer();
+    chatTimer = setInterval(function () {
+      if (current !== "amis" || !chatWith || document.hidden) return;
+      if (document.activeElement && document.activeElement.tagName === "TEXTAREA" && document.activeElement.value) return;
+      openChat(chatWith);
+    }, 10000);
+  }
+
+  /* ---------- Administration (équipe) ---------- */
+  async function renderAdmin() {
+    var body = $("adm-body"), msg = $("adm-msg");
+    setMsg(msg, "");
+    body.textContent = "";
+    if (!sb || !session || !role) {
+      var p0 = el("div", "panel");
+      p0.append(el("p", "", "Accès réservé à l'équipe."));
+      body.append(p0);
+      return;
+    }
+    function panel(title) {
+      var d = el("div", "panel");
+      var h = el("h3", "", title);
+      h.style.cssText = "margin:0 0 8px;font-size:10px;font-weight:normal";
+      d.append(h);
+      body.append(d);
+      return d;
+    }
+    function field(parent, label, tag) {
+      var l = el("label", "", label);
+      var i = document.createElement(tag || "input");
+      i.style.marginBottom = "10px";
+      parent.append(l, i);
+      return i;
+    }
+    function button(parent, label, alt, fn) {
+      var b = el("button", "btn mini" + (alt ? " alt" : ""), label);
+      b.type = "button";
+      b.addEventListener("click", fn);
+      parent.append(b);
+      return b;
+    }
+    async function act(call, ok) {
+      var r = await call;
+      if (r.error) { setMsg(msg, rewardError(r.error), true); return false; }
+      setMsg(msg, ok);
+      return true;
+    }
+
+    var st = await sb.rpc("staff_stats");
+    var ps = panel("CHIFFRES (RÔLE : " + role.toUpperCase() + ")");
+    if (!st.error && st.data) {
+      var d = st.data;
+      [["Joueurs", d.players], ["Nouveaux aujourd'hui", d.new_today], ["Parties aujourd'hui", d.games_today],
+       ["BOYCOINS en circulation", d.bc_in_circulation], ["Signalements ouverts", d.open_reports], ["Comptes suspendus", d.banned]]
+        .forEach(function (x) { var l = el("div", "line"); l.append(el("span", "", x[0]), el("span", "", String(x[1]))); ps.append(l); });
+    }
+
+    var isAdmin = role === "founder" || role === "admin";
+    if (isAdmin) {
+      var pm = panel("MAINTENANCE");
+      pm.append(el("p", "small", "État : " + (maint && maint.on ? "ACTIVE" : "éteinte")));
+      var mi = field(pm, "MESSAGE AFFICHÉ AUX JOUEURS");
+      mi.maxLength = 200;
+      var rowm = el("div", "row");
+      button(rowm, "ACTIVER", false, async function () { if (await act(sb.rpc("staff_set_maintenance", { p_on: true, p_message: mi.value }), "Maintenance activée.")) { await loadMaint(); renderAdmin(); } });
+      button(rowm, "DÉSACTIVER", true, async function () { if (await act(sb.rpc("staff_set_maintenance", { p_on: false, p_message: "" }), "Maintenance désactivée.")) { await loadMaint(); renderAdmin(); } });
+      pm.append(rowm);
+
+      var pn = panel("PUBLIER UNE ACTUALITÉ");
+      var nt = field(pn, "TITRE"); nt.maxLength = 80;
+      var nb = field(pn, "TEXTE", "textarea"); nb.rows = 3; nb.maxLength = 600;
+      var rown = el("div", "row");
+      button(rown, "PUBLIER", false, async function () {
+        if (!nt.value.trim() || !nb.value.trim()) { setMsg(msg, "Titre et texte obligatoires.", true); return; }
+        if (await act(sb.rpc("staff_post_news", { p_title: nt.value, p_body: nb.value }), "Actualité publiée.")) { nt.value = ""; nb.value = ""; }
+      });
+      pn.append(rown);
+    }
+
+    if (isAdmin) {
+      var pbeta = panel("BÊTA PRIVÉE");
+      var bst = await sb.rpc("my_access");
+      var betaOn = !!(bst.data && bst.data.beta_on);
+      pbeta.append(el("p", "small", "État : " + (betaOn ? "ACTIVE (seuls les testeurs ajoutés peuvent jouer en ligne)" : "éteinte (tout le monde peut jouer)")));
+      var rowbeta = el("div", "row");
+      button(rowbeta, betaOn ? "DÉSACTIVER" : "ACTIVER", betaOn, async function () { if (await act(sb.rpc("staff_set_beta", { p_on: !betaOn }), betaOn ? "Bêta privée désactivée." : "Bêta privée activée.")) renderAdmin(); });
+      pbeta.append(rowbeta);
+      var bl = await sb.rpc("staff_beta_list");
+      pbeta.append(el("p", "small", "Testeurs : " + ((bl.data && bl.data.length) ? bl.data.map(function (x) { return x.pseudo; }).join(", ") : "aucun")));
+      var bpseudo = field(pbeta, "PSEUDO DU TESTEUR"); bpseudo.maxLength = 16;
+      var rowb2 = el("div", "row");
+      button(rowb2, "AJOUTER", false, async function () { if (await act(sb.rpc("staff_beta_add", { p_pseudo: bpseudo.value }), "Testeur ajouté.")) renderAdmin(); });
+      button(rowb2, "RETIRER", true, async function () { if (await act(sb.rpc("staff_beta_remove", { p_pseudo: bpseudo.value }), "Testeur retiré.")) renderAdmin(); });
+      pbeta.append(rowb2);
+
+      var pbk = panel("SAUVEGARDE");
+      pbk.append(el("p", "small", "Télécharge toutes les données de jeu (profils, scores, XP, BOYCOINS, badges, amis, messages…) dans un fichier, avec un contrôle automatique. Les emails et mots de passe restent chez Supabase et ne sont pas dans ce fichier. Garde le fichier en lieu sûr."));
+      var rowbk = el("div", "row");
+      button(rowbk, "TÉLÉCHARGER LA SAUVEGARDE", false, async function () {
+        setMsg(msg, "Préparation…");
+        var ex = await sb.rpc("staff_export");
+        if (ex.error) { setMsg(msg, rewardError(ex.error), true); return; }
+        var text = JSON.stringify(ex.data);
+        // Vérification : on relit le texte qui va être enregistré et on recompte chaque table.
+        var chk;
+        try { chk = JSON.parse(text); } catch (e) { setMsg(msg, "Sauvegarde illisible : rien n'a été téléchargé.", true); return; }
+        var bad = [], total = 0, tabs = chk.integrity ? Object.keys(chk.integrity) : [];
+        if (!chk.data || !tabs.length) { setMsg(msg, "Sauvegarde incomplète : rien n'a été téléchargé.", true); return; }
+        tabs.forEach(function (k) {
+          var n = Array.isArray(chk.data[k]) ? chk.data[k].length : -1;
+          if (n !== chk.integrity[k].rows) bad.push(k);
+          total += Math.max(n, 0);
+        });
+        if (bad.length || total !== chk.total_rows) { setMsg(msg, "Contrôle d'intégrité en échec (" + bad.join(", ") + ") : rien n'a été téléchargé.", true); return; }
+        var sha = "";
+        try {
+          var buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+          sha = Array.prototype.map.call(new Uint8Array(buf), function (x) { return ("0" + x.toString(16)).slice(-2); }).join("").slice(0, 12);
+        } catch (e) { /* facultatif */ }
+        var blob = new Blob([text], { type: "application/json" });
+        var a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "boygames-sauvegarde-" + new Date().toISOString().slice(0, 10) + ".json";
+        document.body.append(a);
+        a.click();
+        a.remove();
+        setMsg(msg, "Sauvegarde vérifiée et téléchargée : " + total + " lignes dans " + tabs.length + " tables (dont " + chk.integrity.messages.rows + " messages, " + chk.integrity.profiles.rows + " profils)." + (sha ? " Empreinte " + sha + "." : ""));
+      });
+      pbk.append(rowbk);
+    }
+    if (role === "founder") {
+      var prl = panel("RÔLES (FONDATEUR)");
+      var rls = await sb.rpc("staff_list_roles");
+      prl.append(el("p", "small", "Équipe : " + ((rls.data && rls.data.length) ? rls.data.map(function (x) { return x.pseudo + " (" + x.role + ")"; }).join(", ") : "personne")));
+      var rp = field(prl, "PSEUDO"); rp.maxLength = 16;
+      var sel = field(prl, "RÔLE", "select");
+      [["admin", "Administrateur"], ["moderator", "Modérateur"], ["none", "Aucun (retirer)"]].forEach(function (o) { var op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; sel.append(op); });
+      var rowr = el("div", "row");
+      button(rowr, "VALIDER", false, async function () { if (await act(sb.rpc("staff_set_role", { p_pseudo: rp.value, p_role: sel.value }), "Rôle mis à jour.")) renderAdmin(); });
+      prl.append(rowr);
+    }
+
+    var pr = panel("SIGNALEMENTS");
+    var rep = await sb.rpc("staff_reports");
+    if (rep.error || !rep.data || !rep.data.length) {
+      pr.append(el("p", "small", "Aucun signalement ouvert."));
+    } else {
+      rep.data.forEach(function (x) {
+        var blk = el("div", "line");
+        blk.style.display = "block";
+        blk.append(el("p", "small", x.reporter + " signale " + x.reported + " : " + x.reason));
+        var rr = el("div", "row");
+        button(rr, "RÉSOLU", true, async function () { if (await act(sb.rpc("staff_resolve_report", { p_id: x.id }), "Marqué résolu.")) renderAdmin(); });
+        button(rr, "SUSPENDRE 1 J", false, async function () { if (await act(sb.rpc("staff_ban", { p_pseudo: x.reported, p_reason: x.reason, p_days: 1 }), x.reported + " suspendu 1 jour.")) { await sb.rpc("staff_resolve_report", { p_id: x.id }); renderAdmin(); } });
+        button(rr, "SUSPENDRE 7 J", false, async function () { if (await act(sb.rpc("staff_ban", { p_pseudo: x.reported, p_reason: x.reason, p_days: 7 }), x.reported + " suspendu 7 jours.")) { await sb.rpc("staff_resolve_report", { p_id: x.id }); renderAdmin(); } });
+        blk.append(rr);
+        pr.append(blk);
+      });
+    }
+
+
+    if (role === "founder" || role === "admin") {
+      var pbug = panel("BUGS SIGNALÉS");
+      var BUG_ST = { "new": "Nouveau", in_progress: "En cours", resolved: "Résolu", wontfix: "Non retenu" };
+      var BUG_PR = { low: "Basse", normal: "Normale", high: "Haute", blocker: "Bloquante" };
+      var BUG_CAT = {}; BUG_CATS.forEach(function (c) { BUG_CAT[c[0]] = c[1]; });
+      var bugHead = el("p", "small", ""); pbug.append(bugHead);
+      var bugFilter = field(pbug, "FILTRE", "select");
+      [["", "Tous"], ["new", "Nouveaux"], ["in_progress", "En cours"], ["resolved", "Résolus"], ["wontfix", "Non retenus"]].forEach(function (o) { var op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; bugFilter.append(op); });
+      var bugList = el("div", ""); pbug.append(bugList);
+      async function loadBugs() {
+        var cn = await sb.rpc("staff_bug_counts");
+        if (cn.error) { bugHead.textContent = "Signalements de bugs indisponibles (base non à jour)."; bugList.textContent = ""; return; }
+        var c = {}; (cn.data || []).forEach(function (x) { c[x.status] = Number(x.n); });
+        bugHead.textContent = "Nouveaux : " + (c["new"] || 0) + " · En cours : " + (c.in_progress || 0) + " · Résolus : " + (c.resolved || 0) + " · Non retenus : " + (c.wontfix || 0);
+        var r = await sb.rpc("staff_bug_list", { p_status: bugFilter.value || null });
+        bugList.textContent = "";
+        if (r.error || !r.data || !r.data.length) { bugList.append(el("p", "small", "Aucun signalement.")); return; }
+        r.data.forEach(function (b) {
+          var wrap = el("div", "");
+          var head = el("button", "bugrow"); head.type = "button";
+          head.append(el("span", "pill " + b.priority, BUG_PR[b.priority] || b.priority), el("span", "pill", BUG_ST[b.status] || b.status));
+          head.append(document.createTextNode("#" + b.id + " · " + new Date(b.created_at).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" }) + " · " + b.pseudo + " · " + (BUG_CAT[b.category] || b.category) + (b.has_screenshot ? " · 📷" : "") + " — " + b.description.slice(0, 70) + (b.description.length > 70 ? "…" : "")));
+          var det = el("div", "bugdet"); det.hidden = true;
+          head.addEventListener("click", function () { det.hidden = !det.hidden; });
+          var full = el("p", "", b.description); full.style.whiteSpace = "pre-wrap";
+          var meta = el("pre", "", "Page : " + (b.page || "?") + "   Jeu : " + (b.game || "-") + "   Version : " + (b.app_version || "?") + "\n" + JSON.stringify(b.device || {}, null, 1).replace(/[{}"]/g, ""));
+          det.append(full, meta);
+          if (b.has_screenshot) {
+            var shotBox = el("div", "");
+            var sb2 = el("button", "btn alt mini", "VOIR LA CAPTURE"); sb2.type = "button";
+            sb2.addEventListener("click", async function () {
+              var sr = await sb.rpc("staff_bug_screenshot", { p_id: b.id });
+              if (sr.error || !sr.data) { setMsg(msg, "Capture introuvable.", true); return; }
+              var im = document.createElement("img"); im.className = "shot"; im.src = sr.data; im.style.maxWidth = "100%"; im.alt = "Capture du signalement " + b.id;
+              shotBox.textContent = ""; shotBox.append(im);
+            });
+            shotBox.append(sb2); det.append(shotBox);
+          }
+          var stSel = field(det, "STATUT", "select");
+          Object.keys(BUG_ST).forEach(function (k) { var op = document.createElement("option"); op.value = k; op.textContent = BUG_ST[k]; stSel.append(op); });
+          stSel.value = b.status;
+          var prSel = field(det, "PRIORITÉ", "select");
+          Object.keys(BUG_PR).forEach(function (k) { var op = document.createElement("option"); op.value = k; op.textContent = BUG_PR[k]; prSel.append(op); });
+          prSel.value = b.priority;
+          var nt = field(det, "NOTE INTERNE", "textarea"); nt.value = b.admin_note || ""; nt.maxLength = 1000;
+          var rw = el("div", "row");
+          button(rw, "ENREGISTRER", false, async function () {
+            if (await act(sb.rpc("staff_bug_update", { p_id: b.id, p_status: stSel.value, p_priority: prSel.value, p_note: nt.value }), "Signalement #" + b.id + " mis à jour.")) loadBugs();
+          });
+          det.append(rw);
+          wrap.append(head, det);
+          bugList.append(wrap);
+        });
+      }
+      bugFilter.addEventListener("change", loadBugs);
+      await loadBugs();
+    }
+
+    var pb = panel("SUSPENDRE / RÉTABLIR UN JOUEUR");
+    var bp = field(pb, "PSEUDO"); bp.maxLength = 16;
+    var rowb = el("div", "row");
+    button(rowb, "SUSPENDRE (DÉFINITIF)", false, async function () { if (!window.confirm("Suspendre " + bp.value + " sans limite de durée ?")) return; await act(sb.rpc("staff_ban", { p_pseudo: bp.value, p_reason: "décision de l'équipe", p_days: null }), "Joueur suspendu."); });
+    button(rowb, "RÉTABLIR", true, async function () { await act(sb.rpc("staff_unban", { p_pseudo: bp.value }), "Joueur rétabli."); });
+    pb.append(rowb);
+  }
+
+  /* ---------- Account screen ---------- */
+  function renderAccount() {
+    var body = $("acc-body"), msg = $("acc-msg");
+    setMsg(msg, "");
+    if (!online) {
+      body.innerHTML = "<p style=\"margin:0\">Les comptes sont désactivés dans cet aperçu. Ils fonctionneront une fois le site relié à sa base de données.</p>";
+      return;
+    }
+    if (!session) {
+      renderAuthForm();
+    } else if (!profile) {
+      renderProfileForm();
+    } else {
+      renderMe();
+    }
+    if (accNotice) { setMsg(msg, accNotice); accNotice = ""; }
+  }
+
+  var authMode = "signup";
+
+  function authError(err, isSignup) {
+    var m = String(err && err.message || "").toLowerCase();
+    if (err && err.status === 429) return "Trop d'essais. Réessaie dans quelques minutes.";
+    if (m.indexOf("already registered") >= 0) return "Cette adresse a déjà un compte. Choisis « Se connecter ».";
+    if (m.indexOf("invalid login") >= 0) return "E-mail ou mot de passe incorrect.";
+    if (m.indexOf("not confirmed") >= 0) return "Ce compte demande encore une confirmation par e-mail. Préviens le créateur du site.";
+    if (m.indexOf("password") >= 0) return "Mot de passe refusé : choisis-en un plus long ou plus compliqué.";
+    return isSignup ? "Impossible de créer le compte. Réessaie." : "Connexion impossible. Réessaie.";
+  }
+
+  function renderAuthForm() {
+    var body = $("acc-body"), msg = $("acc-msg");
+    var isSignup = authMode === "signup";
+    body.innerHTML =
+      "<div class=\"tabs\" role=\"group\" aria-label=\"Mode\" style=\"margin-bottom:14px\">" +
+      "<button class=\"tab\" type=\"button\" id=\"m-signup\" aria-pressed=\"" + isSignup + "\">CRÉER UN COMPTE</button>" +
+      "<button class=\"tab\" type=\"button\" id=\"m-signin\" aria-pressed=\"" + !isSignup + "\">SE CONNECTER</button></div>" +
+      "<form id=\"f-auth\" novalidate>" +
+      "<label for=\"in-email\">ADRESSE E-MAIL</label>" +
+      "<input id=\"in-email\" type=\"email\" inputmode=\"email\" autocomplete=\"email\" autocapitalize=\"off\" required>" +
+      "<label for=\"in-pass\" style=\"margin-top:10px\">MOT DE PASSE</label>" +
+      "<input id=\"in-pass\" type=\"password\" autocomplete=\"" + (isSignup ? "new-password" : "current-password") + "\" minlength=\"8\" required>" +
+      (isSignup ? "<p class=\"hint\">8 caractères minimum. Note-le bien : si tu l'oublies, ton compte est perdu et personne ne peut le retrouver.</p>" : "") +
+      "<div class=\"row\" style=\"margin-top:12px\"><button class=\"btn\" type=\"submit\">" + (isSignup ? "CRÉER MON COMPTE" : "ME CONNECTER") + "</button></div>" +
+      "</form>";
+    $("m-signup").addEventListener("click", function () { authMode = "signup"; renderAccount(); });
+    $("m-signin").addEventListener("click", function () { authMode = "signin"; renderAccount(); });
+    $("f-auth").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      var email = $("in-email").value.trim();
+      var pass = $("in-pass").value;
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { setMsg(msg, "Adresse e-mail invalide.", true); return; }
+      if (pass.length < 8) { setMsg(msg, "Le mot de passe doit faire au moins 8 caractères.", true); return; }
+      setMsg(msg, isSignup ? "Création du compte…" : "Connexion…");
+      var r;
+      if (isSignup) {
+        r = await sb.auth.signUp({ email: email, password: pass });
+        if (!r.error && r.data && r.data.user && r.data.user.identities && r.data.user.identities.length === 0) {
+          setMsg(msg, "Cette adresse a déjà un compte. Choisis « Se connecter ».", true);
+          return;
+        }
+        if (!r.error && !(r.data && r.data.session)) {
+          r = await sb.auth.signInWithPassword({ email: email, password: pass });
+        }
+      } else {
+        r = await sb.auth.signInWithPassword({ email: email, password: pass });
+      }
+      if (r.error) { setMsg(msg, authError(r.error, isSignup), true); return; }
+      accNotice = isSignup ? "Compte créé." : "Connecté.";
+    });
+  }
+
+  function renderProfileForm() {
+    var body = $("acc-body"), msg = $("acc-msg");
+    body.innerHTML =
+      "<p>Dernière étape : choisis ton pseudo. Il sera visible de tous dans le classement.</p>" +
+      "<form id=\"f-profile\" novalidate>" +
+      "<label for=\"in-pseudo\">PSEUDO</label>" +
+      "<input id=\"in-pseudo\" maxlength=\"16\" autocomplete=\"off\" autocapitalize=\"off\" spellcheck=\"false\" required>" +
+      "<p class=\"hint\">3 à 16 caractères : lettres, chiffres, _ et -</p>" +
+      "<label for=\"in-country\">PAYS</label>" +
+      "<select id=\"in-country\"><option value=\"FR\">France</option><option value=\"OTHER\">Autre pays</option></select>" +
+      "<div class=\"row\" style=\"margin-top:12px\"><button class=\"btn\" type=\"submit\">CRÉER MON PROFIL</button></div>" +
+      "</form>";
+    $("f-profile").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      var pseudo = $("in-pseudo").value.trim();
+      var country = $("in-country").value;
+      if (!/^[A-Za-z0-9_-]{3,16}$/.test(pseudo)) { setMsg(msg, "Pseudo invalide : 3 à 16 lettres, chiffres, _ ou -.", true); return; }
+      setMsg(msg, "Création du profil…");
+      var r = await sb.from("profiles").insert({ id: session.user.id, pseudo: pseudo, country: country });
+      if (r.error) {
+        setMsg(msg, r.error.code === "23505" ? "Ce pseudo est déjà pris. Essaie-en un autre." : "Impossible de créer le profil. Réessaie.", true);
+        return;
+      }
+      accNotice = "Profil créé. Bienvenue !";
+      await refreshAuth(session);
+    });
+  }
+
+  function renderMe() {
+    var body = $("acc-body"), msg = $("acc-msg");
+    body.innerHTML =
+      "<p>CONNECTÉ EN TANT QUE</p>" +
+      "<p id=\"acc-pseudo\" style=\"font-size:12px\"></p>" +
+      "<p id=\"acc-mail\" style=\"word-break:break-all;font-size:8px\"></p>" +
+      "<p id=\"acc-country\" style=\"font-size:8px\"></p>" +
+      "<p id=\"acc-level\" style=\"font-size:8px\"></p>" +
+      "<div id=\"acc-badges\"></div>" +
+      "<div class=\"row\" style=\"margin-top:12px\"><button class=\"btn\" type=\"button\" id=\"b-out\">SE DÉCONNECTER</button></div>" +
+      "<hr class=\"sep\">" +
+      "<div id=\"del-ask\"><button class=\"btn alt\" type=\"button\" id=\"b-del\">SUPPRIMER MON COMPTE</button></div>" +
+      "<div id=\"del-confirm\" hidden>" +
+      "<p>Tous tes scores seront effacés pour toujours. Cette action est définitive.</p>" +
+      "<div class=\"row\"><button class=\"btn\" type=\"button\" id=\"b-del-yes\">OUI, SUPPRIMER</button>" +
+      "<button class=\"btn alt\" type=\"button\" id=\"b-del-no\">ANNULER</button></div></div>";
+    $("acc-pseudo").textContent = profile.pseudo;
+    $("acc-mail").textContent = session.user.email || "";
+    $("acc-country").textContent = profile.country === "FR" ? "PAYS : FRANCE" : "PAYS : AUTRE";
+    if (role) {
+      var al = el("p", "", "");
+      var aa = el("a", "btn", "ADMINISTRATION");
+      aa.href = "#admin";
+      al.append(aa);
+      $("acc-level").after(al);
+    }
+    if (me) {
+      $("acc-level").textContent = "NIVEAU " + me.level + " · " + me.xp + " XP · " + me.bc + " BOYCOINS";
+      var avBox = $("acc-badges");
+      if (avBox) {
+        avBox.append(el("p", "", "MON AVATAR"));
+        var avGrid = el("div", "avgrid");
+        Object.keys(AVATARS).forEach(function (code) {
+          var b = el("button", me.avatar === code ? "on" : "");
+          b.type = "button";
+          b.setAttribute("aria-label", "Avatar " + code);
+          b.append(avatarEl(code, 48));
+          b.addEventListener("click", async function () {
+            var res = await sb.rpc("set_avatar", { p_code: code });
+            if (res.error) { setMsg(msg, rewardError(res.error), true); return; }
+            await loadMe();
+            route();
+          });
+          avGrid.append(b);
+        });
+        avBox.append(avGrid);
+      }
+      var tbox = el("div", ""); $("acc-badges").append(tbox);
+      syncTiers(true).then(function () { renderTiers(tbox, msg); });
+      loadBadgeCat().then(function () {
+        var box = $("acc-badges");
+        if (!box || !badgeCat) return;
+        box.append(el("p", "", "BADGES SPÉCIAUX"));
+        box.append(el("p", "small", "Touche un badge obtenu pour l'afficher sur ta fiche."));
+        var grid = el("div", "badges");
+        badgeCat.forEach(function (b) {
+          var on = me.badges.indexOf(b.code) >= 0;
+          if (b.exclusive && !on) return;
+          var card = el("div", (on ? "badge" : "badge off") + (b.exclusive ? " excl" : "") + (on ? " pick" : "") + (me.featured_badge === b.code ? " sel" : ""));
+          card.append(el("b", "", on ? b.name : "???"), el("span", "", b.description));
+          if (on) {
+            card.addEventListener("click", async function () {
+              var res = await sb.rpc("set_featured_badge", { p_code: me.featured_badge === b.code ? "" : b.code });
+              if (res.error) { setMsg(msg, rewardError(res.error), true); return; }
+              await loadMe();
+              route();
+            });
+          }
+          grid.append(card);
+        });
+        box.append(grid);
+      });
+    }
+    $("b-out").addEventListener("click", async function () {
+      await sb.auth.signOut();
+    });
+    $("b-del").addEventListener("click", function () { $("del-ask").hidden = true; $("del-confirm").hidden = false; });
+    $("b-del-no").addEventListener("click", function () { $("del-ask").hidden = false; $("del-confirm").hidden = true; });
+    $("b-del-yes").addEventListener("click", async function () {
+      setMsg(msg, "Suppression…");
+      var r = await sb.rpc("delete_my_account");
+      if (r.error) { setMsg(msg, "Impossible de supprimer le compte. Réessaie plus tard.", true); return; }
+      accNotice = "Ton compte et tes scores ont été supprimés.";
+      await sb.auth.signOut();
+    });
+  }
+
+  /* ---------- Snake ---------- */
+  var snake = (function () {
+    var W = 144, H = 208, CELL = 8, HUD = 16;
+    var COLS = W / CELL, ROWS = (H - HUD) / CELL;
+    var C0 = "#9bbc0f", C2 = "#306230", C3 = "#0f380f", SKIN = null;
+
+    var canvas = $("screen");
+    var ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+
+    var best = localBest("snake");
+    var body, dir, queue, food, score, speed, acc, last, deathAt;
+    var state = "ready", soundOn = true, audio = null, running = false;
+
+    function reset() {
+      var cx = Math.floor(COLS / 2), cy = Math.floor(ROWS / 2);
+      body = [{ x: cx, y: cy }, { x: cx - 1, y: cy }, { x: cx - 2, y: cy }];
+      dir = { x: 1, y: 0 };
+      queue = [];
+      score = 0;
+      speed = 240;
+      acc = 0;
+      spawnFood();
+      setMsg($("snake-msg"), "");
+    }
+
+    function spawnFood() {
+      var free = [];
+      for (var y = 0; y < ROWS; y++) {
+        for (var x = 0; x < COLS; x++) {
+          var taken = false;
+          for (var i = 0; i < body.length; i++) {
+            if (body[i].x === x && body[i].y === y) { taken = true; break; }
+          }
+          if (!taken) free.push({ x: x, y: y });
+        }
+      }
+      food = free.length ? free[Math.floor(Math.random() * free.length)] : null;
+    }
+
+    function beep(freq, ms, delay) {
+      if (!soundOn) return;
+      try {
+        if (!audio) {
+          var AC = window.AudioContext || window.webkitAudioContext;
+          if (!AC) return;
+          audio = new AC();
+        }
+        if (audio.state === "suspended") audio.resume();
+        var t = audio.currentTime + (delay || 0);
+        var osc = audio.createOscillator();
+        var gain = audio.createGain();
+        osc.type = "square";
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.05, t);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + ms / 1000);
+        osc.connect(gain);
+        gain.connect(audio.destination);
+        osc.start(t);
+        osc.stop(t + ms / 1000 + 0.02);
+      } catch (e) { /* sound is optional */ }
+    }
+
+    function step() {
+      if (queue.length) dir = queue.shift();
+      var head = { x: body[0].x + dir.x, y: body[0].y + dir.y };
+      if (head.x < 0 || head.y < 0 || head.x >= COLS || head.y >= ROWS) return die();
+      var eating = food && head.x === food.x && head.y === food.y;
+      var limit = eating ? body.length : body.length - 1;
+      for (var i = 0; i < limit; i++) {
+        if (body[i].x === head.x && body[i].y === head.y) return die();
+      }
+      body.unshift(head);
+      if (eating) {
+        score++;
+        speed = Math.max(130, 240 - score * 4);
+        beep(880, 70);
+        spawnFood();
+        if (!food) win();
+      } else {
+        body.pop();
+      }
+    }
+
+    function die() {
+      state = "dying";
+      deathAt = performance.now();
+      beep(220, 140);
+      beep(165, 140, 0.15);
+      beep(110, 260, 0.3);
+    }
+
+    function win() {
+      beep(660, 100);
+      beep(880, 100, 0.12);
+      beep(1320, 200, 0.24);
+      finish();
+    }
+
+    function finish() {
+      state = "over";
+      if (score > best) { best = score; saveLocalBest("snake", best); }
+      if (score > 0) submit(score);
+    }
+
+    async function submit(value) {
+      var m = $("snake-msg");
+      if (!online) { setMsg(m, "Score gardé sur cet appareil."); return; }
+      if (!session || !profile) {
+        m.textContent = "";
+        m.append("Score non enregistré en ligne. ");
+        var a = document.createElement("a");
+        a.href = "#compte";
+        a.textContent = "Crée un compte";
+        m.append(a, " pour le garder.");
+        return;
+      }
+      setMsg(m, "Envoi du score…");
+      var r = await sb.rpc("submit_score", { p_game: "snake", p_score: value });
+      if (r.error) {
+        var em = String(r.error.message || "");
+        if (em.indexOf("maintenance") >= 0) setMsg(m, "Maintenance en cours : score non enregistré.", true);
+        else if (em.indexOf("beta") >= 0) setMsg(m, "Bêta privée : ton compte n'est pas encore ajouté, score non enregistré.", true);
+        else if (em.indexOf("banned") >= 0) setMsg(m, "Ton compte est suspendu : score non enregistré.", true);
+        else setMsg(m, "Score non envoyé. Joue une autre partie pour réessayer.", true);
+        return;
+      }
+      if (value > onlineBest) onlineBest = value;
+      var d = r.data;
+      if (d && typeof d === "object" && d.xp !== undefined) {
+        await loadBadgeCat();
+        var txt = "Score enregistré. +" + d.xp + " XP, +" + d.bc + " BOYCOINS.";
+        if (d.level_up) txt += " NIVEAU " + d.level + " !";
+        if (d.new_badges && d.new_badges.length) txt += " Badge : " + d.new_badges.map(badgeName).join(", ") + ".";
+        setMsg(m, txt);
+        loadMe();
+      } else {
+        setMsg(m, "Score enregistré sur ton compte.");
+      }
+    }
+
+    function action() {
+      if (state === "ready") { state = "playing"; beep(660, 60); }
+      else if (state === "playing") { state = "paused"; }
+      else if (state === "paused") { state = "playing"; beep(660, 60); }
+      else if (state === "over") { reset(); state = "playing"; beep(660, 60); }
+    }
+
+    function togglePause() {
+      if (state === "playing") state = "paused";
+      else if (state === "paused") { state = "playing"; beep(660, 60); }
+    }
+
+    function restart() {
+      reset();
+      state = "playing";
+      beep(660, 60);
+    }
+
+    function turn(dx, dy) {
+      if (state === "dying" || state === "over" || state === "paused") return;
+      if (state === "ready") {
+        if (dx === -dir.x && dy === -dir.y) body.reverse();
+        dir = { x: dx, y: dy };
+        state = "playing";
+        beep(660, 60);
+        return;
+      }
+      var ref = queue.length ? queue[queue.length - 1] : dir;
+      if (dx === ref.x && dy === ref.y) return;
+      if (dx === -ref.x && dy === -ref.y) return;
+      if (queue.length < 3) queue.push({ x: dx, y: dy });
+    }
+
+    function text(str, x, y, color) { ctx.fillStyle = color; ctx.fillText(str, x, y); }
+    function pad(n, len) { var s = String(n); while (s.length < len) s = "0" + s; return s; }
+    function centered(str, y, color) { text(str, Math.round((W - str.length * 8) / 2), y, color); }
+
+    function panel(lines) {
+      var maxLen = 0;
+      for (var i = 0; i < lines.length; i++) maxLen = Math.max(maxLen, lines[i].length);
+      var w = maxLen * 8 + 16;
+      var h = lines.length * 12 + 12;
+      var x = Math.round((W - w) / 2);
+      var y = Math.round(HUD + (H - HUD - h) / 2);
+      ctx.fillStyle = C3;
+      ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
+      ctx.fillStyle = C0;
+      ctx.fillRect(x, y, w, h);
+      for (var j = 0; j < lines.length; j++) centered(lines[j], y + 14 + j * 12, C3);
+    }
+
+    function draw(now) {
+      ctx.fillStyle = C0;
+      ctx.fillRect(0, 0, W, H);
+      ctx.font = "8px 'Press Start 2P', monospace";
+      ctx.textBaseline = "alphabetic";
+
+      text("SCORE " + pad(score, 3), 4, 11, C3);
+      var hi = "REC " + pad(Math.max(best, onlineBest, score), 3);
+      text(hi, W - 4 - hi.length * 8, 11, C3);
+      ctx.fillStyle = C3;
+      ctx.fillRect(0, HUD - 1, W, 1);
+
+      if (food) {
+        var fx = food.x * CELL, fy = HUD + food.y * CELL;
+        ctx.fillStyle = "#F43F5E";
+        ctx.fillRect(fx + 3, fy + 1, 2, 6);
+        ctx.fillRect(fx + 1, fy + 3, 6, 2);
+        ctx.fillRect(fx + 2, fy + 2, 4, 4);
+      }
+
+      var hidden = state === "dying" && Math.floor((now - deathAt) / 110) % 2 === 1;
+      if (!hidden) {
+        for (var i = body.length - 1; i >= 0; i--) {
+          var s = body[i];
+          var px = s.x * CELL, py = HUD + s.y * CELL;
+          if (i === 0) {
+            ctx.fillStyle = SKIN || C3;
+            ctx.fillRect(px, py, CELL, CELL);
+            ctx.fillStyle = C0;
+            var ex = dir.x === 1 ? 5 : dir.x === -1 ? 1 : 2;
+            var ey = dir.y === 1 ? 5 : dir.y === -1 ? 1 : 2;
+            ctx.fillRect(px + ex, py + ey, 2, 2);
+            if (dir.x !== 0) ctx.fillRect(px + ex, py + 5 - (ey - 2), 2, 2);
+            else ctx.fillRect(px + 5 - (ex - 2), py + ey, 2, 2);
+          } else {
+            ctx.fillStyle = C2;
+            ctx.fillRect(px + 1, py + 1, CELL - 2, CELL - 2);
+            ctx.fillStyle = SKIN || C3;
+            ctx.fillRect(px + 2, py + 2, CELL - 4, CELL - 4);
+          }
+        }
+      }
+
+      if (state === "ready") {
+        panel(["SNAKE", "", "GLISSE POUR", "COMMENCER"]);
+      } else if (state === "paused") {
+        panel(["PAUSE", "", "TOUCHE POUR", "REPRENDRE"]);
+      } else if (state === "over") {
+        var newBest = score > 0 && score >= Math.max(best, onlineBest);
+        var lines = [body.length >= COLS * ROWS ? "BRAVO !" : "PERDU", "SCORE " + score];
+        if (newBest) lines.push("NOUVEAU REC !");
+        lines.push("", "TOUCHE POUR", "REJOUER");
+        panel(lines);
+      }
+    }
+
+    function frame(now) {
+      if (current !== "snake") { running = false; return; }
+      if (last == null) last = now;
+      var dt = Math.min(now - last, 250);
+      last = now;
+      if (state === "playing") {
+        acc += dt;
+        while (acc >= speed && state === "playing") { acc -= speed; step(); }
+      } else if (state === "dying") {
+        if (now - deathAt > 800) finish();
+      }
+      draw(now);
+      requestAnimationFrame(frame);
+    }
+
+    function enter() {
+      last = null;
+      if (!running) { running = true; requestAnimationFrame(frame); }
+    }
+
+    function leave() {
+      if (state === "playing") state = "paused";
+    }
+
+    /* Keyboard (only while Snake is on screen) */
+    window.addEventListener("keydown", function (e) {
+      if (current !== "snake") return;
+      var k = e.key, handled = true;
+      if (k === "ArrowUp" || k === "w" || k === "W" || k === "z" || k === "Z") turn(0, -1);
+      else if (k === "ArrowDown" || k === "s" || k === "S") turn(0, 1);
+      else if (k === "ArrowLeft" || k === "a" || k === "A" || k === "q" || k === "Q") turn(-1, 0);
+      else if (k === "ArrowRight" || k === "d" || k === "D") turn(1, 0);
+      else if (k === " " || k === "Enter" || k === "p" || k === "P") action();
+      else handled = false;
+      if (handled) e.preventDefault();
+    });
+
+    $("b-pause").addEventListener("click", togglePause);
+    $("b-restart").addEventListener("click", restart);
+    var soundBtn = $("b-sound");
+    soundBtn.addEventListener("click", function () {
+      soundOn = !soundOn;
+      soundBtn.setAttribute("aria-pressed", String(soundOn));
+      soundBtn.textContent = soundOn ? "SON" : "MUET";
+      if (soundOn) beep(660, 60);
+    });
+
+    /* Swipe anywhere on the Snake screen; tap to resume or replay */
+    var area = $("view-snake");
+    var sx = 0, sy = 0, moved = false, tracking = false;
+    area.addEventListener("pointerdown", function (e) {
+      if (e.target.closest && e.target.closest("button, a")) return;
+      tracking = true; moved = false; sx = e.clientX; sy = e.clientY;
+    });
+    area.addEventListener("pointermove", function (e) {
+      if (!tracking) return;
+      var dx = e.clientX - sx, dy = e.clientY - sy;
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      moved = true;
+      if (Math.abs(dx) > Math.abs(dy)) turn(dx > 0 ? 1 : -1, 0);
+      else turn(0, dy > 0 ? 1 : -1);
+      sx = e.clientX; sy = e.clientY;
+    });
+    area.addEventListener("pointerup", function () {
+      if (tracking && !moved && state !== "ready" && state !== "playing" && state !== "dying") action();
+      tracking = false;
+    });
+    area.addEventListener("pointercancel", function () { tracking = false; });
+
+    document.addEventListener("visibilitychange", function () {
+      if (document.hidden && state === "playing") state = "paused";
+    });
+    window.addEventListener("bg:pause", function () { if (state === "playing") state = "paused"; });
+
+    reset();
+    if (document.fonts && document.fonts.load) {
+      document.fonts.load("8px 'Press Start 2P'").catch(function () { /* fallback font is fine */ });
+    }
+
+    function setLook(c0, c2, c3, skin) { C0 = c0; C2 = c2; C3 = c3; SKIN = skin || null; }
+
+    return { enter: enter, leave: leave, setLook: setLook };
+  })();
+
+  /* ---------- Block Drop ---------- */
+  /*BLOCKS-LOGIC-START*/
+  var BL = (function () {
+    var COLS = 10, ROWS = 18;
+    var PIECES = [
+      [[1, 1, 1, 1]],
+      [[1, 1], [1, 1]],
+      [[0, 1, 0], [1, 1, 1]],
+      [[0, 1, 1], [1, 1, 0]],
+      [[1, 1, 0], [0, 1, 1]],
+      [[1, 0, 0], [1, 1, 1]],
+      [[0, 0, 1], [1, 1, 1]]
+    ];
+    function rotate(m) {
+      var h = m.length, w = m[0].length, r = [];
+      for (var x = 0; x < w; x++) { r[x] = []; for (var y = h - 1; y >= 0; y--) r[x].push(m[y][x]); }
+      return r;
+    }
+    function newGrid() {
+      var g = [];
+      for (var y = 0; y < ROWS; y++) { g[y] = []; for (var x = 0; x < COLS; x++) g[y][x] = 0; }
+      return g;
+    }
+    function fits(grid, m, px, py) {
+      for (var y = 0; y < m.length; y++) {
+        for (var x = 0; x < m[y].length; x++) {
+          if (!m[y][x]) continue;
+          var gx = px + x, gy = py + y;
+          if (gx < 0 || gx >= COLS || gy >= ROWS) return false;
+          if (gy >= 0 && grid[gy][gx]) return false;
+        }
+      }
+      return true;
+    }
+    function lock(grid, m, px, py) {
+      for (var y = 0; y < m.length; y++) {
+        for (var x = 0; x < m[y].length; x++) {
+          if (m[y][x] && py + y >= 0) grid[py + y][px + x] = 1;
+        }
+      }
+    }
+    function clearLines(grid) {
+      var n = 0;
+      for (var y = ROWS - 1; y >= 0; y--) {
+        var full = true;
+        for (var x = 0; x < COLS; x++) if (!grid[y][x]) { full = false; break; }
+        if (full) {
+          grid.splice(y, 1);
+          var row = [];
+          for (var i = 0; i < COLS; i++) row.push(0);
+          grid.unshift(row);
+          n++;
+          y++;
+        }
+      }
+      return n;
+    }
+    function lineScore(n, level) { return [0, 100, 300, 500, 800][n] * level; }
+    function levelFor(lines) { return 1 + Math.floor(lines / 10); }
+    function gravityMs(level) { return Math.max(90, 700 - (level - 1) * 60); }
+    function makeBag(rand) {
+      var a = [0, 1, 2, 3, 4, 5, 6];
+      for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(rand() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; }
+      return a;
+    }
+    return { COLS: COLS, ROWS: ROWS, PIECES: PIECES, rotate: rotate, newGrid: newGrid, fits: fits, lock: lock,
+             clearLines: clearLines, lineScore: lineScore, levelFor: levelFor, gravityMs: gravityMs, makeBag: makeBag };
+  })();
+  /*BLOCKS-LOGIC-END*/
+
+  var blocks = (function () {
+    var CELL = 12, FX = 12, FY = 16, W = 144, H = 232;
+    var canvas = $("bl-screen"), ctx = canvas.getContext("2d");
+    var grid, cur, curX, curY, next, bag = [], score, lines, level, state = "ready", acc = 0, last = 0, running = false;
+    var best = localBest("blocks");
+
+    function rand() { return Math.random(); }
+    function take() {
+      if (!bag.length) bag = BL.makeBag(rand);
+      return BL.PIECES[bag.pop()];
+    }
+    function spawn() {
+      cur = next || take();
+      next = take();
+      curX = Math.floor((BL.COLS - cur[0].length) / 2);
+      curY = 0;
+      if (!BL.fits(grid, cur, curX, curY)) finish();
+    }
+    function reset() {
+      grid = BL.newGrid(); bag = []; next = null; score = 0; lines = 0; level = 1; acc = 0;
+      state = "ready";
+      setMsg($("bl-msg"), "");
+      spawn();
+    }
+    function move(dx) { if (state === "playing" && BL.fits(grid, cur, curX + dx, curY)) curX += dx; }
+    function rot() {
+      if (state !== "playing") return;
+      var r = BL.rotate(cur), kicks = [0, -1, 1, -2, 2];
+      for (var i = 0; i < kicks.length; i++) {
+        if (BL.fits(grid, r, curX + kicks[i], curY)) { cur = r; curX += kicks[i]; return; }
+      }
+    }
+    function drop() {
+      if (BL.fits(grid, cur, curX, curY + 1)) { curY++; return true; }
+      BL.lock(grid, cur, curX, curY);
+      var n = BL.clearLines(grid);
+      if (n) { lines += n; score += BL.lineScore(n, level); level = BL.levelFor(lines); }
+      spawn();
+      return false;
+    }
+    function soft() { if (state === "playing" && drop()) score += 1; acc = 0; }
+    function hard() {
+      if (state !== "playing") return;
+      var c = 0;
+      while (BL.fits(grid, cur, curX, curY + 1)) { curY++; c++; }
+      score += c * 2;
+      drop();
+      acc = 0;
+    }
+    function finish() {
+      state = "over";
+      if (score > best) { best = score; saveLocalBest("blocks", best); }
+      if (score > 0) submit(score);
+    }
+    async function submit(value) {
+      var m = $("bl-msg");
+      if (!online) { setMsg(m, "Score gardé sur cet appareil."); return; }
+      if (!session || !profile) {
+        m.textContent = "";
+        m.append("Score non enregistré en ligne. ");
+        var a = document.createElement("a");
+        a.href = "#compte";
+        a.textContent = "Crée un compte";
+        m.append(a, " pour le garder.");
+        return;
+      }
+      setMsg(m, "Envoi du score…");
+      var r = await sb.rpc("submit_score", { p_game: "blocks", p_score: value });
+      if (r.error) {
+        var em = String(r.error.message || "");
+        if (em.indexOf("maintenance") >= 0) setMsg(m, "Maintenance en cours : score non enregistré.", true);
+        else if (em.indexOf("beta") >= 0) setMsg(m, "Bêta privée : ton compte n'est pas encore ajouté, score non enregistré.", true);
+        else if (em.indexOf("banned") >= 0) setMsg(m, "Ton compte est suspendu : score non enregistré.", true);
+        else if (em.indexOf("unknown game") >= 0) setMsg(m, "Ce jeu n'est pas encore ouvert au classement.", true);
+        else setMsg(m, "Score non envoyé. Joue une autre partie pour réessayer.", true);
+        return;
+      }
+      var d = r.data;
+      if (d && typeof d === "object" && d.xp !== undefined) {
+        var txt = "Score enregistré. +" + d.xp + " XP, +" + d.bc + " BOYCOINS.";
+        if (d.level_up) txt += " NIVEAU " + d.level + " !";
+        setMsg(m, txt);
+        loadMe();
+      } else {
+        setMsg(m, "Score enregistré sur ton compte.");
+      }
+    }
+
+    function action() {
+      if (state === "ready") state = "playing";
+      else if (state === "paused") state = "playing";
+      else if (state === "over") { reset(); state = "playing"; }
+    }
+    function togglePause() {
+      if (state === "playing") state = "paused";
+      else if (state === "paused") state = "playing";
+    }
+
+    function css(n) { return getComputedStyle($("view-blocks")).getPropertyValue(n).trim(); }
+    function block(x, y, lcd, ink) {
+      ctx.fillStyle = ink; ctx.fillRect(x, y, CELL, CELL);
+      ctx.fillStyle = lcd; ctx.fillRect(x + 2, y + 2, CELL - 4, CELL - 4);
+      ctx.fillStyle = ink; ctx.fillRect(x + 4, y + 4, CELL - 8, CELL - 8);
+    }
+    function draw() {
+      var lcd = css("--lcd") || "#9bbc0f", ink = css("--ink") || "#0f380f";
+      ctx.fillStyle = lcd; ctx.fillRect(0, 0, W, H);
+      ctx.font = "8px 'Press Start 2P', monospace";
+      ctx.fillStyle = ink;
+      ctx.fillText(String(score), 4, 11);
+      ctx.fillText("N" + level, 40, 11);
+      ctx.fillRect(0, FY - 1, W, 1);
+      ctx.strokeStyle = ink; ctx.lineWidth = 2;
+      ctx.strokeRect(FX - 1, FY, BL.COLS * CELL + 2, BL.ROWS * CELL + 1);
+      for (var y = 0; y < BL.ROWS; y++) for (var x = 0; x < BL.COLS; x++) if (grid[y][x]) block(FX + x * CELL, FY + 1 + y * CELL, lcd, ink);
+      if (cur && state !== "over") {
+        for (var cy = 0; cy < cur.length; cy++) for (var cx = 0; cx < cur[cy].length; cx++) {
+          if (cur[cy][cx]) block(FX + (curX + cx) * CELL, FY + 1 + (curY + cy) * CELL, lcd, ink);
+        }
+      }
+      if (next) {
+        ctx.fillStyle = ink;
+        ctx.fillText("SUIV", 64, 11);
+        for (var ny = 0; ny < next.length; ny++) for (var nx = 0; nx < next[ny].length; nx++) {
+          if (next[ny][nx]) ctx.fillRect(W - 6 - 16 + nx * 4, 3 + ny * 4, 3, 3);
+        }
+      }
+      if (state === "ready") panel(["BLOCK DROP", "", "TOUCHE POUR", "COMMENCER"]);
+      else if (state === "paused") panel(["PAUSE", "", "TOUCHE POUR", "REPRENDRE"]);
+      else if (state === "over") panel(["PERDU", "SCORE " + score, "REC " + Math.max(best, score), "LIGNES " + lines, "", "TOUCHE POUR", "REJOUER"]);
+    }
+    function panel(linesArr) {
+      var lcd = css("--lcd") || "#9bbc0f", ink = css("--ink") || "#0f380f";
+      var maxLen = 0;
+      linesArr.forEach(function (l) { maxLen = Math.max(maxLen, l.length); });
+      var w = maxLen * 8 + 16, h = linesArr.length * 12 + 12;
+      var x = Math.round((W - w) / 2), y = Math.round((H - h) / 2);
+      ctx.fillStyle = ink; ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
+      ctx.fillStyle = lcd; ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = ink;
+      linesArr.forEach(function (l, i) { ctx.fillText(l, Math.round((W - l.length * 8) / 2), y + 14 + i * 12); });
+    }
+
+    function frame(now) {
+      if (current !== "blocks") { running = false; return; }
+      var dt = Math.min(100, now - last);
+      last = now;
+      if (state === "playing") {
+        acc += dt;
+        var g = BL.gravityMs(level);
+        while (acc >= g && state === "playing") { acc -= g; drop(); }
+      }
+      draw();
+      requestAnimationFrame(frame);
+    }
+
+    function enter() {
+      reset();
+      if (!running) { running = true; last = performance.now(); requestAnimationFrame(frame); }
+    }
+    function leave() { if (state === "playing") state = "paused"; }
+    window.addEventListener("bg:pause", leave);
+
+    window.addEventListener("keydown", function (e) {
+      if (current !== "blocks") return;
+      var k = e.key, used = true;
+      if (k === "ArrowLeft") move(-1);
+      else if (k === "ArrowRight") move(1);
+      else if (k === "ArrowUp") { if (state === "playing") rot(); else action(); }
+      else if (k === "ArrowDown") soft();
+      else if (k === " ") { if (state === "playing") hard(); else action(); }
+      else if (k === "p" || k === "P") togglePause();
+      else used = false;
+      if (used) e.preventDefault();
+    });
+
+    var view = $("view-blocks"), t0 = null, moved = false;
+    view.addEventListener("touchstart", function (e) {
+      if (e.target.closest && e.target.closest("button,a")) return;
+      var t = e.changedTouches[0];
+      t0 = { x: t.clientX, y: t.clientY, ox: t.clientX, oy: t.clientY, at: Date.now() };
+      moved = false;
+    }, { passive: true });
+    view.addEventListener("touchmove", function (e) {
+      if (!t0) return;
+      var t = e.changedTouches[0], dx = t.clientX - t0.x, dy = t.clientY - t0.y;
+      if (Math.abs(dx) >= 22) {
+        move(dx > 0 ? 1 : -1); t0.x = t.clientX; moved = true;
+      } else if (dy >= 26) {
+        soft(); t0.y = t.clientY; moved = true;
+      }
+    }, { passive: true });
+    view.addEventListener("touchend", function (e) {
+      if (!t0) return;
+      var t = e.changedTouches[0], dt = Date.now() - t0.at;
+      var totalDy = t.clientY - t0.oy, totalDx = t.clientX - t0.ox;
+      if (!moved && Math.abs(totalDx) < 12 && Math.abs(totalDy) < 12 && dt < 300) {
+        if (state === "playing") rot(); else action();
+      } else if (totalDy > 70 && dt < 220 && Math.abs(totalDx) < 40) {
+        hard();
+      }
+      t0 = null;
+    }, { passive: true });
+    $("bl-pause").addEventListener("click", togglePause);
+    $("bl-restart").addEventListener("click", function () { reset(); state = "playing"; });
+
+    return { enter: enter, leave: leave };
+  })();
+
+  /* ---------- Space Attack ---------- */
+  /*SPACE-LOGIC-START*/
+  var SP = (function () {
+    var W = 144, H = 208, HUD = 16, SHIP_W = 12, SHIP_H = 8, SHIP_Y = H - 16;
+    var EW = 10, EH = 8, COLS = 6;
+    function wave(n) {
+      var rows = Math.min(2 + Math.floor((n - 1) / 2), 5), list = [];
+      for (var r = 0; r < rows; r++) for (var c = 0; c < COLS; c++) list.push({ x: 10 + c * 16, y: HUD + 10 + r * 14, row: r });
+      return list;
+    }
+    function create() {
+      return { ship: { x: W / 2 - SHIP_W / 2 }, bullets: [], shots: [], enemies: wave(1), dir: 1, wave: 1, score: 0, lives: 3,
+               t: 0, fireAt: 0, enemyFireAt: 1500, invuln: 0, over: false, flash: 0 };
+    }
+    function hit(a, b) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
+    // dt en secondes ; input.targetX = position voulue du centre du vaisseau (ou null)
+    function step(g, dt, input, rand) {
+      if (g.over) return g;
+      dt = Math.min(dt, 0.05);
+      g.t += dt * 1000;
+      if (g.invuln > 0) g.invuln = Math.max(0, g.invuln - dt * 1000);
+
+      // vaisseau
+      if (input && input.targetX !== null && input.targetX !== undefined) {
+        var want = Math.max(0, Math.min(W - SHIP_W, input.targetX - SHIP_W / 2));
+        var maxMove = 150 * dt, d = want - g.ship.x;
+        g.ship.x += Math.abs(d) <= maxMove ? d : (d > 0 ? maxMove : -maxMove);
+      }
+      // tir automatique
+      if (g.t >= g.fireAt) { g.bullets.push({ x: g.ship.x + SHIP_W / 2 - 1, y: SHIP_Y - 4 }); g.fireAt = g.t + 320; }
+      g.bullets.forEach(function (b) { b.y -= 190 * dt; });
+      g.bullets = g.bullets.filter(function (b) { return b.y > HUD - 4; });
+
+      // formation d'ennemis
+      var speed = 14 + g.wave * 5 + (COLS * 5 - g.enemies.length) * 0.4;
+      var edge = false;
+      g.enemies.forEach(function (e) { e.x += g.dir * speed * dt; if (e.x < 2 || e.x + EW > W - 2) edge = true; });
+      if (edge) { g.dir = -g.dir; g.enemies.forEach(function (e) { e.x += g.dir * 2; e.y += 6; }); }
+
+      // tirs ennemis
+      if (g.enemies.length && g.t >= g.enemyFireAt) {
+        var shooter = g.enemies[Math.floor(rand() * g.enemies.length)];
+        g.shots.push({ x: shooter.x + EW / 2 - 1, y: shooter.y + EH });
+        g.enemyFireAt = g.t + Math.max(450, 1300 - g.wave * 80);
+      }
+      g.shots.forEach(function (s) { s.y += (70 + g.wave * 6) * dt; });
+      g.shots = g.shots.filter(function (s) { return s.y < H; });
+
+      // balles du joueur contre ennemis
+      g.bullets = g.bullets.filter(function (b) {
+        var bb = { x: b.x, y: b.y, w: 2, h: 5 };
+        for (var i = 0; i < g.enemies.length; i++) {
+          var e = g.enemies[i];
+          if (hit(bb, { x: e.x, y: e.y, w: EW, h: EH })) { g.enemies.splice(i, 1); g.score += 10 + (4 - Math.min(e.row, 4)) * 2; return false; }
+        }
+        return true;
+      });
+
+      // tirs ennemis contre le vaisseau
+      var ship = { x: g.ship.x, y: SHIP_Y, w: SHIP_W, h: SHIP_H };
+      if (g.invuln <= 0) {
+        for (var k = 0; k < g.shots.length; k++) {
+          if (hit({ x: g.shots[k].x, y: g.shots[k].y, w: 2, h: 5 }, ship)) {
+            g.shots.splice(k, 1); g.lives--; g.invuln = 1500; g.flash = 1500;
+            if (g.lives <= 0) { g.over = true; return g; }
+            break;
+          }
+        }
+      }
+      // ennemis qui atteignent le bas
+      for (var j = 0; j < g.enemies.length; j++) if (g.enemies[j].y + EH >= SHIP_Y) { g.over = true; return g; }
+
+      // vague terminée
+      if (!g.enemies.length) { g.score += 100 * g.wave; g.wave++; g.enemies = wave(g.wave); g.shots = []; g.dir = 1; g.enemyFireAt = g.t + 1500; }
+      return g;
+    }
+    return { W: W, H: H, HUD: HUD, SHIP_W: SHIP_W, SHIP_H: SHIP_H, SHIP_Y: SHIP_Y, EW: EW, EH: EH, create: create, step: step, wave: wave };
+  })();
+  /*SPACE-LOGIC-END*/
+
+  /*BOYBLOCKS-ENGINE*/
+
+  /* ---------- BOYBLOCKS (solo) : 8x8, 3 pièces, glisser-déposer ---------- */
+  function makeBoyBlocks(canvasId, duel) {
+    var canvas = $(canvasId), ctx = canvas.getContext("2d");
+    var W = 720, H = 1040, CELL = 78, BX = 48, BY = 148, TRAY_Y = 818, TRAY_CELL = 40, LIFT = 170, overAt = 0;
+    var COLORS = ["", "#22D3EE", "#E879F9", "#FBBF24", "#34D399", "#F87171", "#60A5FA", "#A78BFA"];
+    var g = null, state = "ready", ranked = false, runId = null, running = false, best = localBest("boyblocks");
+    var drag = null, fx = [], pops = [], banner = null, shake = 0, shown = 0, flashRows = [], lastT = 0;
+    var soundOn = true, audio = null, startToken = 0, overInfo = null;
+    try { soundOn = localStorage.getItem("boygames-bb-sound") !== "0"; } catch (e) { /* ignore */ }
+
+    function beep(freq, ms, delay, type, vol) {
+      if (!soundOn) return;
+      try {
+        if (!audio) { var AC = window.AudioContext || window.webkitAudioContext; if (!AC) return; audio = new AC(); }
+        if (audio.state === "suspended") audio.resume();
+        var t = audio.currentTime + (delay || 0), o = audio.createOscillator(), gn = audio.createGain();
+        o.type = type || "triangle"; o.frequency.value = freq;
+        gn.gain.setValueAtTime(vol || 0.06, t); gn.gain.exponentialRampToValueAtTime(0.0001, t + ms / 1000);
+        o.connect(gn); gn.connect(audio.destination); o.start(t); o.stop(t + ms / 1000 + 0.02);
+      } catch (e) { /* ignore */ }
+    }
+    function buzz(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* ignore */ } }
+
+    function newSeed() { return Math.floor(Math.random() * 4294967296); }
+
+    async function reset() {
+      var token = ++startToken;
+      drag = null; fx = []; pops = []; banner = null; flashRows = []; overInfo = null; shown = 0;
+      state = "loading"; g = null; runId = null; ranked = false;
+      setMsg($("bb-msg"), "");
+      var seed = newSeed();
+      if (online && sb && session && profile) {
+        try {
+          var r = await sb.rpc("boyblocks_start");
+          if (token !== startToken) return;
+          if (!r.error && r.data && r.data.run_id) { seed = Number(r.data.seed); runId = r.data.run_id; ranked = true; }
+          else setMsg($("bb-msg"), bbStartError(r.error), true);
+        } catch (e) { if (token !== startToken) return; setMsg($("bb-msg"), "Partie hors classement (connexion impossible).", true); }
+      } else if (online && !session) {
+        setMsg($("bb-msg"), "Partie libre : connecte-toi pour gagner XP, BOYCOINS et classement.");
+      }
+      if (token !== startToken) return;
+      g = BBE.newGame(seed, { ensureFit: true });
+      state = g.over ? "over" : "playing";
+      if (g.over) finish();
+    }
+    function bbStartError(err) {
+      var m = String((err && err.message) || "");
+      if (m.indexOf("maintenance") >= 0) return "Maintenance : partie hors classement.";
+      if (m.indexOf("beta") >= 0) return "Bêta privée : ton compte n'est pas encore ajouté, partie hors classement.";
+      if (m.indexOf("banned") >= 0) return "Ton compte est suspendu : partie hors classement.";
+      if (m.indexOf("too many") >= 0) return "Trop de parties ouvertes : partie hors classement.";
+      return "Partie hors classement (serveur indisponible).";
+    }
+
+    async function finish() {
+      state = "over"; overAt = Date.now();
+      var sc = g.score;
+      if (sc > best) { best = sc; saveLocalBest("boyblocks", best); }
+      overInfo = { score: sc, lines: g.lines, streak: g.best_streak, record: sc >= best && sc > 0 };
+      beep(220, 260, 0, "sawtooth", 0.05); beep(165, 360, 0.2, "sawtooth", 0.05); buzz(60);
+      if (!ranked || !runId) { if (online && session) setMsg($("bb-msg"), "Partie hors classement : rien n'est enregistré sur ton compte."); return; }
+      var moves = g.log.slice(), id = runId, mine = g;
+      setMsg($("bb-msg"), "Vérification de la partie…");
+      try {
+        var r = await sb.rpc("boyblocks_finish", { p_run: id, p_moves: moves });
+        if (g !== mine) return;
+        if (r.error) { setMsg($("bb-msg"), "Partie non enregistrée (" + (String(r.error.message).indexOf("invalid") >= 0 ? "vérification refusée" : "serveur indisponible") + ").", true); return; }
+        var d = r.data || {};
+        var txt = "Score vérifié et enregistré. +" + d.xp + " XP, +" + d.bc + " BOYCOINS.";
+        if (d.level_up) txt += " NIVEAU " + d.level + " !";
+        if (d.new_badges && d.new_badges.length) txt += " Badge : " + d.new_badges.map(badgeName).join(", ") + ".";
+        setMsg($("bb-msg"), txt);
+        loadMe();
+      } catch (e) { if (g === mine) setMsg($("bb-msg"), "Partie non enregistrée (connexion perdue).", true); }
+    }
+
+    /* ----- géométrie ----- */
+    function slotRect(i) { var sw = (W - 2 * BX) / 3; return { x: BX + i * sw, y: TRAY_Y, w: sw, h: H - TRAY_Y - 20 }; }
+    function pieceSize(p, cell) { var s = BBE.PIECES[p.p]; return { w: s.w * cell, h: s.h * cell }; }
+    function toLocal(e) {
+      var rc = canvas.getBoundingClientRect();
+      return { x: (e.clientX - rc.left) * W / rc.width, y: (e.clientY - rc.top) * H / rc.height };
+    }
+    function dropCell(d) {
+      var s = BBE.PIECES[g.pieces[d.slot].p];
+      var x = d.x - s.w * CELL / 2, y = d.y - LIFT - s.h * CELL / 2;
+      return { r: Math.round((y - BY) / CELL), c: Math.round((x - BX) / CELL) };
+    }
+
+    /* ----- entrées ----- */
+    canvas.addEventListener("pointerdown", function (e) {
+      if (duel && !duel.active()) return;
+      if (state !== "playing" || drag) return;
+      var p = toLocal(e);
+      for (var i = 0; i < 3; i++) {
+        var rc = slotRect(i);
+        if (g.pieces[i] && p.x >= rc.x && p.x < rc.x + rc.w && p.y >= rc.y - 30 && p.y < rc.y + rc.h) {
+          drag = { slot: i, x: p.x, y: p.y, id: e.pointerId };
+          try { canvas.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
+          beep(520, 40, 0, "square", 0.025);
+          e.preventDefault();
+          return;
+        }
+      }
+    });
+    canvas.addEventListener("pointermove", function (e) {
+      if (!drag || e.pointerId !== drag.id) return;
+      var p = toLocal(e); drag.x = p.x; drag.y = p.y; e.preventDefault();
+    });
+    function endDrag(e, cancel) {
+      if (!drag || e.pointerId !== drag.id) return;
+      var d = drag; drag = null;
+      if (cancel || state !== "playing") return;
+      var p = toLocal(e); d.x = p.x; d.y = p.y;
+      var cell = dropCell(d);
+      var before = g.grid.slice(), piece = g.pieces[d.slot], shape = BBE.PIECES[piece.p];
+      var res = BBE.place(g, d.slot, cell.r, cell.c);
+      if (!res.ok) { beep(140, 90, 0, "square", 0.03); return; }
+      if (duel) duel.send({ t: "place", slot: d.slot, r: cell.r, c: cell.c });
+      shape.cells.forEach(function (x) { before[(cell.r + x[0]) * 8 + cell.c + x[1]] = piece.color; });
+      buzz(res.lines ? 25 : 8);
+      beep(330 + shape.n * 20, 70, 0, "triangle", 0.06);
+      var cx = BX + (cell.c + shape.w / 2) * CELL, cy = BY + (cell.r + shape.h / 2) * CELL;
+      pops.push({ t: "+" + shape.n, x: cx, y: cy, life: 0.7, max: 0.7, c: "#F8FAFC", s: 40 });
+      if (res.lines) {
+        res.cleared.forEach(function (k) {
+          var col = COLORS[before[k]] || "#fff", px = BX + (k % 8) * CELL + CELL / 2, py = BY + Math.floor(k / 8) * CELL + CELL / 2;
+          for (var n = 0; n < 5; n++) fx.push({ x: px, y: py, vx: (Math.random() - 0.5) * 700, vy: (Math.random() - 0.7) * 700, life: 0.6 + Math.random() * 0.3, max: 0.9, c: col, s: 8 + Math.random() * 10 });
+        });
+        var pts = res.gain - shape.n - (res.allClear ? 300 : 0);
+        pops.push({ t: "+" + pts, x: cx, y: cy - 50, life: 1.1, max: 1.1, c: "#FBBF24", s: 56 });
+        shake = Math.min(18, 6 + res.lines * 3);
+        for (var q = 0; q < Math.min(res.lines, 4); q++) beep(440 + q * 110 + g.streak * 30, 120, q * 0.07, "square", 0.05);
+        if (res.lines >= 2) banner = { t: res.lines >= 4 ? "INCROYABLE !" : res.lines === 3 ? "SUPER !" : "DOUBLE !", c: "#E879F9", life: 1.1, max: 1.1 };
+        if (g.streak >= 2) banner = { t: "COMBO ×" + BBE.comboMult(g.streak).toFixed(1).replace(".0", ""), c: "#22D3EE", life: 1.2, max: 1.2 };
+        if (res.allClear) { banner = { t: "GRILLE VIDÉE +300", c: "#FBBF24", life: 1.6, max: 1.6 }; beep(660, 200, 0.2, "square", 0.06); beep(880, 300, 0.35, "square", 0.06); }
+      }
+      if (res.over) { if (duel) { state = "blocked"; beep(220, 260, 0, "sawtooth", 0.05); } else finish(); }
+    }
+    canvas.addEventListener("pointerup", function (e) { endDrag(e, false); });
+    canvas.addEventListener("pointercancel", function (e) { endDrag(e, true); });
+    canvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+
+    /* ----- dessin ----- */
+    function roundRect(x, y, w, h, r) {
+      ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+    }
+    function block(x, y, s, color, alpha) {
+      ctx.globalAlpha = alpha == null ? 1 : alpha;
+      var pad = Math.max(1.5, s * 0.05);
+      roundRect(x + pad, y + pad, s - 2 * pad, s - 2 * pad, s * 0.18);
+      ctx.fillStyle = color; ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,.28)"; roundRect(x + pad + s * 0.08, y + pad + s * 0.06, s - 2 * pad - s * 0.16, s * 0.22, s * 0.1); ctx.fill();
+      ctx.fillStyle = "rgba(0,0,0,.22)"; roundRect(x + pad + s * 0.08, y + s - pad - s * 0.24, s - 2 * pad - s * 0.16, s * 0.16, s * 0.08); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    function drawPiece(p, x, y, cell, alpha) {
+      var s = BBE.PIECES[p.p];
+      s.cells.forEach(function (c) { block(x + c[1] * cell, y + c[0] * cell, cell, COLORS[p.color], alpha); });
+    }
+
+    function draw(dt) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = "#0B1220"; ctx.fillRect(0, 0, W, H);
+      var ox = 0, oy = 0;
+      if (shake > 0.3) { ox = (Math.random() - 0.5) * shake; oy = (Math.random() - 0.5) * shake; shake *= Math.pow(0.002, dt); }
+      ctx.translate(ox, oy);
+      ctx.textBaseline = "alphabetic";
+      var score = g ? g.score : 0;
+      shown += (score - shown) * Math.min(1, dt * 10); if (Math.abs(score - shown) < 1) shown = score;
+      if (duel) drawDuelHud();
+      else {
+        ctx.fillStyle = "#94A3B8"; ctx.font = "700 26px system-ui, sans-serif"; ctx.textAlign = "left"; ctx.fillText("SCORE", BX, 48);
+        ctx.fillStyle = "#F8FAFC"; ctx.font = "800 64px system-ui, sans-serif"; ctx.fillText(String(Math.round(shown)), BX, 108);
+        ctx.textAlign = "right"; ctx.fillStyle = "#94A3B8"; ctx.font = "700 26px system-ui, sans-serif"; ctx.fillText("RECORD", W - BX, 48);
+        ctx.fillStyle = "#FBBF24"; ctx.font = "800 44px system-ui, sans-serif"; ctx.fillText(String(Math.max(best, score)), W - BX, 100);
+      }
+      if (g && g.streak >= 1 && !duel) {
+        ctx.textAlign = "center"; ctx.fillStyle = "#22D3EE"; ctx.font = "800 28px system-ui, sans-serif";
+        ctx.fillText("COMBO ×" + BBE.comboMult(g.streak + 1).toFixed(1).replace(".0", "") + " SI TU ENCHAÎNES", W / 2, 140);
+      }
+      // plateau
+      ctx.fillStyle = "#111A2E"; roundRect(BX - 10, BY - 10, 8 * CELL + 20, 8 * CELL + 20, 22); ctx.fill();
+      ctx.strokeStyle = "#7E22CE"; ctx.lineWidth = 3; ctx.stroke();
+      for (var i = 0; i < 64; i++) {
+        var x = BX + (i % 8) * CELL, y = BY + Math.floor(i / 8) * CELL;
+        ctx.fillStyle = ((i % 8 + Math.floor(i / 8)) & 1) ? "#16213A" : "#131D34"; roundRect(x + 3, y + 3, CELL - 6, CELL - 6, 10); ctx.fill();
+      }
+      if (g) {
+        for (var k = 0; k < 64; k++) if (g.grid[k]) block(BX + (k % 8) * CELL, BY + Math.floor(k / 8) * CELL, CELL, COLORS[g.grid[k]]);
+        // aperçu du dépôt
+        if (drag && g.pieces[drag.slot]) {
+          var pc = g.pieces[drag.slot], sh = BBE.PIECES[pc.p], cl = dropCell(drag);
+          if (BBE.fits(g.grid, sh, cl.r, cl.c)) {
+            var tmp = g.grid.slice();
+            sh.cells.forEach(function (c) { tmp[(cl.r + c[0]) * 8 + cl.c + c[1]] = 9; });
+            var fullR = [], fullC = [];
+            for (var a = 0; a < 8; a++) {
+              var fr = true, fc = true;
+              for (var b = 0; b < 8; b++) { if (!tmp[a * 8 + b]) fr = false; if (!tmp[b * 8 + a]) fc = false; }
+              if (fr) fullR.push(a); if (fc) fullC.push(a);
+            }
+            ctx.fillStyle = "rgba(251,191,36,.22)";
+            fullR.forEach(function (r) { roundRect(BX, BY + r * CELL, 8 * CELL, CELL, 10); ctx.fill(); });
+            fullC.forEach(function (c) { roundRect(BX + c * CELL, BY, CELL, 8 * CELL, 10); ctx.fill(); });
+            drawPiece(pc, BX + cl.c * CELL, BY + cl.r * CELL, CELL, 0.45);
+          }
+        }
+      }
+      // réserve de pièces
+      ctx.fillStyle = "#0F172A"; roundRect(BX - 10, TRAY_Y - 20, W - 2 * BX + 20, H - TRAY_Y, 22); ctx.fill();
+      if (g) for (var s = 0; s < 3; s++) {
+        var p = g.pieces[s]; if (!p) continue;
+        if (drag && drag.slot === s) continue;
+        var rc = slotRect(s), sz = pieceSize(p, TRAY_CELL);
+        var playable = BBE.canPlaceAnywhere(g.grid, BBE.PIECES[p.p]);
+        drawPiece(p, rc.x + (rc.w - sz.w) / 2, rc.y + (rc.h - sz.h) / 2 - 10, TRAY_CELL, playable ? 1 : 0.3);
+      }
+      // pièce portée
+      if (drag && g && g.pieces[drag.slot]) {
+        var dp = g.pieces[drag.slot], dsz = pieceSize(dp, CELL);
+        drawPiece(dp, drag.x - dsz.w / 2, drag.y - LIFT - dsz.h / 2, CELL, 0.95);
+      }
+      // particules, textes
+      fx = fx.filter(function (f) { f.life -= dt; return f.life > 0; });
+      fx.forEach(function (f) { f.x += f.vx * dt; f.y += f.vy * dt; f.vy += 1500 * dt; ctx.globalAlpha = Math.max(0, f.life / f.max); ctx.fillStyle = f.c; ctx.fillRect(f.x - f.s / 2, f.y - f.s / 2, f.s, f.s); });
+      ctx.globalAlpha = 1;
+      pops = pops.filter(function (f) { f.life -= dt; return f.life > 0; });
+      ctx.textAlign = "center";
+      pops.forEach(function (f) { f.y -= 60 * dt; ctx.globalAlpha = Math.min(1, f.life / f.max * 1.5); ctx.fillStyle = f.c; ctx.font = "800 " + f.s + "px system-ui, sans-serif"; ctx.fillText(f.t, f.x, f.y); });
+      ctx.globalAlpha = 1;
+      if (banner) {
+        banner.life -= dt;
+        if (banner.life <= 0) banner = null;
+        else {
+          var k2 = 1 - banner.life / banner.max, sc = 0.6 + Math.min(1, k2 * 6) * 0.5;
+          ctx.save(); ctx.translate(W / 2, BY + 4 * CELL); ctx.scale(sc, sc); ctx.globalAlpha = Math.min(1, banner.life * 3);
+          ctx.fillStyle = "rgba(11,18,32,.7)"; roundRect(-300, -50, 600, 100, 24); ctx.fill();
+          ctx.fillStyle = banner.c; ctx.font = "800 62px system-ui, sans-serif"; ctx.textBaseline = "middle"; ctx.fillText(banner.t, 0, 4);
+          ctx.restore(); ctx.textBaseline = "alphabetic";
+        }
+      }
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      if (state === "loading") {
+        ctx.fillStyle = "rgba(11,18,32,.8)"; ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = "#F8FAFC"; ctx.textAlign = "center"; ctx.font = "800 54px system-ui, sans-serif"; ctx.fillText("PRÉPARATION…", W / 2, H / 2);
+      }
+      if (duel && duelFinal) drawDuelEnd();
+      else if (duel && state === "blocked") {
+        ctx.fillStyle = "rgba(11,18,32,.6)"; ctx.fillRect(0, 0, W, H);
+        ctx.textAlign = "center"; ctx.fillStyle = "#F87171"; ctx.font = "800 64px system-ui, sans-serif"; ctx.fillText("PLUS DE PLACE !", W / 2, 470);
+        ctx.fillStyle = "#94A3B8"; ctx.font = "700 36px system-ui, sans-serif"; ctx.fillText("on attend la fin du duel…", W / 2, 540);
+      }
+      if (!duel && state === "over" && overInfo) {
+        ctx.fillStyle = "rgba(11,18,32,.82)"; ctx.fillRect(0, 0, W, H);
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#F87171"; ctx.font = "800 70px system-ui, sans-serif"; ctx.fillText("PARTIE TERMINÉE", W / 2, 360);
+        ctx.fillStyle = "#F8FAFC"; ctx.font = "800 150px system-ui, sans-serif"; ctx.fillText(String(overInfo.score), W / 2, 530);
+        ctx.fillStyle = overInfo.record ? "#FBBF24" : "#94A3B8"; ctx.font = "800 40px system-ui, sans-serif";
+        ctx.fillText(overInfo.record ? "NOUVEAU RECORD !" : "RECORD : " + best, W / 2, 600);
+        ctx.fillStyle = "#94A3B8"; ctx.font = "700 34px system-ui, sans-serif";
+        ctx.fillText(overInfo.lines + " lignes · meilleur combo ×" + overInfo.streak, W / 2, 665);
+        ctx.fillStyle = "#22D3EE"; ctx.font = "800 38px system-ui, sans-serif"; ctx.fillText("TOUCHE POUR REJOUER", W / 2, 780);
+      }
+    }
+
+    /* ----- duel : état venant du serveur ----- */
+    var duelSt = null, duelAt = 0, duelFinal = null, duelYou = 0, duelNames = ["", ""], duelRun = false;
+    function drawDuelHud() {
+      var opp = duelSt ? duelSt.players[1 - duelYou] : null, me = duelSt ? duelSt.players[duelYou] : null;
+      ctx.textAlign = "left"; ctx.fillStyle = "#22D3EE"; ctx.font = "700 24px system-ui, sans-serif"; ctx.fillText(String(duelNames[duelYou] || "TOI").slice(0, 10).toUpperCase(), BX, 44);
+      ctx.fillStyle = "#F8FAFC"; ctx.font = "800 62px system-ui, sans-serif"; ctx.fillText(String(Math.round(shown)), BX, 104);
+      var left = duelSt ? Math.max(0, duelSt.msLeft - (Date.now() - duelAt)) : 0, sec = Math.ceil(left / 1000);
+      ctx.textAlign = "center"; ctx.fillStyle = sec <= 15 ? "#F87171" : "#F8FAFC"; ctx.font = "800 54px system-ui, sans-serif";
+      ctx.fillText(Math.floor(sec / 60) + ":" + (sec % 60 < 10 ? "0" : "") + (sec % 60), W / 2 - 10, 92);
+      if (opp) {
+        var mx = W - BX - 96, my = 26, cs = 12;
+        ctx.fillStyle = "#111A2E"; ctx.fillRect(mx - 4, my - 4, 8 * cs + 8, 8 * cs + 8);
+        for (var i = 0; i < 64; i++) { var v = +opp.grid.charAt(i); if (v) { ctx.fillStyle = COLORS[v]; ctx.fillRect(mx + (i % 8) * cs, my + Math.floor(i / 8) * cs, cs - 1, cs - 1); } }
+        ctx.textAlign = "right"; ctx.fillStyle = "#E879F9"; ctx.font = "700 22px system-ui, sans-serif"; ctx.fillText(String(duelNames[1 - duelYou] || "ADVERSAIRE").slice(0, 10).toUpperCase(), mx - 18, 44);
+        ctx.fillStyle = "#F8FAFC"; ctx.font = "800 46px system-ui, sans-serif"; ctx.fillText(String(opp.score), mx - 18, 96);
+        if (me && opp.score > me.score) { ctx.fillStyle = "#F87171"; ctx.font = "700 22px system-ui, sans-serif"; ctx.fillText("+" + (opp.score - me.score) + " devant", mx - 18, 124); }
+        else if (me && me.score > opp.score) { ctx.fillStyle = "#34D399"; ctx.font = "700 22px system-ui, sans-serif"; ctx.fillText("tu mènes de " + (me.score - opp.score), mx - 18, 124); }
+      }
+    }
+    function drawDuelEnd() {
+      ctx.fillStyle = "rgba(11,18,32,.84)"; ctx.fillRect(0, 0, W, H);
+      ctx.textAlign = "center";
+      var w = duelFinal.winner, win = w === duelYou, draw = w === "draw";
+      ctx.fillStyle = draw ? "#FBBF24" : win ? "#34D399" : "#F87171"; ctx.font = "800 84px system-ui, sans-serif";
+      ctx.fillText(draw ? "ÉGALITÉ" : win ? "VICTOIRE !" : "DÉFAITE", W / 2, 420);
+      var me = duelFinal.players[duelYou], op = duelFinal.players[1 - duelYou];
+      ctx.fillStyle = "#F8FAFC"; ctx.font = "800 120px system-ui, sans-serif"; ctx.fillText(me.score + " - " + op.score, W / 2, 580);
+      ctx.fillStyle = "#94A3B8"; ctx.font = "700 34px system-ui, sans-serif";
+      ctx.fillText(duelFinal.reason === "left" ? "ton adversaire est parti" : duelFinal.reason === "time" ? "temps écoulé" : "grille bloquée", W / 2, 650);
+    }
+    function duelStart() { if (!duelRun) { duelRun = true; running = true; lastT = performance.now(); requestAnimationFrame(loop); } }
+    function duelStop() { duelRun = false; running = false; drag = null; }
+    function duelSync(log) {
+      if (!duelSt) return;
+      g = BBE.newGame(duelSt.seed, { ensureFit: false });
+      for (var i = 0; i < log.length; i++) BBE.place(g, log[i][0], log[i][1], log[i][2]);
+      shown = g.score; state = g.over ? "blocked" : "playing";
+    }
+    function duelOnState(st, you, names) {
+      duelYou = you; duelNames = names; duelSt = st; duelAt = Date.now();
+      if (!g || g.seed !== st.seed) {
+        g = BBE.newGame(st.seed, { ensureFit: false }); shown = 0; state = "playing"; duelFinal = null; fx = []; pops = []; banner = null;
+        if (st.players[you].moves > 0) duel.send({ t: "sync" });
+      } else if (st.players[you].moves > g.moves) duel.send({ t: "sync" });
+      else if (st.players[you].moves === g.moves && st.players[you].score !== g.score) duel.send({ t: "sync" });
+      duelFinal = st.over ? st : null;
+      if (st.over) { drag = null; if (!duelEnded) { duelEnded = true; beep(st.winner === you ? 660 : 200, 300, 0, "square", 0.06); buzz(60); } } else duelEnded = false;
+      duelStart();
+    }
+    var duelEnded = false;
+
+    function loop(t) {
+      if (!running) return;
+      var dt = Math.min(0.05, (t - lastT) / 1000 || 0.016); lastT = t;
+      try { draw(dt); } catch (e) { /* un dessin raté ne doit jamais bloquer le jeu */ }
+      requestAnimationFrame(loop);
+    }
+    function enter() {
+      $("bb-sound").setAttribute("aria-pressed", String(soundOn));
+      if (!g || state === "over") { reset(); }
+      if (!running) { running = true; lastT = performance.now(); requestAnimationFrame(loop); }
+    }
+    function leave() { running = false; drag = null; }
+    window.addEventListener("bg:pause", function () { drag = null; });
+
+    if (!duel) {
+      canvas.addEventListener("click", function () { if (state === "over" && Date.now() - overAt > 900) reset(); });
+      $("bb-restart").addEventListener("click", function () { reset(); });
+      $("bb-sound").addEventListener("click", function () {
+        soundOn = !soundOn; $("bb-sound").setAttribute("aria-pressed", String(soundOn));
+        try { localStorage.setItem("boygames-bb-sound", soundOn ? "1" : "0"); } catch (e) { /* ignore */ }
+        if (soundOn) beep(660, 80);
+      });
+      canvas.addEventListener("keydown", function (e) { if (e.key === "Enter" && state === "over" && Date.now() - overAt > 900) reset(); });
+    }
+    return { enter: enter, leave: leave, onState: duelOnState, onSync: duelSync, stop: duelStop, _debug: function () { return { g: g, state: state, ranked: ranked }; } };
+  }
+  var boyblocks = makeBoyBlocks("bb-screen", null);
+
+  var space = (function () {
+    var canvas = $("sp-screen"), ctx = canvas.getContext("2d");
+    var g, state = "ready", last = 0, running = false, targetX = null, keys = { l: false, r: false };
+    var best = localBest("space");
+
+    function reset() { g = SP.create(); state = "ready"; targetX = null; setMsg($("sp-msg"), ""); }
+    function finish() {
+      state = "over";
+      if (g.score > best) { best = g.score; saveLocalBest("space", best); }
+      if (g.score > 0) submit(g.score);
+    }
+    async function submit(value) {
+      var m = $("sp-msg");
+      if (!online) { setMsg(m, "Score gardé sur cet appareil."); return; }
+      if (!session || !profile) {
+        m.textContent = "";
+        m.append("Score non enregistré en ligne. ");
+        var a = document.createElement("a");
+        a.href = "#compte";
+        a.textContent = "Crée un compte";
+        m.append(a, " pour le garder.");
+        return;
+      }
+      setMsg(m, "Envoi du score…");
+      var r = await sb.rpc("submit_score", { p_game: "space", p_score: Math.min(value, 20000) });
+      if (r.error) {
+        var em = String(r.error.message || "");
+        if (em.indexOf("maintenance") >= 0) setMsg(m, "Maintenance en cours : score non enregistré.", true);
+        else if (em.indexOf("beta") >= 0) setMsg(m, "Bêta privée : ton compte n'est pas encore ajouté, score non enregistré.", true);
+        else if (em.indexOf("banned") >= 0) setMsg(m, "Ton compte est suspendu : score non enregistré.", true);
+        else if (em.indexOf("unknown game") >= 0) setMsg(m, "Ce jeu n'est pas encore ouvert au classement.", true);
+        else setMsg(m, "Score non envoyé. Joue une autre partie pour réessayer.", true);
+        return;
+      }
+      var d = r.data;
+      if (d && typeof d === "object" && d.xp !== undefined) {
+        var txt = "Score enregistré. +" + d.xp + " XP, +" + d.bc + " BOYCOINS.";
+        if (d.level_up) txt += " NIVEAU " + d.level + " !";
+        setMsg(m, txt);
+        loadMe();
+      } else {
+        setMsg(m, "Score enregistré sur ton compte.");
+      }
+    }
+    function action() {
+      if (state === "ready" || state === "paused") state = "playing";
+      else if (state === "over") { reset(); state = "playing"; }
+    }
+    function togglePause() { if (state === "playing") state = "paused"; else if (state === "paused") state = "playing"; }
+
+    function css(n) { return getComputedStyle($("view-space")).getPropertyValue(n).trim(); }
+    function draw() {
+      var lcd = css("--lcd") || "#9bbc0f", ink = css("--ink") || "#0f380f", mid = css("--mid") || "#306230";
+      ctx.fillStyle = lcd; ctx.fillRect(0, 0, SP.W, SP.H);
+      ctx.font = "8px 'Press Start 2P', monospace";
+      ctx.fillStyle = ink;
+      ctx.fillText("SC " + g.score, 4, 11);
+      var lv = "V" + g.wave + " ";
+      for (var i = 0; i < g.lives; i++) lv += "\u2665";
+      ctx.fillText(lv, SP.W - 4 - lv.length * 8, 11);
+      ctx.fillRect(0, SP.HUD - 1, SP.W, 1);
+      g.enemies.forEach(function (e) {
+        var x = Math.round(e.x), y = Math.round(e.y);
+        ctx.fillStyle = "#F43F5E";
+        ctx.fillRect(x + 1, y, 8, 2); ctx.fillRect(x, y + 2, 10, 3); ctx.fillRect(x + 1, y + 5, 2, 3); ctx.fillRect(x + 7, y + 5, 2, 3);
+        ctx.fillStyle = lcd; ctx.fillRect(x + 2, y + 2, 2, 2); ctx.fillRect(x + 6, y + 2, 2, 2);
+      });
+      ctx.fillStyle = ink;
+      g.bullets.forEach(function (b) { ctx.fillRect(Math.round(b.x), Math.round(b.y), 2, 5); });
+      ctx.fillStyle = mid;
+      g.shots.forEach(function (s) { ctx.fillRect(Math.round(s.x), Math.round(s.y), 2, 5); });
+      var blink = g.invuln > 0 && Math.floor(g.invuln / 100) % 2 === 0;
+      if (!blink) {
+        ctx.fillStyle = ink;
+        var sx = Math.round(g.ship.x), sy = SP.SHIP_Y;
+        ctx.fillRect(sx + 5, sy, 2, 3); ctx.fillRect(sx + 3, sy + 3, 6, 2); ctx.fillRect(sx, sy + 5, 12, 3);
+      }
+      if (state === "ready") panel(["SPACE ATTACK", "", "GLISSE POUR", "BOUGER", "TOUCHE POUR", "COMMENCER"]);
+      else if (state === "paused") panel(["PAUSE", "", "TOUCHE POUR", "REPRENDRE"]);
+      else if (state === "over") panel(["PERDU", "SCORE " + g.score, "REC " + Math.max(best, g.score), "VAGUE " + g.wave, "", "TOUCHE POUR", "REJOUER"]);
+    }
+    function panel(lines) {
+      var lcd = css("--lcd") || "#9bbc0f", ink = css("--ink") || "#0f380f";
+      var maxLen = 0; lines.forEach(function (l) { maxLen = Math.max(maxLen, l.length); });
+      var w = maxLen * 8 + 16, h = lines.length * 12 + 12, x = Math.round((SP.W - w) / 2), y = Math.round((SP.H - h) / 2);
+      ctx.fillStyle = ink; ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
+      ctx.fillStyle = lcd; ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = ink;
+      lines.forEach(function (l, i) { ctx.fillText(l, Math.round((SP.W - l.length * 8) / 2), y + 14 + i * 12); });
+    }
+
+    function frame(now) {
+      if (current !== "space") { running = false; return; }
+      var dt = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      if (state === "playing") {
+        var tx = targetX;
+        if (keys.l || keys.r) tx = g.ship.x + SP.SHIP_W / 2 + (keys.r ? 1 : 0) * 40 - (keys.l ? 1 : 0) * 40;
+        SP.step(g, dt, { targetX: tx }, Math.random);
+        if (g.over) finish();
+      }
+      draw();
+      requestAnimationFrame(frame);
+    }
+    function enter() {
+      reset();
+      if (!running) { running = true; last = performance.now(); requestAnimationFrame(frame); }
+    }
+    function leave() { if (state === "playing") state = "paused"; keys.l = keys.r = false; }
+    window.addEventListener("bg:pause", leave);
+
+    window.addEventListener("keydown", function (e) {
+      if (current !== "space") return;
+      if (e.key === "ArrowLeft") { keys.l = true; if (state !== "playing") action(); e.preventDefault(); }
+      else if (e.key === "ArrowRight") { keys.r = true; if (state !== "playing") action(); e.preventDefault(); }
+      else if (e.key === " " || e.key === "ArrowUp") { action(); e.preventDefault(); }
+      else if (e.key === "p" || e.key === "P") togglePause();
+    });
+    window.addEventListener("keyup", function (e) {
+      if (e.key === "ArrowLeft") keys.l = false;
+      if (e.key === "ArrowRight") keys.r = false;
+    });
+    var view = $("view-space"), tStart = null, tMoved = false;
+    function toGame(clientX) { var r = canvas.getBoundingClientRect(); return (clientX - r.left) * (SP.W / r.width); }
+    view.addEventListener("touchstart", function (e) {
+      if (e.target.closest && e.target.closest("button,a")) return;
+      var t = e.changedTouches[0]; tStart = { x: t.clientX, y: t.clientY, at: Date.now() }; tMoved = false;
+      if (state === "playing") targetX = toGame(t.clientX);
+    }, { passive: true });
+    view.addEventListener("touchmove", function (e) {
+      if (!tStart) return;
+      var t = e.changedTouches[0];
+      if (Math.abs(t.clientX - tStart.x) > 8) tMoved = true;
+      targetX = toGame(t.clientX);
+    }, { passive: true });
+    view.addEventListener("touchend", function () {
+      if (tStart && !tMoved && Date.now() - tStart.at < 300 && state !== "playing") action();
+      tStart = null;
+    }, { passive: true });
+    canvas.addEventListener("mousedown", function (e) { if (state !== "playing") action(); else targetX = toGame(e.clientX); });
+    canvas.addEventListener("mousemove", function (e) { if (e.buttons && state === "playing") targetX = toGame(e.clientX); });
+    $("sp-pause").addEventListener("click", togglePause);
+    $("sp-restart").addEventListener("click", function () { reset(); state = "playing"; });
+
+    return { enter: enter, leave: leave };
+  })();
+
+  /* ---------- Jeux en ligne à 2 (serveur de jeu) ---------- */
+  var arena = (function () {
+    var CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+    var SIZES = { snake: [240, 264], space: [144, 208], blocks: [240, 236], boyblocks: [720, 1040] };
+    var canvas = $("ar-screen"), ctx = canvas.getContext("2d");
+    var ws = null, code = "", kind = "snake", you = -1, names = ["", ""], st = null, phase = "idle";
+    var retries = 0, wantOpen = false, touch = null;
+    var bbDuel = makeBoyBlocks("ar-screen", { active: function () { return kind === "boyblocks" && phase === "playing"; }, send: function (o) { send(o); } });
+    canvas.style.touchAction = "none";
+
+    function say(id, txt, err) { setMsg($(id), txt, err); }
+    function css(name) { return getComputedStyle($("view-arena")).getPropertyValue(name).trim(); }
+    function show(inGame) { $("ar-lobby").hidden = inGame; $("ar-stage").hidden = !inGame; updateIngame(); }
+    function kindOf(c) { return c.charAt(0) === "P" ? "space" : c.charAt(0) === "B" ? "blocks" : c.charAt(0) === "X" ? "boyblocks" : "snake"; }
+
+    function resize() {
+      var sz = SIZES[kind];
+      canvas.width = sz[0]; canvas.height = sz[1];
+      canvas.style.aspectRatio = sz[0] + "/" + sz[1];
+      canvas.style.width = kind === "space" ? "min(100%,360px)" : "min(100%,420px)";
+      fitGame();
+    }
+
+    function connect() {
+      if (!cfg.ARENA_URL) { say("ar-note", "Le serveur de jeu n'est pas encore branché.", true); return; }
+      if (!session || !profile) { say("ar-note", "Connecte-toi pour jouer en ligne.", true); return; }
+      wantOpen = true;
+      kind = kindOf(code);
+      $("view-arena").setAttribute("data-kind", kind);
+      resize();
+      show(true);
+      say("ar-top", "Connexion…");
+      say("ar-msg", "");
+      try { ws = new WebSocket(cfg.ARENA_URL.replace(/\/$/, "") + "/play/" + code); } catch (e) { say("ar-note", "Connexion impossible.", true); show(false); return; }
+      var mine = ws;
+      mine.addEventListener("open", function () {
+        sb.auth.getSession().then(function (r) {
+          var tok = r && r.data && r.data.session ? r.data.session.access_token : "";
+          mine.send(JSON.stringify({ t: "hello", token: tok }));
+        });
+      });
+      mine.addEventListener("message", function (ev) { if (mine === ws) onMsg(ev.data); });
+      mine.addEventListener("close", function () {
+        if (mine !== ws) return;
+        if (wantOpen && phase !== "over" && retries < 3) {
+          retries++;
+          say("ar-msg", "Connexion perdue, nouvel essai…");
+          setTimeout(function () { if (wantOpen) connect(); }, 1500);
+        } else if (wantOpen && phase !== "over") {
+          say("ar-msg", "Connexion perdue.", true);
+        }
+      });
+    }
+
+    function onMsg(raw) {
+      var m;
+      try { m = JSON.parse(raw); } catch (e) { return; }
+      if (m.t === "error") {
+        wantOpen = false;
+        var txt = m.code === "full" ? "Cette salle est déjà pleine." : m.code === "auth" ? "Connexion refusée. Reconnecte-toi puis réessaie." : m.code === "banned" ? "Ton compte est suspendu." : m.code === "beta" ? "Bêta privée : ton compte n'est pas encore ajouté." : m.code === "maintenance" ? "Maintenance en cours, réessaie plus tard." : "Erreur de connexion.";
+        say("ar-note", txt, true);
+        show(false);
+      } else if (m.t === "lobby") {
+        retries = 0;
+        you = m.you; names = m.players; phase = m.phase || "lobby";
+        st = null;
+        say("ar-top", names[1] ? names[0] + " et " + names[1] : "Salle " + m.code + " : en attente d'un ami. Donne-lui ce code.");
+        draw();
+      } else if (m.t === "rematch") {
+        if (m.wants && m.wants[1 - you] && !m.wants[you]) say("ar-msg", "Ton adversaire veut rejouer !");
+      } else if (m.t === "left") {
+        $("ar-again").hidden = true;
+        say("ar-msg", "Ton adversaire est parti.");
+      } else if (m.t === "countdown") {
+        bbDuel.stop();
+        phase = "countdown";
+        wantOpen = true;
+        st = null;
+        $("ar-again").hidden = true;
+        $("ar-again").disabled = false;
+        say("ar-top", names[0] + " et " + names[1]);
+        say("ar-msg", "Prépare-toi…");
+      } else if (m.t === "sync") {
+        if (kind === "boyblocks" && st) bbDuel.onSync(m.log || []);
+      } else if (m.t === "state") {
+        st = m;
+        if (kind === "boyblocks") bbDuel.onState(m, you, names);
+        if (m.over) { phase = "over"; wantOpen = false; endText(m); if (m.reason !== "left") { $("ar-again").hidden = false; $("ar-again").disabled = false; } } else { phase = "playing"; say("ar-msg", ""); }
+        draw();
+      }
+    }
+
+    function endText(m) {
+      var t;
+      if (m.winner === "team") t = "PARTIE FINIE : " + m.score + " points, vague " + m.wave + ".";
+      else t = m.winner === "draw" ? "ÉGALITÉ" : m.winner === you ? "TU AS GAGNÉ !" : "TU AS PERDU";
+      if (m.reason === "left" && m.winner === you) t += " (ton adversaire est parti)";
+      say("ar-msg", t);
+    }
+
+    function colors() { return { lcd: css("--lcd") || "#9bbc0f", ink: css("--ink") || "#0f380f", mid: css("--mid") || "#306230" }; }
+    function font() { ctx.font = "8px 'Press Start 2P', monospace"; }
+    function banner(c, text, y, w) {
+      var W = canvas.width;
+      ctx.fillStyle = c.ink; ctx.fillRect(Math.round((W - w) / 2), y, w, 22);
+      ctx.fillStyle = c.lcd; ctx.fillText(text, Math.round((W - text.length * 8) / 2), y + 15);
+    }
+    function resultWord(m) { return m.winner === "team" ? "FIN" : m.winner === "draw" ? "EGALITE" : m.winner === you ? "GAGNE !" : "PERDU"; }
+
+    function draw() {
+      if (kind === "boyblocks" && st) return;                 // dessiné en continu par la boucle de BoyBlocks
+      var c = colors();
+      ctx.fillStyle = c.lcd; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      font();
+      ctx.fillStyle = c.ink;
+      if (!st) {
+        var line = phase === "lobby" ? "CODE " + code : "...";
+        ctx.fillText(line, Math.round((canvas.width - line.length * 8) / 2), Math.round(canvas.height / 2));
+        return;
+      }
+      if (kind === "snake") drawSnake(c);
+      else if (kind === "space") drawSpace(c);
+      else drawBlocks(c);
+    }
+
+    function drawSnake(c) {
+      var CELL = 10, HUD = 24;
+      var a = (you === 0 ? ">" : "") + (names[0] || "J1").slice(0, 8), b = (names[1] || "J2").slice(0, 8) + (you === 1 ? "<" : "");
+      ctx.fillText(a + " " + st.players[0].score, 4, 15);
+      var rt = st.players[1].score + " " + b; ctx.fillText(rt, 236 - rt.length * 8, 15);
+      ctx.fillRect(0, HUD - 1, 240, 1);
+      st.food.forEach(function (f) { ctx.fillRect(f.x * CELL + 4, HUD + f.y * CELL + 1, 2, 8); ctx.fillRect(f.x * CELL + 1, HUD + f.y * CELL + 4, 8, 2); });
+      st.players.forEach(function (p, i) {
+        p.body.forEach(function (cell, k) {
+          var x = cell.x * CELL, y = HUD + cell.y * CELL;
+          if (!p.alive) { ctx.strokeStyle = c.mid; ctx.strokeRect(x + 1.5, y + 1.5, CELL - 3, CELL - 3); return; }
+          if (i === 0) { ctx.fillStyle = c.ink; ctx.fillRect(x, y, CELL, CELL); }
+          else { ctx.fillStyle = c.mid; ctx.fillRect(x + 1, y + 1, CELL - 2, CELL - 2); ctx.fillStyle = c.ink; ctx.fillRect(x + 3, y + 3, CELL - 6, CELL - 6); }
+          if (k === 0) { ctx.fillStyle = c.lcd; ctx.fillRect(x + 3, y + 3, 2, 2); ctx.fillRect(x + 6, y + 3, 2, 2); }
+        });
+      });
+      ctx.fillStyle = c.ink;
+      if (st.over) banner(c, resultWord(st), HUD + 8, 160);
+    }
+
+    function drawSpace(c) {
+      var W = 144, H = 208, HUD = 16;
+      ctx.fillText("SC " + st.score + " V" + st.wave, 4, 11);
+      var lv = "";
+      st.ships.forEach(function (s, i) { lv += (i === you ? "*" : "") + s.lives + " "; });
+      ctx.fillText(lv, W - 4 - lv.length * 8, 11);
+      ctx.fillRect(0, HUD - 1, W, 1);
+      st.enemies.forEach(function (e) {
+        var x = Math.round(e[0]), y = Math.round(e[1]);
+        ctx.fillStyle = "#F43F5E";
+        ctx.fillRect(x + 1, y, 8, 2); ctx.fillRect(x, y + 2, 10, 3); ctx.fillRect(x + 1, y + 5, 2, 3); ctx.fillRect(x + 7, y + 5, 2, 3);
+        ctx.fillStyle = c.lcd; ctx.fillRect(x + 2, y + 2, 2, 2); ctx.fillRect(x + 6, y + 2, 2, 2);
+      });
+      ctx.fillStyle = c.ink;
+      st.bullets.forEach(function (b) { ctx.fillRect(Math.round(b[0]), Math.round(b[1]), 2, 5); });
+      ctx.fillStyle = c.mid;
+      st.shots.forEach(function (b) { ctx.fillRect(Math.round(b[0]), Math.round(b[1]), 2, 5); });
+      st.ships.forEach(function (s, i) {
+        if (s.lives <= 0) return;
+        if (s.invuln && Math.floor(Date.now() / 100) % 2 === 0) return;
+        ctx.fillStyle = i === you ? c.ink : c.mid;
+        var sx = Math.round(s.x), sy = H - 16;
+        ctx.fillRect(sx + 5, sy, 2, 3); ctx.fillRect(sx + 3, sy + 3, 6, 2); ctx.fillRect(sx, sy + 5, 12, 3);
+      });
+      ctx.fillStyle = c.ink;
+      if (st.over) banner(c, "FIN : " + st.score, 60, 112);
+    }
+
+    function drawBlocks(c) {
+      var CELL = 10, FY = 26, order = you === 1 ? [1, 0] : [0, 1], xs = [10, 130];
+      ctx.fillStyle = c.ink;
+      order.forEach(function (pi, slot) {
+        var p = st.players[pi], x0 = xs[slot];
+        var nm = (names[pi] || "J").slice(0, 9) + (pi === you ? "*" : "");
+        ctx.fillStyle = c.ink;
+        ctx.fillText(nm, x0, 11);
+        ctx.fillText(String(p.score), x0, 22);
+        ctx.strokeStyle = c.ink; ctx.lineWidth = 2;
+        ctx.strokeRect(x0 - 1, FY, 10 * CELL + 2, 18 * CELL + 2);
+        for (var y = 0; y < 18; y++) for (var x = 0; x < 10; x++) {
+          var v = p.grid[y].charAt(x);
+          if (v === "0") continue;
+          var px = x0 + x * CELL, py = FY + 1 + y * CELL;
+          ctx.fillStyle = c.ink; ctx.fillRect(px, py, CELL, CELL);
+          ctx.fillStyle = c.lcd; ctx.fillRect(px + 2, py + 2, CELL - 4, CELL - 4);
+          if (v === "1") { ctx.fillStyle = c.ink; ctx.fillRect(px + 4, py + 4, CELL - 8, CELL - 8); }
+        }
+        if (p.pending > 0) { ctx.fillStyle = c.mid; ctx.fillRect(x0 - 8, FY + 18 * CELL - p.pending * CELL + 1, 5, p.pending * CELL); }
+        if (!p.alive) { ctx.fillStyle = c.ink; ctx.fillRect(x0 + 10, FY + 80, 80, 20); ctx.fillStyle = c.lcd; ctx.fillText("PERDU", x0 + 30, FY + 94); }
+      });
+      ctx.fillStyle = c.ink;
+      if (st.over) banner(c, resultWord(st), 211, 112);
+    }
+
+    /* ----- envoi des commandes ----- */
+    function send(o) { if (ws && ws.readyState === 1 && phase === "playing") ws.send(JSON.stringify(o)); }
+    function dir(d) { send({ t: "dir", d: d }); }
+    function act(a) { send({ t: "act", a: a }); }
+    function toGameX(clientX) { var r = canvas.getBoundingClientRect(); return (clientX - r.left) * (144 / r.width); }
+
+    var KEYS = { ArrowUp: "U", ArrowDown: "D", ArrowLeft: "L", ArrowRight: "R", w: "U", s: "D", a: "L", d: "R" };
+    var spaceKeys = { l: false, r: false }, spaceX = 72, spaceTimer = null;
+    window.addEventListener("keydown", function (e) {
+      if (current !== "arena") return;
+      if (kind === "snake" && KEYS[e.key]) { e.preventDefault(); dir(KEYS[e.key]); }
+      else if (kind === "blocks") {
+        var m = { ArrowLeft: "L", ArrowRight: "R", ArrowUp: "ROT", ArrowDown: "SOFT", " ": "HARD" }[e.key];
+        if (m) { e.preventDefault(); act(m); }
+      } else if (kind === "space") {
+        if (e.key === "ArrowLeft") { spaceKeys.l = true; e.preventDefault(); }
+        if (e.key === "ArrowRight") { spaceKeys.r = true; e.preventDefault(); }
+      }
+    });
+    window.addEventListener("keyup", function (e) {
+      if (e.key === "ArrowLeft") spaceKeys.l = false;
+      if (e.key === "ArrowRight") spaceKeys.r = false;
+    });
+    function startSpaceKeys() {
+      if (spaceTimer) return;
+      spaceTimer = setInterval(function () {
+        if (kind !== "space" || (!spaceKeys.l && !spaceKeys.r)) return;
+        spaceX = Math.max(0, Math.min(144, spaceX + (spaceKeys.r ? 12 : 0) - (spaceKeys.l ? 12 : 0)));
+        send({ t: "move", x: spaceX });
+      }, 50);
+    }
+
+    var view = $("view-arena"), t0 = null, moved = false;
+    view.addEventListener("touchstart", function (e) {
+      if (e.target.closest && e.target.closest("button,input,a")) return;
+      var t = e.changedTouches[0];
+      t0 = { x: t.clientX, y: t.clientY, ox: t.clientX, oy: t.clientY, at: Date.now() };
+      moved = false;
+      if (kind === "space") { spaceX = toGameX(t.clientX); send({ t: "move", x: spaceX }); }
+    }, { passive: true });
+    view.addEventListener("touchmove", function (e) {
+      if (!t0) return;
+      var t = e.changedTouches[0], dx = t.clientX - t0.x, dy = t.clientY - t0.y;
+      if (kind === "snake") {
+        if (Math.abs(dx) < 18 && Math.abs(dy) < 18) return;
+        dir(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "R" : "L") : (dy > 0 ? "D" : "U"));
+        t0.x = t.clientX; t0.y = t.clientY;
+      } else if (kind === "space") {
+        spaceX = toGameX(t.clientX); send({ t: "move", x: spaceX });
+      } else if (kind === "blocks") {
+        if (Math.abs(dx) >= 22) { act(dx > 0 ? "R" : "L"); t0.x = t.clientX; moved = true; }
+        else if (dy >= 26) { act("SOFT"); t0.y = t.clientY; moved = true; }
+      }
+    }, { passive: true });
+    view.addEventListener("touchend", function (e) {
+      if (!t0) return;
+      var t = e.changedTouches[0], dt = Date.now() - t0.at;
+      var totalDy = t.clientY - t0.oy, totalDx = t.clientX - t0.ox;
+      if (kind === "blocks") {
+        if (!moved && Math.abs(totalDx) < 12 && Math.abs(totalDy) < 12 && dt < 300) act("ROT");
+        else if (totalDy > 70 && dt < 220 && Math.abs(totalDx) < 40) act("HARD");
+      }
+      t0 = null;
+    }, { passive: true });
+    canvas.addEventListener("mousemove", function (e) { if (kind === "space" && e.buttons) { spaceX = toGameX(e.clientX); send({ t: "move", x: spaceX }); } });
+    canvas.addEventListener("mousedown", function (e) { if (kind === "space") { spaceX = toGameX(e.clientX); send({ t: "move", x: spaceX }); } });
+
+    function newCode(prefix) {
+      var out = prefix;
+      var buf = new Uint8Array(4);
+      (window.crypto || window.msCrypto).getRandomValues(buf);
+      for (var i = 0; i < 4; i++) out += CODE_CHARS.charAt(buf[i] % CODE_CHARS.length);
+      return out;
+    }
+    function start(c) { code = c; phase = "lobby"; st = null; you = -1; names = ["", ""]; retries = 0; spaceX = 72; startSpaceKeys(); connect(); }
+
+    ["S", "P", "B", "X"].forEach(function (k) {
+      $("ar-create-" + k).addEventListener("click", function () { say("ar-note", ""); start(newCode(k)); });
+    });
+    $("ar-join").addEventListener("click", function () {
+      var c = $("ar-code").value.trim().toUpperCase();
+      if (!/^[SPBX][A-Z0-9]{3,7}$/.test(c)) { say("ar-note", "Code invalide.", true); return; }
+      say("ar-note", ""); start(c);
+    });
+    $("ar-leave").addEventListener("click", function () { $("ar-again").hidden = true; leave(); show(false); });
+    $("ar-again").addEventListener("click", function () {
+      if (!ws || ws.readyState !== 1) { say("ar-msg", "Connexion perdue. Quitte puis recrée une partie.", true); return; }
+      $("ar-again").disabled = true;
+      ws.send(JSON.stringify({ t: "again" }));
+      say("ar-msg", "En attente de ton adversaire…");
+    });
+
+    function leave() {
+      bbDuel.stop();
+      wantOpen = false;
+      if (ws) { var w = ws; ws = null; try { w.close(); } catch (e) { /* ignore */ } }
+      phase = "idle";
+      if (spaceTimer) { clearInterval(spaceTimer); spaceTimer = null; }
+    }
+    function enter() {
+      show(false);
+      say("ar-note", "");
+      if (!online || !session || !profile) say("ar-note", "Connecte-toi pour jouer en ligne.", true);
+      else if (!cfg.ARENA_URL) say("ar-note", "Le serveur de jeu n'est pas encore branché.", true);
+    }
+    return { enter: enter, leave: leave };
+  })();
+
+
+  /* ---------- Signaler un bug (toutes les pages, y compris en jeu) ---------- */
+  var APP_BUILD = "2026.10.15-a";
+  var recentErrors = [];
+  function pushErr(t) { recentErrors.push(String(t).slice(0, 160)); if (recentErrors.length > 5) recentErrors.shift(); }
+  window.addEventListener("error", function (e) { pushErr((e.message || "error") + " @" + String(e.filename || "").split("/").pop() + ":" + (e.lineno || "")); });
+  window.addEventListener("unhandledrejection", function (e) { pushErr("promise: " + (e.reason && e.reason.message || e.reason)); });
+  var BUG_CATS = [["game", "Un jeu"], ["display", "Affichage / mobile"], ["account", "Compte / connexion"], ["friends", "Amis / messages"], ["boycoins", "BOYCOINS / boutique"], ["other", "Autre"]];
+  var bugShot = null, bugOpen = false;
+
+  function bugContext() {
+    var standalone = false;
+    try { standalone = !!(window.navigator.standalone || (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches)); } catch (e) { /* ignore */ }
+    return {
+      build: APP_BUILD, test: !!isTest, page: location.hash || "#menu", game: current || "", ingame: document.body.classList.contains("ingame"),
+      viewport: window.innerWidth + "x" + window.innerHeight, dpr: window.devicePixelRatio || 1, pwa: standalone,
+      online: navigator.onLine, lang: navigator.language || "", ua: String(navigator.userAgent || "").slice(0, 220),
+      errors: recentErrors.slice(), at: new Date().toISOString()
+    };
+  }
+
+  function shrinkImage(file) {
+    return new Promise(function (resolve, reject) {
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onload = function () {
+        var scale = Math.min(1, 1000 / Math.max(img.width, img.height)), out = "";
+        for (var tries = 0; tries < 6; tries++) {
+          var c = document.createElement("canvas");
+          c.width = Math.max(1, Math.round(img.width * scale)); c.height = Math.max(1, Math.round(img.height * scale));
+          c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+          var q = 0.7;
+          out = c.toDataURL("image/jpeg", q);
+          while (out.length > 200000 && q > 0.35) { q -= 0.1; out = c.toDataURL("image/jpeg", q); }
+          if (out.length <= 280000) break;
+          scale *= 0.7;
+        }
+        URL.revokeObjectURL(url);
+        out.length <= 290000 ? resolve(out) : reject(new Error("big"));
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error("img")); };
+      img.src = url;
+    });
+  }
+
+  function closeBug() { $("bug-modal").hidden = true; bugOpen = false; }
+
+  function openBug() {
+    var modal = $("bug-modal"), card = $("bug-card");
+    window.dispatchEvent(new Event("bg:pause"));       // jeux solo : pause automatique (les duels continuent)
+    bugOpen = true; bugShot = null;
+    card.textContent = "";
+    card.append(el("h3", "", "SIGNALER UN BUG"));
+    if (!sb || !session) {
+      card.append(el("p", "", "Connecte-toi (page Profil) pour envoyer un signalement : cela évite les abus et nous permet de te répondre."));
+      var r0 = el("div", "row");
+      var go = el("a", "btn", "ALLER AU PROFIL"); go.href = "#compte"; go.addEventListener("click", closeBug);
+      var cl0 = el("button", "btn alt", "FERMER"); cl0.type = "button"; cl0.addEventListener("click", closeBug);
+      r0.append(go, cl0); card.append(r0);
+      modal.hidden = false;
+      return;
+    }
+    var l1 = el("label", "", "CATÉGORIE"), cat = document.createElement("select");
+    BUG_CATS.forEach(function (c) { var o = document.createElement("option"); o.value = c[0]; o.textContent = c[1]; cat.append(o); });
+    if (current === "snake" || current === "blocks" || current === "space" || current === "arena") cat.value = "game";
+    var l2 = el("label", "", "DESCRIPTION (CE QUI S'EST PASSÉ, CE QUE TU ATTENDAIS)"), txt = document.createElement("textarea");
+    txt.maxLength = 2000; txt.placeholder = "Ex : en jouant à Snake, l'écran se fige après la pause…";
+    var l3 = el("label", "", "CAPTURE D'ÉCRAN (FACULTATIF)"), file = document.createElement("input");
+    file.type = "file"; file.accept = "image/*";
+    var prev = el("div", "");
+    file.addEventListener("change", async function () {
+      bugShot = null; prev.textContent = "";
+      var f = file.files && file.files[0];
+      if (!f) return;
+      try {
+        bugShot = await shrinkImage(f);
+        var im = document.createElement("img"); im.className = "shot"; im.src = bugShot; im.alt = "Aperçu de la capture";
+        prev.append(im);
+      } catch (e) { setMsg(note, "Image illisible ou trop lourde : elle ne sera pas jointe.", true); }
+    });
+    var det = document.createElement("details");
+    var sm = document.createElement("summary"); sm.textContent = "Informations techniques envoyées";
+    var pre = document.createElement("pre"); pre.textContent = JSON.stringify(bugContext(), null, 1).replace(/[{}"]/g, "");
+    det.append(sm, pre);
+    var note = el("p", "msg", ""); note.setAttribute("role", "status");
+    var row = el("div", "row");
+    var send = el("button", "btn", "ENVOYER"); send.type = "button";
+    txt.addEventListener("input", function () { if (note.classList.contains("err")) setMsg(note, ""); });
+    var cancel = el("button", "btn alt", "ANNULER"); cancel.type = "button";
+    cancel.addEventListener("click", closeBug);
+    send.addEventListener("click", async function () {
+      var d = txt.value.trim();
+      if (d.length < 10) { setMsg(note, "Décris le problème en au moins 10 caractères.", true); return; }
+      send.disabled = true; setMsg(note, "Envoi…");
+      var ctx = bugContext();
+      var r = await sb.rpc("submit_bug_report", { p_category: cat.value, p_description: d, p_page: ctx.page, p_game: ctx.game, p_app_version: APP_BUILD, p_device: ctx, p_screenshot: bugShot });
+      send.disabled = false;
+      if (r.error) {
+        var m = String(r.error.message || "");
+        setMsg(note, /Could not find|schema cache|does not exist/i.test(m) ? "Le service de signalement n'est pas encore activé sur cette base." : rewardError(r.error), true);
+        return;
+      }
+      setMsg(note, "Merci ! Signalement n°" + r.data + " envoyé à l'équipe.");
+      txt.value = ""; txt.disabled = true; send.hidden = true;
+      setTimeout(closeBug, 1800);
+    });
+    row.append(send, cancel);
+    card.append(l1, cat, l2, txt, l3, file, prev, det, note, row);
+    modal.hidden = false;
+    setTimeout(function () { try { txt.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }, 50);
+  }
+  $("bug-fab").addEventListener("click", openBug);
+  // La fenêtre capte le clavier : les touches ne pilotent pas le jeu pendant qu'on écrit.
+  ["keydown", "keyup", "keypress"].forEach(function (ev) {
+    $("bug-modal").addEventListener(ev, function (e) { e.stopPropagation(); if (ev === "keydown" && e.key === "Escape") closeBug(); });
+  });
+  $("bug-modal").addEventListener("pointerdown", function (e) { if (e.target === $("bug-modal")) closeBug(); });
+
+  /* ---------- Plein écran pendant une partie ---------- */
+  var GAME_CANVAS = { snake: "screen", blocks: "bl-screen", boyblocks: "bb-screen", space: "sp-screen", arena: "ar-screen" };
+  function updateIngame() {
+    var on = !!GAME_CANVAS[current] && (current !== "arena" || !$("ar-stage").hidden);
+    document.body.classList.toggle("ingame", on);
+    window.scrollTo(0, 0);
+    fitGame();
+  }
+  function fitGame() {
+    var id = GAME_CANVAS[current];
+    if (!id || !document.body.classList.contains("ingame")) return;
+    var cv = $(id), stage = cv.parentNode;
+    var other = 0;
+    Array.prototype.forEach.call(stage.children, function (c) { if (c !== cv && !c.hidden) other += c.offsetHeight + 10; });
+    var availH = window.innerHeight - other - 70, availW = window.innerWidth - 24;
+    var k = Math.min(availW / cv.width, availH / cv.height);
+    k = Math.max(k, 0.5);
+    cv.style.width = Math.floor(cv.width * k) + "px";
+    cv.style.height = Math.floor(cv.height * k) + "px";
+    cv.style.aspectRatio = cv.width + "/" + cv.height;
+  }
+  window.addEventListener("resize", fitGame);
+  window.addEventListener("orientationchange", function () { setTimeout(fitGame, 200); });
+  $("g-exit").addEventListener("click", function () {
+    if (current === "arena") $("ar-leave").click(); else location.hash = "#menu";
+  });
+
+  /* ---------- Router ---------- */
+  var VIEWS = ["menu", "scores", "amis", "boutique", "compte", "admin", "snake", "arena", "blocks", "boyblocks", "space"];
+
+  function route() {
+    var h = (location.hash || "#menu").slice(1);
+    if (VIEWS.indexOf(h) < 0) h = "menu";
+    if (current === "snake" && h !== "snake") snake.leave();
+    if (current === "arena" && h !== "arena") arena.leave();
+    if (current === "blocks" && h !== "blocks") blocks.leave();
+    if (current === "boyblocks" && h !== "boyblocks") boyblocks.leave();
+    if (current === "space" && h !== "space") space.leave();
+    if (h !== "amis") stopChatTimer();
+    current = h;
+    VIEWS.forEach(function (v) { $("view-" + v).hidden = v !== h; });
+    document.querySelectorAll("[data-nav]").forEach(function (a) {
+      a.classList.toggle("on", a.getAttribute("data-nav") === h);
+    });
+    if (h === "menu") renderMenu();
+    if (h === "scores") loadScores();
+    if (h === "boutique") renderShop();
+    if (h === "amis") renderFriends();
+    if (h === "admin") renderAdmin();
+    if (h !== "snake") loadMaint();
+    if (h === "compte") renderAccount();
+    if (h === "snake") snake.enter();
+    if (h === "arena") arena.enter();
+    if (h === "blocks") blocks.enter();
+    if (h === "boyblocks") boyblocks.enter();
+    if (h === "space") space.enter();
+    updateIngame();
+    window.scrollTo(0, 0);
+  }
+
+  if ("serviceWorker" in window.navigator && location.protocol === "https:") {
+    window.addEventListener("load", function () {
+      window.navigator.serviceWorker.register("sw.js").catch(function () { /* installing is optional */ });
+    });
+  }
+
+  $("offline").hidden = online;
+  $("test-banner").hidden = !isTest;
+  buildGameSelect();
+  window.addEventListener("hashchange", route);
+  route();
+  renderNav();
+
+  if (sb) {
+    sb.auth.onAuthStateChange(function (event, s) {
+      /* Deferred on purpose: calling the client inside this callback can deadlock. */
+      setTimeout(function () { refreshAuth(s); }, 0);
+    });
+  }
+})();
+</script>

@@ -1,0 +1,20 @@
+# Configuration du serveur de jeu BOYGAMES sur Cloudflare (offre gratuite).
+# Aucun secret ici : l'adresse et la clé Supabase ci-dessous sont publiques.
+name = "boygam-arena"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+
+[[durable_objects.bindings]]
+name = "ARENA"
+class_name = "ArenaRoom"
+
+# L'offre gratuite de Cloudflare exige des Durable Objects "SQLite".
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ArenaRoom"]
+
+[vars]
+SUPABASE_URL = "https://xgoqwxvgiavajnygoblt.supabase.co"
+SUPABASE_KEY = "sb_publishable_4CL4SJGei47uchomKgQlXA_6HtR7Yhf"
+# Sites autorisés à ouvrir une partie (adresse du jeu, sans / à la fin).
+ALLOWED_ORIGINS = "https://6hkd26wvy7-del.github.io"

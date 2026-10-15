@@ -1,0 +1,10 @@
+<!doctype html><meta charset="utf-8"><body style="margin:0;background:#0F172A;color:#E2E8F0;font-family:Manrope,system-ui,sans-serif;padding:20px;width:760px">
+<div style="font-size:22px;font-weight:800;margin-bottom:4px">BOYGAMES — badges, 6 paliers</div>
+<div style="opacity:.7;font-size:13px;margin-bottom:16px">Cercle → hexagone → écu → écu ailé → blason couronné → médaillon légendaire</div>
+<div id="g"></div><script src="badges.js"></script><script>
+var games=[["snake","SNAKE"],["space","SPACE ATTACK"],["boyblocks","BOYBLOCKS"]];
+var h='<div style="display:grid;grid-template-columns:90px repeat(6,1fr);gap:10px;align-items:center;text-align:center">';
+h+='<div></div>'+BG_BADGES.TIERS.map(t=>'<div style="font-size:12px;opacity:.85">'+t.n+'</div>').join('');
+games.forEach(function(g,gi){ h+='<div style="font-size:11px;text-align:left;font-weight:700">'+g[1]+'</div>'; BG_BADGES.TIERS.forEach(function(t,i){ h+='<div>'+BG_BADGES.badge(g[0],i,92,gi+"_"+i)+'</div>'; }); });
+document.getElementById('g').innerHTML=h+'</div>';
+</script>
