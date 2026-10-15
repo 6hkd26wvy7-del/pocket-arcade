@@ -6,6 +6,16 @@ Le plus récent en haut. Chaque entrée : ce qui a été fait, où, et ce qui re
 
 ---
 
+## 15/10/2026 (soir) — BoyBlocks 9×9 en essai (pause de session)
+
+- Moteur BoyBlocks 8/9 (client, serveur, base), placement aimanté iPhone, classement `boyblocks9` séparé,
+  bouton GRILLE 8×8 / 9×9, interrupteur d'administration pour revenir au 8×8. Tests : SQL 110, serveur 68, navigateur 15.
+- **Fait sur TEST** : migration v14 (sauvegarde vérifiée avant) ; partie 9×9 rejouée à l'identique sur la base ;
+  comptes (2), scores (28), parties BoyBlocks (7) intacts ; site TEST en ligne vérifié sans erreur.
+- **Pas encore fait** : site 9×9 non publié (`main` reste à `4823f00`), serveur v5 (duel 9×9) non déployé.
+- **À reprendre** : déployer serveur v5, publier le site, faire essayer le 9×9 ; phase 6 (vérification générale) ;
+  comptes sociaux (Quentin).
+
 ## 15/10/2026 (fin d'après-midi) — marketing : fabrication activée, file de validation
 
 - Migration v13 sur TEST (sauvegarde vérifiée avant) : `marketing_videos`, `marketing_posts`, `marketing_settings`,
