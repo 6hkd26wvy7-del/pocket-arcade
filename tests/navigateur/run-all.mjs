@@ -14,7 +14,7 @@ const TESTS = {
   "ui.js": ["OFFRIR dans le chat ? false", "unblock_user", "set_avatar"],
   "ui3.js": ["Sauvegarde vérifiée et téléchargée"],
   "ui4.js": ["Sauvegarde vérifiée et téléchargée"],
-  "iphone.mjs": ["envoyés identiques: true", "Score vérifié et enregistré", "protection ok"],
+  "iphone.mjs": ["envoyés identiques: true", "Score vérifié et enregistré", "protection ok", "accueil ok"],
 };
 let bad = 0;
 for (const [f, want] of Object.entries(TESTS)) {

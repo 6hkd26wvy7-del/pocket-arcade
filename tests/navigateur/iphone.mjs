@@ -17,6 +17,18 @@ for (const h of ['menu','scores','amis','compte','snake','blocks','space','arena
   console.log('page', h, w <= 390 ? 'largeur ok' : 'DÉBORDE ('+w+'px)');
 }
 await page.screenshot({path:FT+'captures/iphone-arena.png'});
+await page.goto('http://x.test/#menu'); await page.waitForTimeout(600);
+const home = await page.evaluate(()=>{
+  const cards=[...document.querySelectorAll('#game-list .game:not([data-game="arena"])')].map(c=>c.getBoundingClientRect());
+  const cols=new Set(cards.map(r=>Math.round(r.left))).size;
+  const tabs=[...document.querySelectorAll('.nav a span')].map(s=>s.textContent);
+  const nav=document.querySelector('.nav').getBoundingClientRect();
+  return { cols, tabs, navEnBas: Math.round(nav.bottom) >= window.innerHeight - 2, jeuxAvantJournee: document.getElementById('game-list').compareDocumentPosition(document.getElementById('me-card')) & 4 };
+});
+await page.click('#bc-chip'); await page.waitForTimeout(300);
+const shop = await page.evaluate(()=>({ hash: location.hash, onglet: document.querySelector('.nav a.on span').textContent }));
+const okHome = home.cols===2 && home.tabs.join(',')==='Accueil,Classements,Amis,Profil' && home.navEnBas && home.jeuxAvantJournee && shop.hash==='#boutique' && shop.onglet==='Profil';
+console.log('accueil :', JSON.stringify(home), JSON.stringify(shop), okHome ? 'accueil ok' : 'ACCUEIL KO');
 await page.goto('http://x.test/#boyblocks'); await page.waitForTimeout(900);
 const sel = await page.evaluate(()=>{
   const ev=new Event('selectstart',{bubbles:true,cancelable:true}); document.getElementById('bb-msg').dispatchEvent(ev);
