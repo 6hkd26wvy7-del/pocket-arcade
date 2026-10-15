@@ -2364,6 +2364,19 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
   var SHIP_C = { n: "#F8FAFC", c: "#22D3EE", C: "#0E7490", b: "#CBD5E1", s: "#64748B", r: "#F43F5E", e: "#475569" };
   // vaisseau du coéquipier : mêmes formes, teintes violettes pour le distinguer
   var SHIP_C2 = { n: "#F8FAFC", c: "#E879F9", C: "#86198F", b: "#DDD6FE", s: "#7C3AED", r: "#F43F5E", e: "#475569" };
+  var BONUS_LOOK = {
+    triple: { col: "#38BDF8", label: "3X", icon: ["#.#.#", "#.#.#", "#.#.#", ".....", "..#.."] },
+    rapid:  { col: "#FBBF24", label: "TIR", icon: ["..##.", ".##..", "####.", "..##.", ".##.."] },
+    laser:  { col: "#F472B6", label: "LASER", icon: ["..#..", "..#..", "..#..", ".###.", "#####"] },
+    shield: { col: "#34D399", label: "BOUCL", icon: [".###.", "#...#", "#...#", "#...#", ".###."] },
+    life:   { col: "#F43F5E", label: "+1 VIE", icon: [".#.#.", "#####", "#####", ".###.", "..#.."] }
+  };
+  function drawBonusIcon(c, kind, x, y) {
+    var L = BONUS_LOOK[kind];
+    c.fillStyle = "#0B1220"; c.fillRect(x, y, 8, 8);
+    c.fillStyle = L.col; c.fillRect(x, y, 8, 1); c.fillRect(x, y + 7, 8, 1); c.fillRect(x, y, 1, 8); c.fillRect(x + 7, y, 1, 8);
+    pixelArt(c, L.icon, { "#": L.col }, x + 1.5 | 0, y + 1.5 | 0);
+  }
   function drawShipFlames(c, sx, sy, t) {
     var f = Math.floor(t / 70) % 3;
     c.fillStyle = "#F59E0B"; c.fillRect(sx + 3, sy + 8, 2, 1 + f % 2); c.fillRect(sx + 7, sy + 8, 2, 1 + (f + 1) % 2);
@@ -3568,26 +3581,8 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     function togglePause() { if (state === "playing") state = "paused"; else if (state === "paused") state = "playing"; }
 
     function css(n) { return getComputedStyle($("view-space")).getPropertyValue(n).trim(); }
-    var BONUS_LOOK = {
-      triple: { col: "#38BDF8", label: "3X", icon: ["#.#.#", "#.#.#", "#.#.#", ".....", "..#.."] },
-      rapid:  { col: "#FBBF24", label: "TIR", icon: ["..##.", ".##..", "####.", "..##.", ".##.."] },
-      laser:  { col: "#F472B6", label: "LASER", icon: ["..#..", "..#..", "..#..", ".###.", "#####"] },
-      shield: { col: "#34D399", label: "BOUCL", icon: [".###.", "#...#", "#...#", "#...#", ".###."] },
-      life:   { col: "#F43F5E", label: "+1 VIE", icon: [".#.#.", "#####", "#####", ".###.", "..#.."] }
-    };
-    function sprite(rows, colors, x, y) {
-      for (var r = 0; r < rows.length; r++) for (var c = 0; c < rows[r].length; c++) {
-        var k = rows[r].charAt(c);
-        if (k === "." || !colors[k]) continue;
-        ctx.fillStyle = colors[k]; ctx.fillRect(x + c, y + r, 1, 1);
-      }
-    }
-    function bonusIcon(kind, x, y) {
-      var L = BONUS_LOOK[kind];
-      ctx.fillStyle = "#0B1220"; ctx.fillRect(x, y, 8, 8);
-      ctx.fillStyle = L.col; ctx.fillRect(x, y, 8, 1); ctx.fillRect(x, y + 7, 8, 1); ctx.fillRect(x, y, 1, 8); ctx.fillRect(x + 7, y, 1, 8);
-      sprite(L.icon, { "#": L.col }, x + 1.5 | 0, y + 1.5 | 0);
-    }
+    function sprite(rows, colors, x, y) { pixelArt(ctx, rows, colors, x, y); }
+    function bonusIcon(kind, x, y) { drawBonusIcon(ctx, kind, x, y); }
     function draw() {
       var lcd = css("--lcd") || "#9bbc0f", ink = css("--ink") || "#0f380f", mid = css("--mid") || "#306230";
       ctx.fillStyle = lcd; ctx.fillRect(0, 0, SP.W, SP.H);
@@ -3889,8 +3884,12 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
         ctx.fillRect(x + 1, y, 8, 2); ctx.fillRect(x, y + 2, 10, 3); ctx.fillRect(x + 1, y + 5, 2, 3); ctx.fillRect(x + 7, y + 5, 2, 3);
         ctx.fillStyle = c.lcd; ctx.fillRect(x + 2, y + 2, 2, 2); ctx.fillRect(x + 6, y + 2, 2, 2);
       });
-      ctx.fillStyle = c.ink;
-      st.bullets.forEach(function (b) { ctx.fillRect(Math.round(b[0]), Math.round(b[1]), 2, 5); });
+      // bonus qui tombent (clignotent doucement, comme en solo)
+      (st.drops || []).forEach(function (o) { if (BONUS_LOOK[o[2]] && Math.floor(now / 180) % 4 !== 3) drawBonusIcon(ctx, o[2], Math.round(o[0]), Math.round(o[1])); });
+      st.bullets.forEach(function (b) {
+        if (b[2]) { ctx.fillStyle = "#F472B6"; ctx.fillRect(Math.round(b[0]), Math.round(b[1]), 4, 10); ctx.fillStyle = "#FCE7F3"; ctx.fillRect(Math.round(b[0]) + 1, Math.round(b[1]), 2, 10); }
+        else { ctx.fillStyle = c.ink; ctx.fillRect(Math.round(b[0]), Math.round(b[1]), 2, 5); }
+      });
       ctx.fillStyle = c.mid;
       st.shots.forEach(function (b) { ctx.fillRect(Math.round(b[0]), Math.round(b[1]), 2, 5); });
       st.ships.forEach(function (s, i) {
@@ -3899,6 +3898,25 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
         var sx = Math.round(s.x), sy = H - 17;
         pixelArt(ctx, SHIP, i === you ? SHIP_C : SHIP_C2, sx, sy);
         drawShipFlames(ctx, sx, sy, now);
+        var pw = s.power || {};
+        if (pw.shield > 0) {
+          ctx.save(); ctx.globalAlpha = 0.35 + 0.15 * Math.sin(now / 120);
+          ctx.strokeStyle = "#34D399"; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.ellipse(sx + 6, sy + 5, 10, 8, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+        }
+        if (s.picked && BONUS_LOOK[s.picked]) {   // message court au-dessus du vaisseau qui a ramassé le bonus
+          var lab = BONUS_LOOK[s.picked].label; ctx.fillStyle = BONUS_LOOK[s.picked].col;
+          ctx.fillText(lab, Math.max(0, Math.min(W - lab.length * 8, sx + 6 - lab.length * 4)), sy - 14);
+        }
+      });
+      // tes bonus actifs avec leur temps restant (sous le bandeau, comme la 2e ligne du solo)
+      var mine = st.ships[you] && st.ships[you].power, bx = 3;
+      if (mine) ["triple", "rapid", "laser", "shield"].forEach(function (k) {
+        if (!(mine[k] > 0)) return;
+        drawBonusIcon(ctx, k, bx, HUD + 2);
+        ctx.fillStyle = "#1E293B"; ctx.fillRect(bx + 9, HUD + 5, 16, 2);
+        ctx.fillStyle = BONUS_LOOK[k].col; ctx.fillRect(bx + 9, HUD + 5, Math.max(1, Math.round(16 * mine[k] / SP.BONUS[k].ms)), 2);
+        bx += 28;
       });
       ctx.fillStyle = c.ink;
       if (st.over) banner(c, "FIN : " + st.score, 60, 112);
