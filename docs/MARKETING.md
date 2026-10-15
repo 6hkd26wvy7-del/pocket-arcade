@@ -1,7 +1,13 @@
 # Machine marketing BOYGAMES (phase 5)
 
-**État au 15/10/2026 : conception + prototype de fabrication fonctionnel. Rien n'est publié, aucun compte créé,
-aucune dépense.** Le prototype fabrique en moins d'une minute une vidéo 9:16 à partir d'une vraie partie.
+**État au 15/10/2026 : fabrication quotidienne ACTIVE dans le cloud + file de validation en TEST. Rien n'est publié
+sur les réseaux, aucun compte social créé, aucune dépense.**
+
+- Chaque jour vers 7 h, GitHub Actions fabrique une vidéo à partir d'une vraie partie et la dépose dans le stockage
+  **privé** de Supabase TEST (fonction `marketing-ingest`, jeton secret dans GitHub, empreinte seule en base).
+- Administration → **Marketing** : aperçu, textes modifiables, date prévue, valider / refuser, calendrier, erreurs.
+- Lancer une vidéo à la main : GitHub → Actions → « Vidéo marketing du jour » → *Run workflow*.
+- Arrêter : désactiver le workflow dans GitHub (Actions → … → *Disable workflow*).
 
 ## 1. Architecture (fonctionne Mac éteint)
 
@@ -95,8 +101,8 @@ je fais tout le reste (configuration, code, secrets rangés dans GitHub, jamais 
 | Étape | Qui | Dépense |
 |---|---|---|
 | A. Prototype de fabrication (fait) | Claude | 0 € |
-| B. Fabrication quotidienne dans le cloud (fichier prêt, inactif tant qu'il n'est pas sur `main`) | accord de Quentin pour l'activer | 0 € |
-| C. File `marketing_videos` + onglet Marketing (aperçu, valider/refuser, calendrier) | Claude, en TEST | 0 € |
+| B. Fabrication quotidienne dans le cloud | fait (activé le 15/10) | 0 € |
+| C. File `marketing_videos` + onglet Marketing (aperçu, valider/refuser, calendrier) | fait (v13, TEST) | 0 € |
 | D. Comptes YouTube / Instagram / TikTok (section 4) | Quentin | 0 € |
 | E. Publication YouTube puis Instagram (après validation humaine) | Claude, après accord | 0 € |
 | F. Audit TikTok | Claude prépare, Quentin envoie | 0 € |

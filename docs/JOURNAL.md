@@ -6,6 +6,17 @@ Le plus récent en haut. Chaque entrée : ce qui a été fait, où, et ce qui re
 
 ---
 
+## 15/10/2026 (fin d'après-midi) — marketing : fabrication activée, file de validation
+
+- Migration v13 sur TEST (sauvegarde vérifiée avant) : `marketing_videos`, `marketing_posts`, `marketing_settings`,
+  stockage privé `marketing`, jeton de dépôt (empreinte seule).
+- Fonction Supabase `marketing-ingest` (TEST) : dépôt sécurisé ; testée (sans jeton → 403, doublon refusé).
+- Workflow `.github/workflows/marketing-video.yml` actif sur `main` : 1 vidéo/jour vers 7 h, aucune publication.
+- Onglet Administration → Marketing en ligne sur le site TEST.
+- Espace de travail `~/Documents/BOYGAMES` créé (liens + copies, rien déplacé).
+- Prochaines étapes : comptes sociaux (Quentin), puis publication YouTube/Instagram après validation humaine ;
+  historique des accroches lu depuis la base (le cloud ne garde pas de mémoire entre deux passages).
+
 ## 15/10/2026 — reprise du projet et phases 1 à 5 (TEST)
 
 **Reprise**
@@ -17,9 +28,9 @@ Le plus récent en haut. Chaque entrée : ce qui a été fait, où, et ce qui re
 **Déployé sur TEST** (avec sauvegarde vérifiée avant chaque migration ; instantanés dans le schéma privé `sauvegardes`)
 | Élément | Version |
 |---|---|
-| Base | v1 → v12 (v10 BoyBlocks règles 2, v11 réglages économie, v12 monétisation) |
+| Base | v1 → v13 (v10 BoyBlocks règles 2, v11 réglages économie, v12 monétisation, v13 file marketing) |
 | Serveur de duels | v4 corrigé (routeur des salles BoyBlocks « X »), version Cloudflare `4d9f8025` |
-| Site TEST | `main` à jour (dernière publication : commit `0de4b47`) |
+| Site TEST | `main` à jour (dernière publication : commit `ae6f32c`) |
 
 **Phases du cahier des charges** (détails : `docs/PLAN-PHASES.md`)
 1. Gameplay : tactile iOS, Snake (pomme, quadrillage), BoyBlocks tirage stratégique, Space Attack (vaisseau, bonus). ✅

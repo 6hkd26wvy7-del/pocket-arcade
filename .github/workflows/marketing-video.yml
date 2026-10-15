@@ -17,8 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: "24"
       - name: Outils (ffmpeg, navigateur)
@@ -34,7 +34,7 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}   # facultatif : sans clé, textes par modèles
           FFMPEG: /usr/bin/ffmpeg
-        run: node fabriquer-video.mjs "${{ github.run_number }}"
+        run: node fabriquer-video.mjs "$(( ${{ github.run_id }} % 100000 ))"   # graine différente à chaque passage
       - name: Dépôt dans la file de validation (stockage privé Supabase TEST)
         working-directory: marketing
         env:

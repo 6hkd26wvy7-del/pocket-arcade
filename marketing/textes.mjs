@@ -8,6 +8,12 @@ const MODELES = [
   { accroche: "Satisfaisant jusqu'au bout", legende: "Une partie de BoyBlocks sans pause : {score} points." },
   { accroche: "{score} points. À toi.", legende: "Glisse, efface, enchaîne. Gratuit, sans pub dans les parties." },
   { accroche: "La grille se vide…", legende: "{lignes} lignes, combo x{combo}. Le défi t'attend sur BOYGAMES." },
+  { accroche: "Défi : bats {score}", legende: "Une vraie partie, un vrai score. Montre-nous ton record sur BOYGAMES." },
+  { accroche: "{lignes} lignes d'affilée", legende: "Pose, efface, recommence. BoyBlocks, gratuit sur BOYGAMES." },
+  { accroche: "Combo x{combo}, sans tricher", legende: "Chaque score est vérifié par le serveur. À ton tour." },
+  { accroche: "Le calme avant le combo", legende: "{score} points en {coups} coups. Et toi ?" },
+  { accroche: "Tu tiens combien de coups ?", legende: "Celle-ci a duré {coups} coups pour {score} points. BOYGAMES, gratuit." },
+  { accroche: "Zéro pub pendant la partie", legende: "Juste toi et la grille. BoyBlocks sur BOYGAMES." },
 ];
 const HASHTAGS = ["#BOYGAMES", "#BoyBlocks", "#jeumobile", "#puzzle", "#satisfaisant", "#gaming", "#jeuxvideo", "#blockpuzzle"];
 
