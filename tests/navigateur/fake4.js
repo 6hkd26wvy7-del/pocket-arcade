@@ -7,6 +7,7 @@ window.supabase = { createClient: function(){
   var tables={ badges:[{code:'first_game',name:'Premiers pas',description:'Termine ta première partie.',exclusive:false},{code:'beta_founder',name:'BÊTA TESTEUR — ÉDITION FONDATRICE',description:'Un des 10 premiers.',exclusive:true},{code:'founder',name:'FONDATEUR',description:'Le créateur.',exclusive:true}], news:[], shop_items:[] };
   return {
    auth:{ onAuthStateChange:function(fn){ fn('INITIAL_SESSION',{user:{id:'u1',email:'a@b.fr'}}); }, signOut:function(){return ok({})} },
+   storage:{ from:function(){ return { createSignedUrl:function(p){ (window.__signed=window.__signed||[]).push(p); return ok({signedUrl:'data:,'}); } }; } },
    from:function(t){ return { select:function(){ return { eq:function(){return {maybeSingle:function(){return ok({pseudo:'Quentin',country:'FR'})}}}, order:function(){ var r=ok(tables[t]||[]); r.limit=function(){return ok(tables[t]||[])}; return r; } }; } } },
    rpc:function(n,a){
     window.__calls.push(n+(a?JSON.stringify(a):''));
@@ -33,6 +34,8 @@ window.supabase = { createClient: function(){
      case 'staff_economy': return ok({settings:{game_bc:{snake:{div:10,cap:null},blocks:{div:200,cap:25},space:{div:100,cap:25},boyblocks:{div:400,cap:25}},game_bc_daily_cap:150,daily_streak:[10,15,20,25,30,40,100],season_rewards:{rank1:500,rank3:300,rank10:150,other:30}},shop:[{code:'title_rookie',name:'Titre : Recrue',kind:'title',price:50}],missions:[{code:'play_3',name:'Joue 3 parties',bc:20,xp:20}],log:[]});
      case 'staff_economy_set': (window.__eco=window.__eco||[]).push(a); return ok(null);
      case 'staff_set_price': (window.__eco=window.__eco||[]).push(a); return ok(null);
+     case 'staff_marketing': return ok({videos:[{id:'v1',run_id:'gh-1',created_at:'2026-10-15T15:00:00Z',game:'boyblocks',video_path:'gh-1/video.mp4',poster_path:'gh-1/poster.jpg',duration:28,stats:{score:606,lignes:26,combo:6},accroche:'Satisfaisant jusqu au bout',legende:'606 points',hashtags:['#BOYGAMES','#puzzle'],text_source:'modèles',status:'a_valider',scheduled_for:null,posts:[]}],counts:{a_valider:1},settings:{auto:{enabled:false,per_day:1,platforms:['youtube','instagram','tiktok'],hour:18}},errors:[]});
+     case 'staff_marketing_review': window.__mk=a; return ok(null);
      case 'economy_public': return ok({daily_streak:[5,5,10,10,15,15,40],game_bc_daily_cap:40});
      default: return ok(null);
     }

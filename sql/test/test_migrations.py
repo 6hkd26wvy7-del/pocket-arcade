@@ -29,6 +29,7 @@ try:
     run_file(c, f"{REPO}/schema_v10_boyblocks_regles2.sql")
     run_file(c, f"{REPO}/schema_v11_economie_reglages.sql"); run_file(c, f"{REPO}/schema_v11_economie_reglages.sql")
     run_file(c, f"{REPO}/schema_v12_monetisation.sql"); run_file(c, f"{REPO}/schema_v12_monetisation.sql")
+    run_file(c, f"{REPO}/schema_v13_marketing.sql"); run_file(c, f"{REPO}/schema_v13_marketing.sql")
     sql("update public.app_settings set value = 'false' where key = 'maintenance'") if sql("select to_regclass('public.app_settings')")[0][0] else None
     print("app_settings:", sql("select * from public.app_settings"))
 
@@ -185,6 +186,26 @@ console.log(JSON.stringify({moves:g.log,score:g.score}));""" % os.path.join(os.p
     t("résiliation : plus Premium, badge Pionnier conservé", lambda: (as_user(c, U1, "select staff_premium_set('joh', 0)")[0][0], sql("select count(*) from user_badges where badge_code = 'premium_pioneer'")[0][0]))
     t("Premium : rien qui touche au jeu (aucune fonction de score ne lit is_premium)", lambda: sql("select string_agg(proname, ',') from pg_proc where pronamespace = 'public'::regnamespace and proname in ('submit_score','bb_award','boyblocks_finish','claim_daily','claim_mission') and prosrc ilike '%premium%'")[0][0] or "aucune")
     t("journal : changements de monétisation tracés", lambda: sql("select count(*) from economy_log where what like 'monetisation:%' or what like 'premium:%'")[0][0])
+
+    print("== v13 : file de validation marketing")
+    sql("insert into marketing_ingest_keys (hash, label) values (encode(sha256(convert_to('jeton-de-test-0123456789abcdef0123456789', 'UTF8')), 'hex'), 'test') on conflict do nothing")
+    def as_service(q, a=None):
+        with c.cursor() as cur:
+            cur.execute("begin"); cur.execute("set local role service_role"); cur.execute(q, a); r = cur.fetchall(); cur.execute("commit"); return r
+    t("jeton correct reconnu", lambda: as_service("select marketing_token_ok('jeton-de-test-0123456789abcdef0123456789')")[0][0] or (_ for _ in ()).throw(Exception("refusé")))
+    t("mauvais jeton refusé", lambda: (not as_service("select marketing_token_ok('mauvais-jeton-0123456789abcdef0123456789')")[0][0]) or (_ for _ in ()).throw(Exception("accepté")))
+    meta = json.dumps({"run_id": "gh-1", "game": "boyblocks", "duree": 28, "partie": {"score": 606}, "textes": {"accroche": "Satisfaisant", "legende": "606 points", "hashtags": ["#BOYGAMES", "#puzzle"], "source": "modèles"}})
+    t("vidéo enregistrée « à valider »", lambda: as_service("select marketing_register(%s::jsonb, 'gh-1/video.mp4', 'gh-1/poster.jpg')", (meta,))[0][0])
+    t("même passage : pas de doublon", lambda: as_service("select marketing_register(%s::jsonb, 'gh-1/video.mp4', null)", (meta,))[0][0])
+    t("dépôt impossible pour un joueur", lambda: must_fail(lambda: as_user(c, U2, "select marketing_register('{}'::jsonb, 'x', null)"), "permission denied"))
+    t("file illisible pour un joueur", lambda: must_fail(lambda: as_user(c, U2, "select staff_marketing(null)"), "forbidden"))
+    vid = as_user(c, U1, "select staff_marketing(null)")[0][0]["videos"][0]["id"]
+    t("validation avec date + texte corrigé → posts créés par réseau", lambda: (as_user(c, U1, "select staff_marketing_review(%s, 'validee', now() + interval '2 days', 'Nouvelle accroche', null, null, '')", (vid,)),
+        sorted(p["platform"] for p in as_user(c, U1, "select staff_marketing(null)")[0][0]["videos"][0]["posts"]))[1])
+    t("revalidation : pas de post en double", lambda: (as_user(c, U1, "select staff_marketing_review(%s, 'validee', null, null, null, null, '')", (vid,)), sql("select count(*) from marketing_posts")[0][0])[1])
+    t("refus", lambda: (as_user(c, U1, "select staff_marketing_review(%s, 'refusee', null, null, null, null, 'trop sombre')", (vid,)), as_user(c, U1, "select staff_marketing('refusee')")[0][0]["counts"])[1])
+    t("mode auto : plateforme inconnue refusée", lambda: must_fail(lambda: as_user(c, U1, """select staff_marketing_settings('{"enabled": true, "per_day": 1, "hour": 18, "platforms": ["myspace"]}'::jsonb)"""), "invalid platform"))
+    t("mode auto reste désactivé par défaut", lambda: as_user(c, U1, "select staff_marketing(null)")[0][0]["settings"]["auto"]["enabled"] is False or (_ for _ in ()).throw(Exception("activé")))
 
     print("== v9 : badges à paliers")
     t("sync_tiers tintintest", lambda: as_user(c, U1, "select sync_tiers()")[0][0])

@@ -302,6 +302,10 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-hi)
 
 label.chk { display: block; text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--text); margin: 4px 0; }
 
+/* Marketing */
+.mk-video { display: block; width: min(100%, 280px); aspect-ratio: 9 / 16; background: #000; border-radius: 12px; margin: 10px auto; }
+.mk-card label { display: block; }
+
 /* Bandeau du site TEST : discret */
 #test-banner { padding: 6px 12px; border-radius: 999px; margin-bottom: 12px; background: rgba(245, 158, 11, .1); border-color: rgba(245, 158, 11, .4); }
 #test-banner p { font-size: 11px; font-weight: 700; letter-spacing: .04em; color: #FDE68A; text-align: center; }
@@ -495,6 +499,13 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       <div id="fr-profile" class="panel" hidden></div>
       <div id="fr-chat" class="panel" hidden></div>
       <p id="fr-msg" class="msg" role="status"></p>
+    </section>
+
+    <section id="view-marketing" hidden>
+      <h2>MARKETING</h2>
+      <p class="small"><a href="#admin">&larr; Administration</a></p>
+      <div id="mk-body"></div>
+      <p id="mk-msg" class="msg" role="status"></p>
     </section>
 
     <section id="view-admin" hidden>
@@ -1659,6 +1670,97 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     }, 10000);
   }
 
+  /* ---------- Marketing (équipe) : file de validation des vidéos ---------- */
+  var mkFilter = "a_valider";
+  var MK_STATUS = { a_valider: "À VALIDER", validee: "VALIDÉE", refusee: "REFUSÉE", publiee: "PUBLIÉE", erreur: "ERREUR" };
+  async function renderMarketing() {
+    var body = $("mk-body"), msg = $("mk-msg");
+    setMsg(msg, ""); body.textContent = "";
+    if (!sb || !session || !role || !(role === "founder" || role === "admin")) { body.append(el("div", "panel", "Accès réservé à l'équipe.")); return; }
+    var r = await sb.rpc("staff_marketing", { p_status: mkFilter === "tout" ? null : mkFilter });
+    if (r.error || !r.data) { body.append(el("div", "panel", "File indisponible (migration v13 non appliquée).")); return; }
+    var D = r.data, C = D.counts || {}, auto = (D.settings || {}).auto || {};
+    // filtres
+    var tabs = el("div", "row");
+    ["a_valider", "validee", "refusee", "publiee", "erreur", "tout"].forEach(function (k) {
+      var b = el("button", "tab", (MK_STATUS[k] || "TOUT") + (k !== "tout" ? " (" + (C[k] || 0) + ")" : "")); b.type = "button";
+      b.setAttribute("aria-pressed", String(mkFilter === k));
+      b.addEventListener("click", function () { mkFilter = k; renderMarketing(); });
+      tabs.append(b);
+    });
+    body.append(tabs);
+    // calendrier : vidéos validées à venir
+    var cal = el("div", "panel"); cal.append(el("h3", "", "CALENDRIER"));
+    var upcoming = (D.videos || []).filter(function (v) { return v.status === "validee"; });
+    if (mkFilter !== "validee" && mkFilter !== "tout") cal.append(el("p", "small", "Ouvre le filtre « VALIDÉE » pour voir le calendrier complet."));
+    if (!upcoming.length) cal.append(el("p", "small", "Aucune vidéo programmée."));
+    upcoming.slice().sort(function (a, b) { return String(a.scheduled_for).localeCompare(String(b.scheduled_for)); }).forEach(function (v) {
+      cal.append(el("p", "small", new Date(v.scheduled_for).toLocaleString("fr-FR", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) + " · " + v.accroche));
+    });
+    body.append(cal);
+    // vidéos
+    if (!(D.videos || []).length) body.append(el("div", "panel", "Aucune vidéo dans cette liste."));
+    (D.videos || []).forEach(function (v) {
+      var card = el("div", "panel mk-card");
+      var head = el("div", "line");
+      head.append(el("span", "", new Date(v.created_at).toLocaleString("fr-FR") + " · " + (v.game || "").toUpperCase()), el("span", "pill", MK_STATUS[v.status] || v.status));
+      card.append(head);
+      var vid = document.createElement("video");
+      vid.className = "mk-video"; vid.controls = true; vid.playsInline = true; vid.preload = "none"; vid.muted = true;
+      card.append(vid);
+      (async function () {   // adresses temporaires (1 h) : la vidéo reste privée
+        var s1 = await sb.storage.from("marketing").createSignedUrl(v.video_path, 3600);
+        if (!s1.error && s1.data) vid.src = s1.data.signedUrl;
+        if (v.poster_path) { var s2 = await sb.storage.from("marketing").createSignedUrl(v.poster_path, 3600); if (!s2.error && s2.data) vid.poster = s2.data.signedUrl; }
+      })();
+      var st = v.stats || {};
+      card.append(el("p", "small", "Partie réelle : " + (st.score || "?") + " points · " + (st.lignes || "?") + " lignes · combo x" + (st.combo || "?") +
+        " · " + (v.duration || "?") + " s · textes : " + (v.text_source || "?")));
+      var acc = field(card, "Accroche (à l'écran)"); acc.value = v.accroche; acc.maxLength = 80;
+      var leg = field(card, "Légende", "textarea"); leg.value = v.legende; leg.rows = 3; leg.maxLength = 2200;
+      var tags = field(card, "Hashtags"); tags.value = (v.hashtags || []).join(" ");
+      var when = field(card, "Publication prévue le");
+      when.type = "datetime-local";
+      var d0 = v.scheduled_for ? new Date(v.scheduled_for) : (function () { var d = new Date(); d.setDate(d.getDate() + 1); d.setHours(auto.hour || 18, 0, 0, 0); return d; })();
+      when.value = new Date(d0.getTime() - d0.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+      (v.posts || []).forEach(function (p) {
+        card.append(el("p", "small", p.platform.toUpperCase() + " : " + p.status + (p.last_error ? " — " + p.last_error : "")));
+      });
+      var row = el("div", "row");
+      var decide = function (decision) {
+        return async function () {
+          var res = await sb.rpc("staff_marketing_review", { p_id: v.id, p_decision: decision, p_scheduled_for: decision === "validee" ? new Date(when.value).toISOString() : null,
+            p_accroche: acc.value.trim(), p_legende: leg.value.trim(), p_hashtags: tags.value.split(/\s+/).filter(Boolean), p_note: "" });
+          if (res.error) { setMsg(msg, rewardError(res.error), true); return; }
+          setMsg(msg, decision === "validee" ? "Vidéo validée et programmée (aucune publication tant que la publication n'est pas branchée)." : decision === "refusee" ? "Vidéo refusée." : "Remise à valider.");
+          renderMarketing();
+        };
+      };
+      if (v.status !== "publiee") {
+        var ok = el("button", "btn mini", v.status === "validee" ? "ENREGISTRER" : "VALIDER"); ok.type = "button"; ok.addEventListener("click", decide("validee"));
+        var no = el("button", "btn mini alt", "REFUSER"); no.type = "button"; no.addEventListener("click", decide("refusee"));
+        row.append(ok, no);
+        if (v.status !== "a_valider") { var back = el("button", "btn mini alt", "À REVOIR"); back.type = "button"; back.addEventListener("click", decide("a_valider")); row.append(back); }
+      }
+      card.append(row);
+      body.append(card);
+    });
+    // erreurs et mode automatique
+    var pe = el("div", "panel"); pe.append(el("h3", "", "ERREURS DE PUBLICATION"));
+    if (!(D.errors || []).length) pe.append(el("p", "small", "Aucune erreur."));
+    (D.errors || []).forEach(function (e) { pe.append(el("p", "small", new Date(e.at).toLocaleString("fr-FR") + " · " + e.platform + " · " + e.error)); });
+    body.append(pe);
+    var pa = el("div", "panel"); pa.append(el("h3", "", "MODE AUTOMATIQUE"));
+    pa.append(el("p", "small", "Désactivé : la publication sur les réseaux n'est pas encore branchée (comptes à créer). Les vidéos validées attendent leur date. " +
+      "Réglages prévus : " + (auto.per_day || 1) + " vidéo par jour vers " + (auto.hour || 18) + " h, réseaux : " + (auto.platforms || []).join(", ") + "."));
+    pa.append(el("p", "small", "Coût actuel : ≈ 1 € par mois (textes). Fabrication et stockage : gratuits."));
+    body.append(pa);
+  }
+  function field(parent, label, tag) {
+    var l = el("label", "", label), i = document.createElement(tag || "input");
+    i.style.cssText = "width:100%;margin-bottom:10px"; parent.append(l, i); return i;
+  }
+
   /* ---------- Administration (équipe) ---------- */
   async function renderAdmin() {
     var body = $("adm-body"), msg = $("adm-msg");
@@ -1745,6 +1847,10 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       button(rowb2, "AJOUTER", false, async function () { if (await act(sb.rpc("staff_beta_add", { p_pseudo: bpseudo.value }), "Testeur ajouté.")) renderAdmin(); });
       button(rowb2, "RETIRER", true, async function () { if (await act(sb.rpc("staff_beta_remove", { p_pseudo: bpseudo.value }), "Testeur retiré.")) renderAdmin(); });
       pbeta.append(rowb2);
+
+      var pmk = panel("MARKETING");
+      pmk.append(el("p", "small", "Vidéos fabriquées chaque jour à partir de vraies parties : aperçu, validation, calendrier. Rien n'est publié sans validation."));
+      var amk = el("a", "btn", "OUVRIR LE MARKETING"); amk.href = "#marketing"; pmk.append(amk);
 
       // Économie BOYCOINS : réglages modifiables, bornés côté base, chaque changement est journalisé.
       var peco = panel("ÉCONOMIE BOYCOINS");
@@ -4005,7 +4111,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
   });
 
   /* ---------- Router ---------- */
-  var VIEWS = ["menu", "scores", "amis", "boutique", "compte", "admin", "snake", "arena", "blocks", "boyblocks", "space"];
+  var VIEWS = ["menu", "scores", "amis", "boutique", "compte", "admin", "marketing", "snake", "arena", "blocks", "boyblocks", "space"];
 
   function route() {
     var h = (location.hash || "#menu").slice(1);
@@ -4018,7 +4124,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     if (h !== "amis") stopChatTimer();
     current = h;
     VIEWS.forEach(function (v) { $("view-" + v).hidden = v !== h; });
-    var tabOf = { boutique: "compte", admin: "compte", arena: "menu", snake: "menu", blocks: "menu", boyblocks: "menu", space: "menu" };
+    var tabOf = { boutique: "compte", admin: "compte", marketing: "compte", arena: "menu", snake: "menu", blocks: "menu", boyblocks: "menu", space: "menu" };
     document.querySelectorAll("[data-nav]").forEach(function (a) {
       var on = a.getAttribute("data-nav") === (tabOf[h] || h);
       a.classList.toggle("on", on);
@@ -4030,6 +4136,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     if (h === "boutique") renderShop();
     if (h === "amis") renderFriends();
     if (h === "admin") renderAdmin();
+    if (h === "marketing") renderMarketing();
     if (h !== "snake") loadMaint();
     if (h === "compte") renderAccount();
     if (h === "snake") snake.enter();

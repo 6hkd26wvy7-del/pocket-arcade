@@ -1,14 +1,14 @@
 # Machine marketing BOYGAMES : fabrique chaque jour une vidéo 9:16 à partir d'une vraie partie, dans le cloud (GitHub
-# Actions, gratuit pour un dépôt public), même Mac éteint. Elle NE PUBLIE RIEN : la vidéo est déposée comme « artefact »
-# (gardé 14 jours) pour être validée. La publication sera une étape séparée, après accord (voir docs/MARKETING.md).
-# Ne s'exécute automatiquement que depuis la branche par défaut (main) : rien ne tourne tant qu'il n'est pas fusionné.
+# Actions, gratuit pour un dépôt public), même Mac éteint. Elle NE PUBLIE RIEN sur les réseaux : la vidéo est déposée
+# dans le stockage PRIVÉ de Supabase TEST et attend une validation dans l'administration (onglet Marketing).
+# Le fichier n'est jamais mis en ligne sur GitHub (dépôt public).
 name: Vidéo marketing du jour
 on:
   schedule:
     - cron: "17 5 * * *"          # chaque jour vers 7 h (heure de Paris en été)
   workflow_dispatch: {}           # lancement à la main depuis l'onglet Actions
 permissions:
-  contents: read
+  contents: read          # aucun droit d'écriture sur le dépôt
 concurrency:
   group: marketing-video
   cancel-in-progress: false
@@ -35,10 +35,15 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}   # facultatif : sans clé, textes par modèles
           FFMPEG: /usr/bin/ffmpeg
         run: node fabriquer-video.mjs "${{ github.run_number }}"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: video-${{ github.run_number }}
-          path: |
-            marketing/sortie/*/video.mp4
-            marketing/sortie/*/infos.json
-          retention-days: 14
+      - name: Dépôt dans la file de validation (stockage privé Supabase TEST)
+        working-directory: marketing
+        env:
+          MARKETING_INGEST_TOKEN: ${{ secrets.MARKETING_INGEST_TOKEN }}
+          RUN_ID: gh-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          D=$(ls -d sortie/*/ | head -1)
+          ffmpeg -hide_banner -loglevel error -y -ss 1.5 -i "$D/video.mp4" -frames:v 1 -vf scale=540:-1 "$D/poster.jpg"
+          python3 -c "import json,os,sys; d=json.load(open(sys.argv[1])); d['run_id']=os.environ['RUN_ID']; d['game']='boyblocks'; json.dump(d,open(sys.argv[2],'w'))" "$D/infos.json" "$D/meta.json"
+          curl --fail-with-body -sS -X POST "https://xgoqwxvgiavajnygoblt.supabase.co/functions/v1/marketing-ingest" \
+            -H "x-marketing-token: $MARKETING_INGEST_TOKEN" \
+            -F "meta=<$D/meta.json" -F "video=@$D/video.mp4;type=video/mp4" -F "poster=@$D/poster.jpg;type=image/jpeg"
