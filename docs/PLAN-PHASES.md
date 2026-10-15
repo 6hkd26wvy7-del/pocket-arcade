@@ -39,3 +39,12 @@ base `rvygnqpagbmiqbdkwlfp`) n'est jamais touchée sans accord.
   moyennes de 85 coups au lieu de 47, aucune partie infinie.
 - Space Attack : vaisseau pixel art (cockpit, ailes, réacteurs animés), bandeau sur deux lignes, 5 bonus à ramasser
   après chaque horde dès la vague 2 (triple tir 10 s, tir rapide 9 s, laser perçant 5 s, bouclier 15 s / 1 tir, vie +1 jusqu'à 5).
+
+## Phase 2 — réalisé
+
+- Accueil : les jeux d'abord, en cartes compactes et entièrement cliquables (illustration, titre, pastille de mode,
+  phrase courte), 2 par ligne sur iPhone, 4 par ligne sur ordinateur ; carte « En ligne » en largeur.
+- « Ta journée » ensuite : profil et XP, bonus de connexion, missions, saison, actualités, installation.
+- Barre de navigation fixe en bas (téléphone) : Accueil, Classements, Amis, Profil. La boutique reste accessible par
+  la pastille BOYCOINS de l'en-tête, qui affiche le solde. L'onglet actif suit chaque page (jeux → Accueil, boutique → Profil).
+- Bandeau « version test » réduit à une fine pastille.
