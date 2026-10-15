@@ -15,6 +15,7 @@ const TESTS = {
   "ui3.js": ["Sauvegarde vérifiée et téléchargée"],
   "ui4.js": ["Sauvegarde vérifiée et téléchargée"],
   "economie.mjs": ["panneau économie : true", "\"p_key\":\"game_bc_daily_cap\",\"p_value\":40", "bonus affiché : 5,5,10,10,15,15,40"],
+  "monetisation.mjs": ["pub accueil visible : true", "vidéo de test affichée : true", "score final continué : {\"p_game\":\"snake\"", "classé envoyé de nouveau : false", "plus de 2e continuation : true", "carte Premium : true", "pub cachée : true | badge : true"],
   "iphone.mjs": ["envoyés identiques: true", "Score vérifié et enregistré", "protection ok", "accueil ok"],
 };
 let bad = 0;

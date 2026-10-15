@@ -18,7 +18,11 @@ window.supabase = { createClient: function(){
      case 'my_tiers': return ok({favorites:window.__fav||['snake:1'],games:[{game:'blocks',best:122,plays:3,tier:null,next:{tier:0,name:'Recrue',min_score:300,min_plays:1}},{game:'boyblocks',best:41000,plays:410,tier:5,next:null},{game:'snake',best:136,plays:3,tier:1,next:{tier:2,name:'Or',min_score:60,min_plays:30}},{game:'space',best:108,plays:3,tier:null,next:{tier:0,name:'Recrue',min_score:200,min_plays:1}}]});
      case 'set_favorites': window.__fav=a.p_list; return ok(null);
      case 'public_tiers': return ok({favorites:['boyblocks:5','snake:1'],games:[]});
-     case 'me': return ok(me);
+     case 'me': return ok(Object.assign({}, me, {premium: !!window.__premium, premium_until: window.__premium ? '2026-11-15T00:00:00Z' : null}));
+     case 'monetization_public': return ok(window.__monet || {ads:{enabled:true,provider:'test',slots:{home:true,scores:true,shop:false}},rewarded:{enabled:true,continue_max:1,games:['snake','space']},premium:{enabled:true,price_eur:0.99,pioneer_limit:100,pioneer_left:99}});
+     case 'rewarded_continue': return ok({ok:true,remaining_today:9,skip_ad:!!window.__premium});
+     case 'submit_continued_score': window.__cont=a; return ok({xp:5,bc:0,level:5,level_up:false,ranked:false});
+     case 'submit_score': window.__ranked=(window.__ranked||[]).concat([a]); return ok({xp:6,bc:2,level:5,level_up:false,new_badges:[]});
      case 'my_missions': return ok([]);
      case 'my_role': return ok(null);
      case 'my_notifications': return ok([]);

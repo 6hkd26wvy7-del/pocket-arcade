@@ -1,6 +1,6 @@
 # Économie BOYCOINS : audit et proposition (phase 3)
 
-**Rien n'est modifié tant que Quentin n'a pas validé.** Les réglages administrables (migration v11) reprennent les
+**Statut (15/10) : proposition validée par Quentin et appliquée sur TEST (journalisée dans economy_log).** Les réglages administrables (migration v11) reprennent les
 montants actuels à l'identique. Aucun BC déjà gagné n'est retiré, aucun objet acheté n'est repris.
 
 ## 1. Audit : d'où viennent les BC aujourd'hui

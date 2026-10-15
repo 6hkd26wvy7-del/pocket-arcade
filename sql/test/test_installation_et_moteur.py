@@ -18,7 +18,7 @@ try:
     sql(STUB)
     run_file(c, f"{REPO}/schema_all.sql"); print("OK  installation neuve (schema_all.sql)")
     sql(SEED)
-    for f in ["schema_v6_v7.sql", "schema_v8_v9.sql", "schema_v10_boyblocks_regles2.sql", "schema_v11_economie_reglages.sql", "schema_v6_v7.sql"]:
+    for f in ["schema_v6_v7.sql", "schema_v8_v9.sql", "schema_v10_boyblocks_regles2.sql", "schema_v11_economie_reglages.sql", "schema_v12_monetisation.sql", "schema_v6_v7.sql", "schema_v12_monetisation.sql"]:
         run_file(c, f"{REPO}/{f}"); print("OK  relance", f)
     for fn in ["boyblocks_start()", "boyblocks_start_v2()", "my_tiers()", "sync_tiers()"]:
         if not sql(f"select has_function_privilege('authenticated', 'public.{fn}', 'execute')")[0][0]:

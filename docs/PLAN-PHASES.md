@@ -54,3 +54,15 @@ base `rvygnqpagbmiqbdkwlfp`) n'est jamais touchée sans accord.
 - Audit et proposition chiffrée : `docs/ECONOMIE-BOYCOINS.md`.
 - Migration v11 appliquée sur TEST : réglages de l'économie administrables (valeurs d'origine, aucun montant modifié),
   panneau « Économie BOYCOINS » dans l'administration, bornes et journal des changements.
+
+## Phase 3 — décision
+
+- Proposition d'économie validée par Quentin et appliquée sur TEST (journalisée).
+
+## Phase 4 — réalisé (préparation, rien de réel)
+
+- Migration v12 appliquée sur TEST ; détails dans `docs/MONETISATION.md`.
+- Publicités : 3 emplacements hors partie (accueil, classements, boutique), jamais pour un Premium.
+- Continuation par vidéo (Snake, Space Attack) : score final hors classement ; vidéo de test de 5 s.
+- Premium : badge, carte d'offre (bouton « bientôt disponible »), cosmétiques réservés, badge Pionnier à vie,
+  simulation d'abonnement par l'équipe. Cadres de test activés sur TEST (désactivables dans l'administration).

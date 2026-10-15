@@ -28,6 +28,7 @@ try:
     old_run = as_user(c, U2, "select boyblocks_start()")[0][0]   # partie commencée AVANT la v10
     run_file(c, f"{REPO}/schema_v10_boyblocks_regles2.sql")
     run_file(c, f"{REPO}/schema_v11_economie_reglages.sql"); run_file(c, f"{REPO}/schema_v11_economie_reglages.sql")
+    run_file(c, f"{REPO}/schema_v12_monetisation.sql"); run_file(c, f"{REPO}/schema_v12_monetisation.sql")
     sql("update public.app_settings set value = 'false' where key = 'maintenance'") if sql("select to_regclass('public.app_settings')")[0][0] else None
     print("app_settings:", sql("select * from public.app_settings"))
 
@@ -158,6 +159,32 @@ console.log(JSON.stringify({moves:g.log,score:g.score}));""" % os.path.join(os.p
     t("plafond modifié appliqué aux parties (2 BC max)", lambda: cap_applies() <= 2 or (_ for _ in ()).throw(Exception("plafond non appliqué")))
     t("changement de prix journalisé, objets achetés conservés", lambda: (as_user(c, U1, "select staff_set_price('title_rookie', 120)"), as_user(c, U1, "select staff_economy()")[0][0]["log"][0]["what"])[1])
     t("récompense de mission modifiable", lambda: (as_user(c, U1, "select staff_set_mission_reward('play_3', 12, 20)"), sql("select reward_bc from missions where code = 'play_3'")[0][0])[1])
+
+    print("== v12 : monétisation (préparation, rien de réel)")
+    t("réglages lisibles par un visiteur, tout désactivé", lambda: {k: v["enabled"] for k, v in as_user(c, None, "select monetization_public()")[0][0].items()})
+    t("continuation refusée tant que désactivée", lambda: must_fail(lambda: as_user(c, U2, "select rewarded_continue('snake')"), "rewarded disabled"))
+    t("jeu non compatible refusé dans les réglages", lambda: must_fail(lambda: as_user(c, U1, """select staff_monetization_set('rewarded', '{"enabled": true, "continue_max": 1, "daily_max": 2, "games": ["blocks"], "bc_per_continue": 0}'::jsonb)"""), "invalid game"))
+    t("plus de 2 continuations refusé", lambda: must_fail(lambda: as_user(c, U1, """select staff_monetization_set('rewarded', '{"enabled": true, "continue_max": 3, "daily_max": 2, "games": ["snake"], "bc_per_continue": 0}'::jsonb)"""), "invalid value"))
+    t("réglage refusé à un joueur", lambda: must_fail(lambda: as_user(c, U2, """select staff_monetization_set('ads', '{"enabled": true, "provider": "test", "slots": {}}'::jsonb)"""), "forbidden"))
+    as_user(c, U1, """select staff_monetization_set('rewarded', '{"enabled": true, "continue_max": 1, "daily_max": 2, "games": ["snake", "space"], "bc_per_continue": 0}'::jsonb)""")
+    t("vidéo de continuation autorisée (Snake)", lambda: as_user(c, U2, "select rewarded_continue('snake')")[0][0])
+    t("jeu non éligible refusé (BoyBlocks)", lambda: must_fail(lambda: as_user(c, U2, "select rewarded_continue('boyblocks')"), "game not eligible"))
+    as_user(c, U2, "select rewarded_continue('space')")
+    t("limite quotidienne de vidéos", lambda: must_fail(lambda: as_user(c, U2, "select rewarded_continue('snake')"), "daily limit"))
+    before = sql("select (select count(*) from scores), (select bc from player_stats where user_id = %s), (select count(*) from leaderboard('snake', null, 50))", (U2,))[0]
+    t("score continué : XP de participation, 0 BC, hors classement", lambda: as_user(c, U2, "select submit_continued_score('snake', 40, 1)")[0][0])
+    after = sql("select (select count(*) from scores), (select bc from player_stats where user_id = %s), (select count(*) from leaderboard('snake', null, 50))", (U2,))[0]
+    t("classement, scores et BC inchangés", lambda: (before, after) if before == after else (_ for _ in ()).throw(Exception(f"{before} -> {after}")))
+    t("trop de continuations refusé", lambda: must_fail(lambda: (sql("update scores_continued set created_at = now() - interval '1 minute'"), as_user(c, U2, "select submit_continued_score('snake', 40, 2)"))[1], "invalid continues"))
+    t("abonnement refusé à un joueur", lambda: must_fail(lambda: as_user(c, U2, "select staff_premium_set('joh', 30)"), "forbidden"))
+    t("Premium simulé pour joh + badge Pionnier", lambda: as_user(c, U1, "select staff_premium_set('joh', 30)")[0][0])
+    t("me() : premium", lambda: as_user(c, U2, "select me()->'premium'")[0][0])
+    t("fiche publique : premium visible", lambda: as_user(c, U2, "select public_profile('joh')->'premium'")[0][0])
+    sql("update shop_items set premium_only = true where code = 'title_legend'")
+    t("cosmétique Premium refusé à un non-abonné", lambda: must_fail(lambda: as_user(c, U1, "select buy_item('title_legend')"), "premium only"))
+    t("résiliation : plus Premium, badge Pionnier conservé", lambda: (as_user(c, U1, "select staff_premium_set('joh', 0)")[0][0], sql("select count(*) from user_badges where badge_code = 'premium_pioneer'")[0][0]))
+    t("Premium : rien qui touche au jeu (aucune fonction de score ne lit is_premium)", lambda: sql("select string_agg(proname, ',') from pg_proc where pronamespace = 'public'::regnamespace and proname in ('submit_score','bb_award','boyblocks_finish','claim_daily','claim_mission') and prosrc ilike '%premium%'")[0][0] or "aucune")
+    t("journal : changements de monétisation tracés", lambda: sql("select count(*) from economy_log where what like 'monetisation:%' or what like 'premium:%'")[0][0])
 
     print("== v9 : badges à paliers")
     t("sync_tiers tintintest", lambda: as_user(c, U1, "select sync_tiers()")[0][0])

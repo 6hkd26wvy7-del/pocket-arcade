@@ -292,6 +292,21 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-hi)
 .eco-row > b { grid-column: 1 / -1; font-size: 12px; margin-top: 6px; }
 .panel h4 { font-size: 13px; margin: 14px 0 6px; color: var(--text); }
 
+/* Monétisation (préparation) : emplacements de pub hors partie, vidéo de continuation, Premium */
+.ad-slot { border: 1px dashed var(--line); border-radius: 14px; padding: 12px; margin: 14px 0; text-align: center; color: var(--muted); font-size: 12px; min-height: 64px; position: relative; }
+.ad-slot[hidden], #ad-modal[hidden] { display: none; }
+.ad-slot p { margin: 8px 0 0; }
+.ad-tag { display: inline-block; font-size: 10px; font-weight: 800; letter-spacing: .08em; color: #0F172A; background: #FBBF24; border-radius: 6px; padding: 1px 6px; }
+#ad-modal { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; background: rgba(5, 8, 20, .92); padding: 24px; text-align: center; }
+.ad-box { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 22px; max-width: 320px; }
+.ad-count { font-family: var(--display); font-size: 48px; font-weight: 800; margin: 10px 0; color: var(--text); }
+.btn-continue { background: linear-gradient(180deg, #FBBF24, #F59E0B) !important; color: #0F172A !important; }
+.prem { display: inline-block; font-size: 10px; font-weight: 800; letter-spacing: .06em; color: #0F172A; background: linear-gradient(90deg, #FDE68A, #F59E0B); border-radius: 999px; padding: 1px 7px; vertical-align: 2px; margin-left: 6px; }
+.premium-card { background: radial-gradient(120% 140% at 100% 0%, rgba(245, 158, 11, .25), transparent 60%), var(--card); border-color: rgba(245, 158, 11, .45); }
+.premium-card ul { margin: 8px 0 12px; padding-left: 18px; font-size: 13px; }
+
+label.chk { display: block; text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--text); margin: 4px 0; }
+
 /* Bandeau du site TEST : discret */
 #test-banner { padding: 6px 12px; border-radius: 999px; margin-bottom: 12px; background: rgba(245, 158, 11, .1); border-color: rgba(245, 158, 11, .4); }
 #test-banner p { font-size: 11px; font-weight: 700; letter-spacing: .04em; color: #FDE68A; text-align: center; }
@@ -448,6 +463,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       <p id="menu-status" class="greet"></p>
       <h2 id="games-title">Jouer</h2>
       <div id="game-list"></div>
+      <div class="ad-slot" data-slot="home" hidden></div>
       <h2 class="day-title">Ta journée</h2>
       <div id="me-card" class="panel" hidden></div>
       <div id="missions-box" class="panel" hidden></div>
@@ -473,6 +489,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       <p id="lb-note" class="msg" role="status"></p>
       <p id="lb-me" class="msg"></p>
       <ol id="lb-list" class="lb"></ol>
+      <div class="ad-slot" data-slot="scores" hidden></div>
     </section>
 
     <section id="view-amis" hidden>
@@ -496,6 +513,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       <h2>BOUTIQUE</h2>
       <div id="shop-body" class="panel"></div>
       <p id="shop-msg" class="msg" role="status"></p>
+      <div class="ad-slot" data-slot="shop" hidden></div>
     </section>
 
     <section id="view-compte" hidden>
@@ -579,6 +597,8 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
   </main>
 
   <button id="bug-fab" type="button" aria-label="Signaler un bug" title="Signaler un bug"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8a4 4 0 018 0v6a4 4 0 01-8 0z"/><path d="M12 10v8M4 13h4M16 13h4M5 7l3 2M19 7l-3 2M5 20l3-2M19 20l-3-2M9 4l1.5 1.5M15 4l-1.5 1.5"/></svg></button>
+  <div id="ad-modal" role="dialog" aria-modal="true" aria-label="Vidéo publicitaire" hidden><div class="ad-box"><span class="ad-tag">PUB</span><p>Vidéo publicitaire de test : aucune vraie publicité.</p><p id="ad-count" class="ad-count"></p><p class="small">Ta partie reprend juste après.</p></div></div>
+  <div id="premium-note" hidden></div>
   <div id="bug-modal" hidden role="dialog" aria-modal="true" aria-label="Signaler un bug"><div id="bug-card"></div></div>
 
   <footer class="foot"><a href="privacy.html">CONFIDENTIALITÉ</a> &middot; <a href="cgu.html">CONDITIONS</a></footer>
@@ -634,6 +654,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
 
   /* ---------- Level, coins, missions, shop (needs schema_v2.sql on the database) ---------- */
   var econPublic = null;
+  var monet = null;   // réglages de monétisation (tout désactivé par défaut, rien de réel)
   var me = null, missions = [], badgeCat = null, shopCat = null;
   var role = null, notifs = [], maint = null, friends = [], chatWith = null, chatTimer = null, access = null, seasonRows = [];
   var TITLES = { title_rookie: "RECRUE", title_legend: "LÉGENDE" };
@@ -831,6 +852,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     }
     if (!me) { role = null; notifs = []; access = null; seasonRows = []; }
     $("bc-chip").hidden = !me;
+    renderAds();
     if (me) $("bc-chip-n").textContent = me.bc;
     applyCosmetics();
     syncTiers(false);
@@ -907,7 +929,9 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     var title = TITLES[equippedCode("title_")];
     var head = el("div", "line");
     var meWho = el("span", "who");
-    meWho.append(avatarEl(me.avatar, 40), el("span", "", profile.pseudo + (title ? " · " + title : "")));
+    var meName = el("span", "", profile.pseudo + (title ? " · " + title : ""));
+    if (me.premium) meName.append(el("span", "prem", "PREMIUM"));
+    meWho.append(avatarEl(me.avatar, 40), meName);
     head.append(meWho, el("span", "", "NIV " + me.level));
     var bar = el("div", "xpbar");
     var fill = document.createElement("i");
@@ -1103,7 +1127,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     }
     if (!me) { body.append(el("p", "", "La boutique n'est pas encore disponible.")); return; }
     if (!shopCat) {
-      var r = await sb.from("shop_items").select("code,kind,name,price").order("sort");
+      var r = await sb.from("shop_items").select("*").order("sort");
       if (r.error) { body.append(el("p", "", "Impossible de charger la boutique. Réessaie plus tard.")); return; }
       shopCat = r.data;
     }
@@ -1114,8 +1138,12 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       var owned = null;
       me.items.forEach(function (x) { if (x.code === it.code) owned = x; });
       var row = el("div", "line");
-      row.append(el("span", "", it.name + (owned ? "" : " (" + it.price + " BC)")));
-      var b = el("button", owned ? "btn alt" : "btn", owned ? (owned.equipped ? "ENLEVER" : "METTRE") : "ACHETER");
+      var nm = el("span", "", it.name + (owned ? "" : " (" + it.price + " BC)"));
+      if (it.premium_only) nm.append(el("span", "prem", "PREMIUM"));
+      row.append(nm);
+      var locked = it.premium_only && !owned && !me.premium;
+      var b = el("button", owned ? "btn alt" : "btn", owned ? (owned.equipped ? "ENLEVER" : "METTRE") : (locked ? "RÉSERVÉ PREMIUM" : "ACHETER"));
+      b.disabled = locked;
       b.type = "button";
       b.addEventListener("click", async function () {
         setMsg(msg, "…");
@@ -1137,11 +1165,62 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     if (!r.error && r.data && r.data.length) onlineBest = r.data[0].score || 0;
   }
 
+  async function loadMonet() {
+    monet = null;
+    if (sb) { try { var r = await sb.rpc("monetization_public"); if (!r.error) monet = r.data; } catch (e) { /* ignore */ } }
+    renderAds();
+  }
+  // Emplacements publicitaires : seulement hors partie (les écrans de jeu ne les contiennent pas), jamais pour un Premium.
+  function renderAds() {
+    var a = monet && monet.ads, prem = !!(me && me.premium);
+    document.querySelectorAll(".ad-slot").forEach(function (slot) {
+      var on = !!(a && a.enabled && a.slots && a.slots[slot.getAttribute("data-slot")]) && !prem;
+      slot.hidden = !on;
+      if (on && !slot.firstChild) slot.append(el("span", "ad-tag", "PUB"), el("p", "", a.provider === "test" ? "Emplacement publicitaire (test) : aucune vraie publicité." : ""));
+    });
+  }
+  // Continuation par vidéo en solo : proposée après une défaite, jamais pendant une partie ni en duel.
+  function rewardedEligible(game, used) {
+    var r = monet && monet.rewarded;
+    return !!(online && sb && session && profile && r && r.enabled && (r.games || []).indexOf(game) >= 0 && used < (r.continue_max || 0));
+  }
+  async function watchRewarded(game) {
+    var res = await sb.rpc("rewarded_continue", { p_game: game });
+    if (res.error) return { ok: false, error: res.error };
+    if (res.data && res.data.skip_ad) return { ok: true };   // Premium : pas de vidéo imposée
+    var m = $("ad-modal"); m.hidden = false;
+    for (var n = 5; n > 0; n--) { $("ad-count").textContent = n; await new Promise(function (ok) { setTimeout(ok, 1000); }); }
+    m.hidden = true;
+    return { ok: true };
+  }
+  function clearContinue(row) { var old = row && row.querySelector(".btn-continue"); if (old) old.remove(); }
+  function offerContinue(row, msgEl, game, used, onYes) {
+    clearContinue(row);
+    if (!rewardedEligible(game, used)) return;
+    var b = el("button", "btn btn-continue", "CONTINUER · VIDÉO"); b.type = "button";
+    b.addEventListener("click", async function () {
+      b.disabled = true;
+      var r = await watchRewarded(game);
+      b.remove();
+      if (r.ok) onYes();
+      else setMsg(msgEl, /daily limit/.test(String(r.error && r.error.message)) ? "Plus de continuation disponible aujourd'hui." : "Continuation indisponible.", true);
+    });
+    row.prepend(b);
+  }
+  async function submitContinued(game, value, used, msgEl) {
+    if (!sb || !session || !profile) return;
+    var r = await sb.rpc("submit_continued_score", { p_game: game, p_score: value, p_continues: used });
+    if (r.error) { setMsg(msgEl, "Partie continuée : score non enregistré.", true); return; }
+    setMsg(msgEl, "Partie continuée : score hors classement. +" + r.data.xp + " XP" + (r.data.bc ? ", +" + r.data.bc + " BOYCOINS." : "."));
+    loadMe();
+  }
+
   async function refreshAuth(s) {
     session = s;
     await loadProfile();
     await syncBest();
     await loadMe();
+    await loadMonet();
     renderNav();
     if (session && !profile && current !== "compte") { location.hash = "#compte"; return; }
     if (current === "compte") renderAccount();
@@ -1496,7 +1575,9 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     box.textContent = "";
     var head = el("div", "pf-head");
     var info = el("div", "");
-    info.append(el("b", "", p.pseudo));
+    var pName = el("b", "", p.pseudo);
+    if (p.premium) pName.append(el("span", "prem", "PREMIUM"));
+    info.append(pName);
     info.append(el("div", "small", "NIVEAU " + p.level + (p.xp !== null && p.xp !== undefined ? " · " + p.xp + " XP" : "")));
     if (p.title) info.append(el("div", "small", "Titre : " + p.title.name.replace(/^Titre\s*/i, "")));
     if (p.featured_badge) info.append(el("div", "pf-badge", p.featured_badge.name));
@@ -1789,6 +1870,49 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
         });
       }
 
+      // Monétisation (préparation) : tout est désactivé par défaut ; rien de réel n'est possible.
+      var pmo = panel("MONÉTISATION (PRÉPARATION)");
+      var mo = await sb.rpc("staff_monetization");
+      if (mo.error || !mo.data) {
+        pmo.append(el("p", "small", "Indisponible (migration v12 non appliquée)."));
+      } else {
+        var MS = mo.data.settings || {}, st2 = mo.data.stats || {};
+        pmo.append(el("p", "small", "Aucune vraie publicité, aucun paiement. Vidéos aujourd'hui : " + st2.videos_today + " · total : " + st2.videos_total +
+          " · parties continuées : " + st2.continued_games + " · pionniers : " + st2.pioneers));
+        var saveMo = function (key, value, label) {
+          if (!window.confirm("Appliquer pour tous les joueurs ?\n" + label)) return;
+          act(sb.rpc("staff_monetization_set", { p_key: key, p_value: value }), "Enregistré : " + label).then(function (ok) { if (ok) renderAdmin(); });
+        };
+        var check = function (parent, label, on) { var l = el("label", "chk"); var c = document.createElement("input"); c.type = "checkbox"; c.checked = !!on; l.append(c, document.createTextNode(" " + label)); parent.append(l); return c; };
+        var A = MS.ads || {}, AS = A.slots || {};
+        pmo.append(el("h4", "", "Publicités (hors parties et duels, jamais pour les Premium)"));
+        var aOn = check(pmo, "Activer les emplacements", A.enabled), aH = check(pmo, "Accueil", AS.home), aS = check(pmo, "Classements", AS.scores), aB = check(pmo, "Boutique", AS.shop);
+        button(pmo, "ENREGISTRER LES PUBLICITÉS", false, function () { saveMo("ads", { enabled: aOn.checked, provider: A.provider || "test", slots: { home: aH.checked, scores: aS.checked, shop: aB.checked } }, "publicités " + (aOn.checked ? "activées" : "désactivées")); });
+        var R = MS.rewarded || {};
+        pmo.append(el("h4", "", "Continuation par vidéo (solo : Snake, Space Attack)"));
+        var rOn = check(pmo, "Activer", R.enabled);
+        var rMax = field(pmo, "Continuations par partie (0 à 2)"); rMax.type = "number"; rMax.value = R.continue_max;
+        var rDay = field(pmo, "Vidéos par joueur et par jour"); rDay.type = "number"; rDay.value = R.daily_max;
+        var rBc = field(pmo, "BC par partie continuée (0 conseillé)"); rBc.type = "number"; rBc.value = R.bc_per_continue;
+        button(pmo, "ENREGISTRER LES VIDÉOS", false, function () { saveMo("rewarded", { enabled: rOn.checked, continue_max: Number(rMax.value), daily_max: Number(rDay.value), games: R.games || ["snake", "space"], bc_per_continue: Number(rBc.value) }, "vidéos " + (rOn.checked ? "activées" : "désactivées")); });
+        var PR = MS.premium || {};
+        pmo.append(el("h4", "", "BOYGAMES Premium"));
+        var pOn = check(pmo, "Afficher l'offre (sans paiement)", PR.enabled);
+        var pPrice = field(pmo, "Prix envisagé (€ / mois)"); pPrice.type = "number"; pPrice.step = "0.01"; pPrice.value = PR.price_eur;
+        var pLim = field(pmo, "Nombre de badges Pionnier Premium"); pLim.type = "number"; pLim.value = PR.pioneer_limit;
+        button(pmo, "ENREGISTRER PREMIUM", false, function () { saveMo("premium", { enabled: pOn.checked, price_eur: Number(pPrice.value), pioneer_limit: Number(pLim.value) }, "Premium " + (pOn.checked ? "affiché" : "masqué")); });
+        pmo.append(el("h4", "", "Simulation d'abonnement (TEST, aucun paiement)"));
+        var simWho = field(pmo, "Pseudo"), simDays = field(pmo, "Jours (0 = résilier)"); simDays.type = "number"; simDays.value = 30;
+        button(pmo, "APPLIQUER", true, function () {
+          var w = simWho.value.trim(); if (!w) return;
+          if (!window.confirm("Simulation : Premium pour " + w + " pendant " + simDays.value + " jour(s) ?")) return;
+          act(sb.rpc("staff_premium_set", { p_pseudo: w, p_days: Number(simDays.value) }), "Simulation enregistrée pour " + w + ".").then(function (ok) { if (ok) renderAdmin(); });
+        });
+        (mo.data.premium || []).forEach(function (x) {
+          pmo.append(el("p", "small", x.pseudo + " · " + (x.active ? "ACTIF" : x.status) + " · jusqu'au " + new Date(x.until).toLocaleDateString("fr-FR") + " · " + x.source));
+        });
+      }
+
       var pbk = panel("SAUVEGARDE");
       pbk.append(el("p", "small", "Télécharge toutes les données de jeu (profils, scores, XP, BOYCOINS, badges, amis, messages…) dans un fichier, avec un contrôle automatique. Les emails et mots de passe restent chez Supabase et ne sont pas dans ce fichier. Garde le fichier en lieu sûr."));
       var rowbk = el("div", "row");
@@ -2049,6 +2173,20 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     }
     if (me) {
       $("acc-level").textContent = "NIVEAU " + me.level + " · " + me.xp + " XP · " + me.bc + " BOYCOINS";
+      var pm = monet && monet.premium;
+      if (me.premium || (pm && pm.enabled)) {
+        var pc = el("div", "panel premium-card");
+        pc.append(el("h3", "", me.premium ? "BOYGAMES PREMIUM ACTIF" : "BOYGAMES PREMIUM"));
+        if (me.premium && me.premium_until) pc.append(el("p", "small", "Jusqu'au " + new Date(me.premium_until).toLocaleDateString("fr-FR") + "."));
+        else if (pm) pc.append(el("p", "", String(pm.price_eur).replace(".", ",") + " € par mois, sans engagement."));
+        var ul = document.createElement("ul");
+        ["Aucune publicité imposée", "Badge PREMIUM à côté de ton pseudo", "Personnalisations et cosmétiques exclusifs", "Cadeaux cosmétiques réguliers", "Aucun avantage dans les jeux : les classements restent justes"]
+          .forEach(function (t) { ul.append(el("li", "", t)); });
+        pc.append(ul);
+        if (pm && pm.pioneer_left > 0 && !me.premium) pc.append(el("p", "small", "Les " + pm.pioneer_left + " prochains abonnés recevront le badge à vie PIONNIER PREMIUM."));
+        if (!me.premium) { var pb = el("button", "btn", "BIENTÔT DISPONIBLE"); pb.type = "button"; pb.disabled = true; pc.append(pb, el("p", "small", "Aucun paiement n'est possible pour l'instant.")); }
+        $("acc-badges").before(pc);
+      }
       var avBox = $("acc-badges");
       if (avBox) {
         avBox.append(el("p", "", "MON AVATAR"));
@@ -2122,8 +2260,10 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     var body, dir, queue, food, score, speed, acc, last, deathAt;
     var state = "ready", soundOn = true, audio = null, running = false;
 
+    var continues = 0;
     function reset() {
       var cx = Math.floor(COLS / 2), cy = Math.floor(ROWS / 2);
+      continues = 0; clearContinue($("snake-msg").nextElementSibling);
       body = [{ x: cx, y: cy }, { x: cx - 1, y: cy }, { x: cx - 2, y: cy }];
       dir = { x: 1, y: 0 };
       queue = [];
@@ -2209,8 +2349,23 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
 
     function finish() {
       state = "over";
-      if (score > best) { best = score; saveLocalBest("snake", best); }
-      if (score > 0) submit(score);
+      if (continues > 0) submitContinued("snake", score, continues, $("snake-msg"));   // hors classement
+      else {
+        if (score > best) { best = score; saveLocalBest("snake", best); }
+        if (score > 0) submit(score);
+      }
+      if (body.length < COLS * ROWS) offerContinue($("snake-msg").nextElementSibling, $("snake-msg"), "snake", continues, revive);
+    }
+    // Reprise après une vidéo : le score est gardé, le serpent repart du centre (raccourci), il faut glisser pour repartir.
+    function revive() {
+      continues++;
+      var cx = Math.floor(COLS / 2), cy = Math.floor(ROWS / 2), len = Math.min(body.length, 6);
+      body = [];
+      for (var i = 0; i < len; i++) body.push({ x: cx, y: cy + i });
+      dir = { x: 0, y: -1 }; queue = []; acc = 0;
+      if (!food || body.some(function (b) { return b.x === food.x && b.y === food.y; })) spawnFood();
+      state = "ready";
+      setMsg($("snake-msg"), "Partie continuée : glisse pour repartir. Le score final sera hors classement.");
     }
 
     async function submit(value) {
@@ -2367,13 +2522,14 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       }
 
       if (state === "ready") {
-        panel(["SNAKE", "", "GLISSE POUR", "COMMENCER"]);
+        panel(continues > 0 ? ["ON CONTINUE !", "SCORE " + score, "GLISSE POUR", "REPARTIR"] : ["SNAKE", "", "GLISSE POUR", "COMMENCER"]);
       } else if (state === "paused") {
         panel(["PAUSE", "", "TOUCHE POUR", "REPRENDRE"]);
       } else if (state === "over") {
-        var newBest = score > 0 && score >= Math.max(best, onlineBest);
+        var newBest = continues === 0 && score > 0 && score >= Math.max(best, onlineBest);
         var lines = [body.length >= COLS * ROWS ? "BRAVO !" : "PERDU", "SCORE " + score];
-        if (newBest) lines.push("NOUVEAU REC !");
+        if (continues > 0) lines.push("HORS CLASSEMENT");
+        else if (newBest) lines.push("NOUVEAU REC !");
         lines.push("", "TOUCHE POUR", "REJOUER");
         panel(lines);
       }
@@ -3451,11 +3607,26 @@ return {SIZE: SIZE, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid, fits: fits, 
     var g, state = "ready", last = 0, running = false, targetX = null, keys = { l: false, r: false };
     var best = localBest("space");
 
-    function reset() { g = SP.create(); state = "ready"; targetX = null; setMsg($("sp-msg"), ""); }
+    var continues = 0;
+    function reset() { g = SP.create(); state = "ready"; targetX = null; continues = 0; setMsg($("sp-msg"), ""); clearContinue($("sp-msg").nextElementSibling); }
     function finish() {
       state = "over";
-      if (g.score > best) { best = g.score; saveLocalBest("space", best); }
-      if (g.score > 0) submit(g.score);
+      if (continues > 0) submitContinued("space", Math.min(g.score, 20000), continues, $("sp-msg"));   // hors classement
+      else {
+        if (g.score > best) { best = g.score; saveLocalBest("space", best); }
+        if (g.score > 0) submit(g.score);
+      }
+      offerContinue($("sp-msg").nextElementSibling, $("sp-msg"), "space", continues, revive);
+    }
+    // Reprise après une vidéo : une vie, quelques secondes d'invulnérabilité, ennemis repoussés vers le haut.
+    function revive() {
+      continues++;
+      g.over = false; g.lives = 1; g.invuln = 2500; g.shots = [];
+      var limit = SP.SHIP_Y - 60, low = 0;
+      g.enemies.forEach(function (e) { low = Math.max(low, e.y + SP.EH); });
+      if (low > limit) g.enemies.forEach(function (e) { e.y -= low - limit; });
+      state = "playing";
+      setMsg($("sp-msg"), "Partie continuée : le score final sera hors classement.");
     }
     async function submit(value) {
       var m = $("sp-msg");
@@ -3588,7 +3759,7 @@ return {SIZE: SIZE, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid, fits: fits, 
       }
       if (state === "ready") panel(["SPACE ATTACK", "", "GLISSE POUR", "BOUGER", "TOUCHE POUR", "COMMENCER", "", "RAMASSE LES", "BONUS !"]);
       else if (state === "paused") panel(["PAUSE", "", "TOUCHE POUR", "REPRENDRE"]);
-      else if (state === "over") panel(["PERDU", "SCORE " + g.score, "REC " + Math.max(best, g.score), "VAGUE " + g.wave, "", "TOUCHE POUR", "REJOUER"]);
+      else if (state === "over") panel(["PERDU", "SCORE " + g.score, continues > 0 ? "HORS CLASSEMENT" : "REC " + Math.max(best, g.score), "VAGUE " + g.wave, "", "TOUCHE POUR", "REJOUER"]);
     }
     function panel(lines) {
       var lcd = css("--lcd") || "#9bbc0f", ink = css("--ink") || "#0f380f";
