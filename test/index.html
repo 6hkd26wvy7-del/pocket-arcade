@@ -1243,19 +1243,9 @@ body.ingame #g-exit { display: inline-block; position: fixed; z-index: 30; left:
     });
     box.append(form);
 
+    /* plus de cadeaux de BC entre joueurs : send_gift est supprimée par la migration v6 */
     var gifts = el("div", "row");
     gifts.style.marginTop = "10px";
-    [10, 25, 50].forEach(function (amt) {
-      var b = el("button", "btn alt mini", "OFFRIR " + amt + " BC");
-      b.type = "button";
-      b.addEventListener("click", async function () {
-        var res = await sb.rpc("send_gift", { p_pseudo: pseudo, p_amount: amt });
-        if (res.error) { setMsg(msg, rewardError(res.error), true); return; }
-        await loadMe();
-        setMsg(msg, "Cadeau envoyé : " + amt + " BOYCOINS à " + pseudo + ".");
-      });
-      gifts.append(b);
-    });
     var rb = el("button", "btn alt mini", "SIGNALER");
     rb.type = "button";
     rb.addEventListener("click", async function () {
