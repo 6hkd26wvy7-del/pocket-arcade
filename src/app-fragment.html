@@ -2616,24 +2616,47 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
   /* ---------- Space Attack ---------- */
   /*SPACE-LOGIC-START*/
   var SP = (function () {
-    var W = 144, H = 208, HUD = 16, SHIP_W = 12, SHIP_H = 8, SHIP_Y = H - 16;
-    var EW = 10, EH = 8, COLS = 6;
+    var W = 144, H = 208, HUD = 24, SHIP_W = 12, SHIP_H = 8, SHIP_Y = H - 18;
+    var EW = 10, EH = 8, COLS = 6, BW = 8, BH = 8, MAX_LIVES = 5;
+    // Bonus : tombent quand une horde est éliminée (à partir de la vague 2), à ramasser avec le vaisseau.
+    // ms = durée d'effet ; weight = fréquence relative. La vie et le bouclier sont plus rares.
+    var BONUS = {
+      triple: { ms: 10000, weight: 30 },   // trois tirs en éventail
+      rapid:  { ms: 9000,  weight: 30 },   // cadence doublée
+      laser:  { ms: 5000,  weight: 15 },   // rayon perçant, plus large
+      shield: { ms: 15000, weight: 15 },   // absorbe un tir ennemi
+      life:   { ms: 0,     weight: 10 }    // +1 vie (5 au maximum)
+    };
+    var BONUS_KEYS = Object.keys(BONUS), BONUS_TOTAL = BONUS_KEYS.reduce(function (t, k) { return t + BONUS[k].weight; }, 0);
     function wave(n) {
       var rows = Math.min(2 + Math.floor((n - 1) / 2), 5), list = [];
-      for (var r = 0; r < rows; r++) for (var c = 0; c < COLS; c++) list.push({ x: 10 + c * 16, y: HUD + 10 + r * 14, row: r });
+      for (var r = 0; r < rows; r++) for (var c = 0; c < COLS; c++) list.push({ x: 10 + c * 16, y: HUD + 8 + r * 14, row: r });
       return list;
     }
     function create() {
-      return { ship: { x: W / 2 - SHIP_W / 2 }, bullets: [], shots: [], enemies: wave(1), dir: 1, wave: 1, score: 0, lives: 3,
-               t: 0, fireAt: 0, enemyFireAt: 1500, invuln: 0, over: false, flash: 0 };
+      return { ship: { x: W / 2 - SHIP_W / 2 }, bullets: [], shots: [], enemies: wave(1), drops: [], dir: 1, wave: 1, score: 0, lives: 3,
+               t: 0, fireAt: 0, enemyFireAt: 1500, invuln: 0, over: false, flash: 0,
+               power: { triple: 0, rapid: 0, laser: 0, shield: 0 }, picked: null, pickedAt: 0 };
     }
     function hit(a, b) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
+    function pickBonus(rand) {
+      var x = rand() * BONUS_TOTAL;
+      for (var i = 0; i < BONUS_KEYS.length; i++) { x -= BONUS[BONUS_KEYS[i]].weight; if (x < 0) return BONUS_KEYS[i]; }
+      return BONUS_KEYS[0];
+    }
+    function applyBonus(g, kind) {
+      if (kind === "life") { if (g.lives < MAX_LIVES) g.lives++; else g.score += 250; }
+      else g.power[kind] = BONUS[kind].ms;          // reprendre un bonus actif relance sa durée (pas de cumul)
+      g.picked = kind; g.pickedAt = g.t;
+    }
     // dt en secondes ; input.targetX = position voulue du centre du vaisseau (ou null)
     function step(g, dt, input, rand) {
       if (g.over) return g;
       dt = Math.min(dt, 0.05);
-      g.t += dt * 1000;
-      if (g.invuln > 0) g.invuln = Math.max(0, g.invuln - dt * 1000);
+      var ms = dt * 1000;
+      g.t += ms;
+      if (g.invuln > 0) g.invuln = Math.max(0, g.invuln - ms);
+      BONUS_KEYS.forEach(function (k) { if (g.power[k] > 0) g.power[k] = Math.max(0, g.power[k] - ms); });
 
       // vaisseau
       if (input && input.targetX !== null && input.targetX !== undefined) {
@@ -2641,10 +2664,19 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
         var maxMove = 150 * dt, d = want - g.ship.x;
         g.ship.x += Math.abs(d) <= maxMove ? d : (d > 0 ? maxMove : -maxMove);
       }
-      // tir automatique
-      if (g.t >= g.fireAt) { g.bullets.push({ x: g.ship.x + SHIP_W / 2 - 1, y: SHIP_Y - 4 }); g.fireAt = g.t + 320; }
-      g.bullets.forEach(function (b) { b.y -= 190 * dt; });
-      g.bullets = g.bullets.filter(function (b) { return b.y > HUD - 4; });
+      // tir automatique (rapide : cadence doublée ; triple : éventail ; laser : rayon perçant)
+      if (g.t >= g.fireAt) {
+        var cx = g.ship.x + SHIP_W / 2 - 1;
+        if (g.power.laser > 0) g.bullets.push({ x: cx - 1, y: SHIP_Y - 10, vx: 0, w: 4, h: 10, pierce: true });
+        else g.bullets.push({ x: cx, y: SHIP_Y - 4, vx: 0, w: 2, h: 5 });
+        if (g.power.triple > 0) {
+          g.bullets.push({ x: cx - 3, y: SHIP_Y - 2, vx: -45, w: 2, h: 5 });
+          g.bullets.push({ x: cx + 3, y: SHIP_Y - 2, vx: 45, w: 2, h: 5 });
+        }
+        g.fireAt = g.t + (g.power.rapid > 0 ? 160 : 320);
+      }
+      g.bullets.forEach(function (b) { b.y -= 190 * dt; b.x += (b.vx || 0) * dt; });
+      g.bullets = g.bullets.filter(function (b) { return b.y > HUD - 10 && b.x > -4 && b.x < W + 4; });
 
       // formation d'ennemis
       var speed = 14 + g.wave * 5 + (COLS * 5 - g.enemies.length) * 0.4;
@@ -2661,22 +2693,35 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       g.shots.forEach(function (s) { s.y += (70 + g.wave * 6) * dt; });
       g.shots = g.shots.filter(function (s) { return s.y < H; });
 
-      // balles du joueur contre ennemis
+      // balles du joueur contre ennemis (le laser traverse)
       g.bullets = g.bullets.filter(function (b) {
-        var bb = { x: b.x, y: b.y, w: 2, h: 5 };
-        for (var i = 0; i < g.enemies.length; i++) {
+        var bb = { x: b.x, y: b.y, w: b.w || 2, h: b.h || 5 }, keep = true;
+        for (var i = g.enemies.length - 1; i >= 0; i--) {
           var e = g.enemies[i];
-          if (hit(bb, { x: e.x, y: e.y, w: EW, h: EH })) { g.enemies.splice(i, 1); g.score += 10 + (4 - Math.min(e.row, 4)) * 2; return false; }
+          if (hit(bb, { x: e.x, y: e.y, w: EW, h: EH })) {
+            g.enemies.splice(i, 1); g.score += 10 + (4 - Math.min(e.row, 4)) * 2;
+            if (!b.pierce) { keep = false; break; }
+          }
         }
-        return true;
+        return keep;
       });
 
-      // tirs ennemis contre le vaisseau
+      // bonus qui tombent : ramassés par le vaisseau, perdus s'ils sortent de l'écran
+      var shipBox = { x: g.ship.x - 1, y: SHIP_Y - 2, w: SHIP_W + 2, h: SHIP_H + 4 };
+      g.drops.forEach(function (o) { o.y += 38 * dt; });
+      g.drops = g.drops.filter(function (o) {
+        if (hit({ x: o.x, y: o.y, w: BW, h: BH }, shipBox)) { applyBonus(g, o.kind); return false; }
+        return o.y < H;
+      });
+
+      // tirs ennemis contre le vaisseau (le bouclier absorbe un tir)
       var ship = { x: g.ship.x, y: SHIP_Y, w: SHIP_W, h: SHIP_H };
       if (g.invuln <= 0) {
         for (var k = 0; k < g.shots.length; k++) {
           if (hit({ x: g.shots[k].x, y: g.shots[k].y, w: 2, h: 5 }, ship)) {
-            g.shots.splice(k, 1); g.lives--; g.invuln = 1500; g.flash = 1500;
+            g.shots.splice(k, 1);
+            if (g.power.shield > 0) { g.power.shield = 0; g.invuln = 600; break; }
+            g.lives--; g.invuln = 1500; g.flash = 1500;
             if (g.lives <= 0) { g.over = true; return g; }
             break;
           }
@@ -2685,11 +2730,16 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       // ennemis qui atteignent le bas
       for (var j = 0; j < g.enemies.length; j++) if (g.enemies[j].y + EH >= SHIP_Y) { g.over = true; return g; }
 
-      // vague terminée
-      if (!g.enemies.length) { g.score += 100 * g.wave; g.wave++; g.enemies = wave(g.wave); g.shots = []; g.dir = 1; g.enemyFireAt = g.t + 1500; }
+      // horde éliminée : points, vague suivante, et un bonus qui tombe (dès la vague 2)
+      if (!g.enemies.length) {
+        g.score += 100 * g.wave;
+        if (g.wave >= 2) g.drops.push({ kind: pickBonus(rand), x: Math.round(8 + rand() * (W - 16 - BW)), y: HUD + 2 });
+        g.wave++; g.enemies = wave(g.wave); g.shots = []; g.dir = 1; g.enemyFireAt = g.t + 1500;
+      }
       return g;
     }
-    return { W: W, H: H, HUD: HUD, SHIP_W: SHIP_W, SHIP_H: SHIP_H, SHIP_Y: SHIP_Y, EW: EW, EH: EH, create: create, step: step, wave: wave };
+    return { W: W, H: H, HUD: HUD, SHIP_W: SHIP_W, SHIP_H: SHIP_H, SHIP_Y: SHIP_Y, EW: EW, EH: EH, BW: BW, BH: BH, MAX_LIVES: MAX_LIVES,
+             BONUS: BONUS, create: create, step: step, wave: wave, applyBonus: applyBonus };
   })();
   /*SPACE-LOGIC-END*/
 
@@ -3095,33 +3145,96 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     function togglePause() { if (state === "playing") state = "paused"; else if (state === "paused") state = "playing"; }
 
     function css(n) { return getComputedStyle($("view-space")).getPropertyValue(n).trim(); }
+    // Vaisseau 12 x 9 en pixel art : nez, cockpit, ailes à pointes rouges, deux réacteurs.
+    var SHIP = [
+      ".....nn.....",
+      ".....cc.....",
+      "....bccb....",
+      "...bbCCbb...",
+      "..sbbbbbbs..",
+      ".rsbbbbbbsr.",
+      "rrsbbssbbsrr",
+      "r..ee..ee..r",
+    ];
+    var SHIP_C = { n: "#F8FAFC", c: "#22D3EE", C: "#0E7490", b: "#CBD5E1", s: "#64748B", r: "#F43F5E", e: "#475569" };
+    var BONUS_LOOK = {
+      triple: { col: "#38BDF8", label: "3X", icon: ["#.#.#", "#.#.#", "#.#.#", ".....", "..#.."] },
+      rapid:  { col: "#FBBF24", label: "TIR", icon: ["..##.", ".##..", "####.", "..##.", ".##.."] },
+      laser:  { col: "#F472B6", label: "LASER", icon: ["..#..", "..#..", "..#..", ".###.", "#####"] },
+      shield: { col: "#34D399", label: "BOUCL", icon: [".###.", "#...#", "#...#", "#...#", ".###."] },
+      life:   { col: "#F43F5E", label: "+1 VIE", icon: [".#.#.", "#####", "#####", ".###.", "..#.."] }
+    };
+    function sprite(rows, colors, x, y) {
+      for (var r = 0; r < rows.length; r++) for (var c = 0; c < rows[r].length; c++) {
+        var k = rows[r].charAt(c);
+        if (k === "." || !colors[k]) continue;
+        ctx.fillStyle = colors[k]; ctx.fillRect(x + c, y + r, 1, 1);
+      }
+    }
+    function bonusIcon(kind, x, y) {
+      var L = BONUS_LOOK[kind];
+      ctx.fillStyle = "#0B1220"; ctx.fillRect(x, y, 8, 8);
+      ctx.fillStyle = L.col; ctx.fillRect(x, y, 8, 1); ctx.fillRect(x, y + 7, 8, 1); ctx.fillRect(x, y, 1, 8); ctx.fillRect(x + 7, y, 1, 8);
+      sprite(L.icon, { "#": L.col }, x + 1.5 | 0, y + 1.5 | 0);
+    }
     function draw() {
       var lcd = css("--lcd") || "#9bbc0f", ink = css("--ink") || "#0f380f", mid = css("--mid") || "#306230";
       ctx.fillStyle = lcd; ctx.fillRect(0, 0, SP.W, SP.H);
+      // étoiles qui défilent (décor)
+      ctx.fillStyle = "#334155";
+      for (var st = 0; st < 18; st++) ctx.fillRect((st * 37) % SP.W, (((st * 53 + g.t / 40) % (SP.H - SP.HUD)) + SP.HUD) | 0, 1, 1);
+
+      // bandeau : ligne 1 = score, vague, vies ; ligne 2 = bonus actifs avec leur temps restant
       ctx.font = "8px 'Press Start 2P', monospace";
-      ctx.fillStyle = ink;
-      ctx.fillText("SC " + g.score, 4, 11);
-      var lv = "V" + g.wave + " ";
-      for (var i = 0; i < g.lives; i++) lv += "\u2665";
-      ctx.fillText(lv, SP.W - 4 - lv.length * 8, 11);
-      ctx.fillRect(0, SP.HUD - 1, SP.W, 1);
+      ctx.fillStyle = ink; ctx.fillText(String(g.score), 3, 10);
+      var wv = "V" + g.wave; ctx.fillStyle = mid; ctx.fillText(wv, Math.round((SP.W - wv.length * 8) / 2), 10);
+      for (var i = 0; i < g.lives; i++) sprite(["..#..", ".###.", "#####", "#.#.#"], { "#": "#F43F5E" }, SP.W - 7 - i * 7, 3);
+      var bx = 3;
+      ["triple", "rapid", "laser", "shield"].forEach(function (k) {
+        var left = g.power[k]; if (!(left > 0)) return;
+        bonusIcon(k, bx, 13);
+        var frac = left / SP.BONUS[k].ms;
+        ctx.fillStyle = "#1E293B"; ctx.fillRect(bx + 9, 16, 16, 2);
+        ctx.fillStyle = BONUS_LOOK[k].col; ctx.fillRect(bx + 9, 16, Math.max(1, Math.round(16 * frac)), 2);
+        bx += 28;
+      });
+      ctx.fillStyle = mid; ctx.fillRect(0, SP.HUD - 1, SP.W, 1);
+
       g.enemies.forEach(function (e) {
         var x = Math.round(e.x), y = Math.round(e.y);
         ctx.fillStyle = "#F43F5E";
         ctx.fillRect(x + 1, y, 8, 2); ctx.fillRect(x, y + 2, 10, 3); ctx.fillRect(x + 1, y + 5, 2, 3); ctx.fillRect(x + 7, y + 5, 2, 3);
         ctx.fillStyle = lcd; ctx.fillRect(x + 2, y + 2, 2, 2); ctx.fillRect(x + 6, y + 2, 2, 2);
       });
-      ctx.fillStyle = ink;
-      g.bullets.forEach(function (b) { ctx.fillRect(Math.round(b.x), Math.round(b.y), 2, 5); });
+      // bonus qui tombent (clignotent doucement pour attirer l'œil)
+      g.drops.forEach(function (o) { if (Math.floor(g.t / 180) % 4 !== 3) bonusIcon(o.kind, Math.round(o.x), Math.round(o.y)); });
+      g.bullets.forEach(function (b) {
+        if (b.pierce) { ctx.fillStyle = "#F472B6"; ctx.fillRect(Math.round(b.x), Math.round(b.y), b.w, b.h); ctx.fillStyle = "#FCE7F3"; ctx.fillRect(Math.round(b.x) + 1, Math.round(b.y), 2, b.h); }
+        else { ctx.fillStyle = g.power.rapid > 0 ? "#FBBF24" : ink; ctx.fillRect(Math.round(b.x), Math.round(b.y), 2, 5); }
+      });
       ctx.fillStyle = mid;
       g.shots.forEach(function (s) { ctx.fillRect(Math.round(s.x), Math.round(s.y), 2, 5); });
+
       var blink = g.invuln > 0 && Math.floor(g.invuln / 100) % 2 === 0;
+      var sx = Math.round(g.ship.x), sy = SP.SHIP_Y - 1;
       if (!blink) {
-        ctx.fillStyle = ink;
-        var sx = Math.round(g.ship.x), sy = SP.SHIP_Y;
-        ctx.fillRect(sx + 5, sy, 2, 3); ctx.fillRect(sx + 3, sy + 3, 6, 2); ctx.fillRect(sx, sy + 5, 12, 3);
+        sprite(SHIP, SHIP_C, sx, sy);
+        // flammes des réacteurs, animées
+        var f = Math.floor(g.t / 70) % 3;
+        ctx.fillStyle = "#F59E0B"; ctx.fillRect(sx + 3, sy + 8, 2, 1 + f % 2); ctx.fillRect(sx + 7, sy + 8, 2, 1 + (f + 1) % 2);
+        ctx.fillStyle = "#FDE68A"; ctx.fillRect(sx + 3, sy + 8, 2, 1); ctx.fillRect(sx + 7, sy + 8, 2, 1);
       }
-      if (state === "ready") panel(["SPACE ATTACK", "", "GLISSE POUR", "BOUGER", "TOUCHE POUR", "COMMENCER"]);
+      if (g.power.shield > 0) {
+        ctx.save(); ctx.globalAlpha = 0.35 + 0.15 * Math.sin(g.t / 120);
+        ctx.strokeStyle = "#34D399"; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.ellipse(sx + 6, sy + 5, 10, 8, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+      }
+      // message court quand un bonus est ramassé
+      if (g.picked && g.t - g.pickedAt < 1400) {
+        var lab = BONUS_LOOK[g.picked].label;
+        ctx.fillStyle = BONUS_LOOK[g.picked].col; ctx.fillText(lab, Math.round((SP.W - lab.length * 8) / 2), SP.SHIP_Y - 18);
+      }
+      if (state === "ready") panel(["SPACE ATTACK", "", "GLISSE POUR", "BOUGER", "TOUCHE POUR", "COMMENCER", "", "RAMASSE LES", "BONUS !"]);
       else if (state === "paused") panel(["PAUSE", "", "TOUCHE POUR", "REPRENDRE"]);
       else if (state === "over") panel(["PERDU", "SCORE " + g.score, "REC " + Math.max(best, g.score), "VAGUE " + g.wave, "", "TOUCHE POUR", "REJOUER"]);
     }

@@ -16,7 +16,7 @@ const box = async()=> page.locator('#bb-screen').boundingBox();
 const bx=await box(); const kx=bx.width/720, ky=bx.height/1040;
 const P=(x,y)=>[bx.x+x*kx, bx.y+y*ky];
 await page.screenshot({path:FT+'captures/bb-start.png'});
-const g=BB.newGame(424242,{ensureFit:true});
+const g=BB.newGame(424242,{ensureFit:true,rules:2});
 let n=0;
 const mouse=page.mouse;
 while(!g.over && n<400){

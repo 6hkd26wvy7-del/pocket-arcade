@@ -12,6 +12,7 @@ window.supabase = { createClient: function(){
     window.__calls.push(n+(a?JSON.stringify(a):''));
     switch(n){
      case 'boyblocks_start': window.__run={seed:424242}; return ok({run_id:'r1',seed:424242});
+     case 'boyblocks_start_v2': window.__run={seed:424242,rules:2}; return ok({run_id:'r1',seed:424242,rules:2});
      case 'boyblocks_finish': window.__fin=a; return ok({xp:12,bc:3,level:5,level_up:false,new_badges:[],score:1});
      case 'sync_tiers': if(window.__synced) return ok([]); window.__synced=1; return ok([{game:'snake',tier:1,name:'Argent'},{game:'boyblocks',tier:5,name:'Légende'}]);
      case 'my_tiers': return ok({favorites:window.__fav||['snake:1'],games:[{game:'blocks',best:122,plays:3,tier:null,next:{tier:0,name:'Recrue',min_score:300,min_plays:1}},{game:'boyblocks',best:41000,plays:410,tier:5,next:null},{game:'snake',best:136,plays:3,tier:1,next:{tier:2,name:'Or',min_score:60,min_plays:30}},{game:'space',best:108,plays:3,tier:null,next:{tier:0,name:'Recrue',min_score:200,min_plays:1}}]});

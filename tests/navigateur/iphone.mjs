@@ -18,8 +18,17 @@ for (const h of ['menu','scores','amis','compte','snake','blocks','space','arena
 }
 await page.screenshot({path:FT+'captures/iphone-arena.png'});
 await page.goto('http://x.test/#boyblocks'); await page.waitForTimeout(900);
+const sel = await page.evaluate(()=>{
+  const ev=new Event('selectstart',{bubbles:true,cancelable:true}); document.getElementById('bb-msg').dispatchEvent(ev);
+  const cm=new Event('contextmenu',{bubbles:true,cancelable:true}); document.getElementById('bb-screen').dispatchEvent(cm);
+  const ta=document.createElement('textarea'); document.getElementById('bug-card').append(ta);
+  const ev2=new Event('selectstart',{bubbles:true,cancelable:true}); ta.dispatchEvent(ev2);
+  const us=getComputedStyle(document.getElementById('bb-msg')).webkitUserSelect, ut=getComputedStyle(ta).webkitUserSelect; ta.remove();
+  return { ingame: document.body.classList.contains('ingame'), texteBloque: ev.defaultPrevented && us==='none', menuBloque: cm.defaultPrevented, saisieLibre: !ev2.defaultPrevented && ut!=='none' };
+});
+console.log('tactile en jeu :', JSON.stringify(sel), (sel.ingame && sel.texteBloque && sel.menuBloque && sel.saisieLibre) ? 'protection ok' : 'PROTECTION KO');
 const bx=await page.locator('#bb-screen').boundingBox(); const kx=bx.width/720, ky=bx.height/1040; const P=(x,y)=>[bx.x+x*kx, bx.y+y*ky];
-const g=BB.newGame(424242,{ensureFit:true}); let n=0;
+const g=BB.newGame(424242,{ensureFit:true,rules:2}); let n=0;
 while(!g.over && n<400){
   let mv=null;
   for(let s=0;s<3&&!mv;s++){ if(!g.pieces[s])continue; const sh=BB.PIECES[g.pieces[s].p];
