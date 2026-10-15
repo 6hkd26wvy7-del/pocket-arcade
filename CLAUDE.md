@@ -41,8 +41,7 @@ Exécuter le fichier entier d'un seul bloc (connecteur Supabase `execute_sql`), 
 plusieurs morceaux ou si une donnée existante change.
 
 ## État au 15/10/2026 (soir) — à reprendre
-- Base TEST v14 (9×9 en essai). Site TEST publié = `main` à jour (9×9 + multijoueur harmonisé). Serveur de duels v5
-  `7b552562` (salles Y = duel 9×9). La production n'utilise pas le serveur de duels (pas d'`ARENA_URL` dans `config.js`).
-- Multijoueur harmonisé avec le solo (visuel/tactile seulement, règles inchangées). Bonus Space Attack **pas** portés en
-  co-op : il faudrait les ajouter au moteur serveur `server/space-engine.js` (changement de mécanique, sur accord).
+- Base TEST v14 (9×9 en essai). Site TEST publié = `main` à jour (9×9 + multijoueur harmonisé). Serveur de duels v5 (salles Y = duel 9×9). La production n'utilise pas le serveur de duels (pas d'`ARENA_URL` dans `config.js`).
+- Multijoueur harmonisé avec le solo (visuel/tactile). Space Attack co-op : bonus du solo portés dans
+  `server/space-engine.js` (le bonus profite au vaisseau qui le ramasse). Serveur `e6ff47b1`.
 - Empreinte distante v14 : `81c4fbed…` (formule `md5(string_agg(proname||':'||md5(prosrc)))`) ; rejeu 9×9 distant = attendu.
