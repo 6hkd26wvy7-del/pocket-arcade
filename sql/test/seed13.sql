@@ -1,0 +1,12 @@
+insert into auth.users values ('aaaaaaaa-0000-0000-0000-000000000001','tintin@x.fr'),('aaaaaaaa-0000-0000-0000-000000000002','joh@x.fr');
+insert into public.profiles(id,pseudo) values ('aaaaaaaa-0000-0000-0000-000000000001','tintintest'),('aaaaaaaa-0000-0000-0000-000000000002','joh');
+insert into public.user_roles values ('aaaaaaaa-0000-0000-0000-000000000001','founder');
+insert into public.beta_members(user_id) values ('aaaaaaaa-0000-0000-0000-000000000002');
+insert into public.app_settings(key,value) values ('beta','{"on":true}') on conflict (key) do update set value=excluded.value;
+insert into public.scores(user_id,game,score) select ('aaaaaaaa-0000-0000-0000-00000000000'||(1+g%2))::uuid, (array['snake','blocks','space'])[1+g%3], 10+g*7 from generate_series(1,18) g;
+insert into public.friendships(user_a,user_b,status,requested_by) values ('aaaaaaaa-0000-0000-0000-000000000001','aaaaaaaa-0000-0000-0000-000000000002','accepted','aaaaaaaa-0000-0000-0000-000000000002');
+insert into public.messages(from_id,to_id,body) select case when g%2=0 then 'aaaaaaaa-0000-0000-0000-000000000001' else 'aaaaaaaa-0000-0000-0000-000000000002' end::uuid, case when g%2=0 then 'aaaaaaaa-0000-0000-0000-000000000002' else 'aaaaaaaa-0000-0000-0000-000000000001' end::uuid, 'message '||g from generate_series(1,5) g;
+insert into public.bc_ledger(user_id,delta,reason) select ('aaaaaaaa-0000-0000-0000-00000000000'||(1+g%2))::uuid, case when g<4 then -10 else 5 end, case when g<4 then 'gift_sent' when g<6 then 'gift_received' else 'game' end from generate_series(1,28) g;
+insert into public.notifications(user_id,kind,body) select ('aaaaaaaa-0000-0000-0000-00000000000'||(1+g%2))::uuid, (array['gift','message','friend_request','friend_accept'])[1+g%4], 'x'||g from generate_series(1,8) g;
+update public.player_stats set bc=70, xp=240, level=3 where user_id='aaaaaaaa-0000-0000-0000-000000000001';
+update public.player_stats set bc=40, xp=130, level=2 where user_id='aaaaaaaa-0000-0000-0000-000000000002';

@@ -22,7 +22,7 @@ def sql(q, a=None):
         except psycopg2.ProgrammingError: return None
 try:
     sql(STUB)
-    for f in ["schema_all.sql", "schema_v5.sql"]: run_file(c, f"{REPO}/{f}")
+    for f in ["schema_v1_v4.sql", "schema_v5.sql"]: run_file(c, f"{HIST}/{f}")
     run_file(c, V6A); sql(SEED)
     run_file(c, f"{REPO}/schema_v6_v7.sql"); run_file(c, f"{REPO}/schema_v8_v9.sql")
     sql("update public.app_settings set value = 'false' where key = 'maintenance'") if sql("select to_regclass('public.app_settings')")[0][0] else None

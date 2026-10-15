@@ -1,0 +1,7 @@
+site/
+pocket-arcade.zip
+pocket-arcade-site.zip
+__pycache__/
+node_modules/
+.DS_Store
+tests/navigateur/captures/

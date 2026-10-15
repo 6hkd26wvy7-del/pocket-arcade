@@ -3,7 +3,8 @@ import os, sys, json, shutil, tempfile
 import pgserver, psycopg2
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-V6A = os.path.join(REPO, "schema_v6a_sauvegarde.sql")
+HIST = os.path.join(REPO, "historique")
+V6A = os.path.join(HIST, "schema_v6a_sauvegarde.sql")
 
 STUB = """
 create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls;

@@ -1,0 +1,7 @@
+{
+  "name": "boygames-tests-navigateur",
+  "private": true,
+  "description": "Tests navigateur BOYGAMES (Playwright, faux Supabase). Lancer : npm install && npx playwright install chromium && npm test",
+  "scripts": { "test": "node run-all.mjs" },
+  "devDependencies": { "playwright": "1.56.1" }
+}

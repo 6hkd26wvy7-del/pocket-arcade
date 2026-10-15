@@ -27,6 +27,7 @@ async function token(sub, over = {}, key = kp.privateKey) {
 const U1 = "11111111-1111-1111-1111-111111111111", U2 = "22222222-2222-2222-2222-222222222222", U3 = "33333333-3333-3333-3333-333333333333", U4 = "44444444-4444-4444-4444-444444444444";
 const names = { [U1]: "Ana", [U2]: "Ben", [U3]: "Cat" }; // U4 : pas de profil
 const FETCH = async (url) => {
+  if (url.includes("/rpc/arena_check")) return { ok: true, json: async () => true };
   if (url.endsWith("/jwks.json")) return { ok: true, json: async () => ({ keys: [jwk] }) };
   const id = url.match(/id=eq\.([0-9a-f-]+)/)[1];
   return { ok: true, json: async () => (names[id] ? [{ pseudo: names[id] }] : []) };

@@ -5,8 +5,9 @@
 import * as SN from "./arena-engine.js";
 import * as SPC from "./space-engine.js";
 import * as BK from "./blocks-engine.js";
+import * as BBD from "./boyblocks-duel.js";
 
-// Les 3 jeux en ligne. La première lettre du code de salle dit de quel jeu il s'agit : S, P ou B.
+// Les 3 jeux en ligne. La première lettre du code de salle dit de quel jeu il s'agit : S, P, B ou X.
 const KINDS = {
   S: { name: "snake", tickMs: SN.TICK_MS, coop: false,
        create: (seed) => SN.newGame(seed), input: (g, i, m) => { if (m.t === "dir") SN.setDirection(g, i, m.d); },
@@ -17,6 +18,9 @@ const KINDS = {
   B: { name: "blocks", tickMs: BK.TICK_MS, coop: false,
        create: (seed) => BK.newGame(seed), input: (g, i, m) => { if (m.t === "act") BK.act(g, i, m.a); },
        step: (g, dt) => BK.step(g, dt), snapshot: BK.snapshot },
+  X: { name: "boyblocks", tickMs: BBD.TICK_MS, coop: false, instant: true,
+       create: (seed) => BBD.newGame(seed), input: (g, i, m) => BBD.input(g, i, m),
+       step: (g, dt) => BBD.step(g, dt), snapshot: BBD.snapshot, syncLog: BBD.syncLog },
 };
 const snapshot = (g, kind) => kind.snapshot(g);
 
@@ -80,12 +84,34 @@ async function fetchPseudo(uid, token, env, fetchFn) {
   return rows && rows[0] && rows[0].pseudo ? String(rows[0].pseudo) : null;
 }
 
+// Contrôle côté serveur : compte suspendu, maintenance, bêta privée.
+// Appelle la fonction arena_check() de la base AVEC le jeton du joueur. En cas de doute : refus.
+async function checkAccess(token, env, fetchFn) {
+  let r;
+  try {
+    r = await fetchFn(env.SUPABASE_URL + "/rest/v1/rpc/arena_check", {
+      method: "POST",
+      headers: { apikey: env.SUPABASE_KEY, Authorization: "Bearer " + token, "Content-Type": "application/json" },
+      body: "{}",
+    });
+  } catch (e) { return "auth"; }
+  if (r.ok) {
+    try { return (await r.json()) === true ? null : "auth"; } catch (e) { return "auth"; }
+  }
+  let msg = "";
+  try { const j = await r.json(); msg = String((j && (j.message || j.error)) || ""); } catch (e) { /* ignore */ }
+  if (/banned/.test(msg)) return "banned";
+  if (/maintenance/.test(msg)) return "maintenance";
+  if (/beta/.test(msg)) return "beta";
+  return "auth";
+}
+
 // ---------- Point d'entrée ----------
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const m = url.pathname.match(/^\/play\/([SPB][A-Z0-9]{3,7})$/);
-    if (!m) return new Response("BOYGAMES arena server v2 (revanche)", { status: 200 });
+    if (!m) return new Response("BOYGAMES arena server v4 (duel BoyBlocks)", { status: 200 });
     if (request.headers.get("Upgrade") !== "websocket") return new Response("Expected websocket", { status: 426 });
     const allowed = String(env.ALLOWED_ORIGINS || "").split(",").map((s) => s.trim()).filter(Boolean);
     const origin = request.headers.get("Origin");
@@ -153,6 +179,12 @@ export class ArenaRoom {
           const { uid } = await verifyJwt(msg.token, this.env, this.fetchFn);
           const pseudo = await fetchPseudo(uid, msg.token, this.env, this.fetchFn);
           if (!pseudo) throw new Error("no profile");
+          const denied = await checkAccess(msg.token, this.env, this.fetchFn);
+          if (denied) {
+            this.send(ws, { t: "error", code: denied });
+            try { ws.close(4004, denied); } catch (e2) { /* ignore */ }
+            return;
+          }
           const idx = this.seat(uid, pseudo, ws);
           if (idx < 0) { this.send(ws, { t: "error", code: "full" }); try { ws.close(4002, "full"); } catch (e) { /* ignore */ } return; }
           authed = true;
@@ -169,7 +201,14 @@ export class ArenaRoom {
       }
 
       if (msg.t === "again") { this.onAgain(me.index); return; }
-      if (this.phase === "playing" && this.game) this.kind.input(this.game, me.index, msg);
+      if (msg.t === "sync" && this.game && this.kind.syncLog && (this.phase === "playing" || this.phase === "over")) { this.send(ws, this.kind.syncLog(this.game, me.index)); return; }
+      if (this.phase === "playing" && this.game) {
+        const changed = this.kind.input(this.game, me.index, msg);
+        if (changed && this.kind.instant) {
+          this.broadcast(snapshot(this.game, this.kind));
+          if (this.game.over) this.finish(this.game.reason);
+        }
+      }
     });
 
     const gone = () => {
