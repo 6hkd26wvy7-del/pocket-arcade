@@ -19,6 +19,7 @@ const TESTS = {
   "marketing.mjs": ["lien marketing : true", "vidéo listée : true", "validation envoyée : validee | accroche : Combo x6 en direct | date ISO : true", "onglet actif : Profil"],
   "duel9.mjs": ["TU AS GAGNÉ", "rejouer visible: true"],
   "bb9.mjs": ["bouton grille : GRILLE 9×9", "\"size\":9", "envoyés identiques: true", "essai désactivé : bouton caché true"],
+  "multi-visuel.mjs": ["multi-visuel OK"],
   "iphone.mjs": ["envoyés identiques: true", "Score vérifié et enregistré", "protection ok", "accueil ok"],
 };
 let bad = 0;

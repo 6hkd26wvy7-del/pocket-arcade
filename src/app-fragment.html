@@ -2329,6 +2329,47 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
   }
 
   /* ---------- Snake ---------- */
+  // pomme en pixel art dans une case de 8x8 : queue, feuille verte, reflet
+  var APPLE = [
+    "....g...",
+    "...bgg..",
+    ".rrbrrr.",
+    "rrwrrrrr",
+    "rwrrrrrr",
+    "rrrrrrrd",
+    ".rrrrrd.",
+    "..rddd..",
+  ];
+  var APPLE_COLORS = { r: "#EF4444", d: "#B91C1C", w: "#FECACA", g: "#22C55E", b: "#7C4A1E" };
+
+  // dessin pixel par pixel partagé (pomme, vaisseau) entre le solo et le multijoueur
+  function pixelArt(c, rows, colors, x, y) {
+    for (var r = 0; r < rows.length; r++) for (var k = 0; k < rows[r].length; k++) {
+      var ch = rows[r].charAt(k);
+      if (ch === "." || !colors[ch]) continue;
+      c.fillStyle = colors[ch]; c.fillRect(x + k, y + r, 1, 1);
+    }
+  }
+  // Vaisseau 12 x 9 en pixel art : nez, cockpit, ailes à pointes rouges, deux réacteurs.
+  var SHIP = [
+    ".....nn.....",
+    ".....cc.....",
+    "....bccb....",
+    "...bbCCbb...",
+    "..sbbbbbbs..",
+    ".rsbbbbbbsr.",
+    "rrsbbssbbsrr",
+    "r..ee..ee..r",
+  ];
+  var SHIP_C = { n: "#F8FAFC", c: "#22D3EE", C: "#0E7490", b: "#CBD5E1", s: "#64748B", r: "#F43F5E", e: "#475569" };
+  // vaisseau du coéquipier : mêmes formes, teintes violettes pour le distinguer
+  var SHIP_C2 = { n: "#F8FAFC", c: "#E879F9", C: "#86198F", b: "#DDD6FE", s: "#7C3AED", r: "#F43F5E", e: "#475569" };
+  function drawShipFlames(c, sx, sy, t) {
+    var f = Math.floor(t / 70) % 3;
+    c.fillStyle = "#F59E0B"; c.fillRect(sx + 3, sy + 8, 2, 1 + f % 2); c.fillRect(sx + 7, sy + 8, 2, 1 + (f + 1) % 2);
+    c.fillStyle = "#FDE68A"; c.fillRect(sx + 3, sy + 8, 2, 1); c.fillRect(sx + 7, sy + 8, 2, 1);
+  }
+
   var snake = (function () {
     var W = 144, H = 208, CELL = 8, HUD = 16;
     var COLS = W / CELL, ROWS = (H - HUD) / CELL;
@@ -2537,26 +2578,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       for (var j = 0; j < lines.length; j++) centered(lines[j], y + 14 + j * 12, C3);
     }
 
-    // pomme en pixel art dans une case de 8x8 : queue, feuille verte, reflet
-    var APPLE = [
-      "....g...",
-      "...bgg..",
-      ".rrbrrr.",
-      "rrwrrrrr",
-      "rwrrrrrr",
-      "rrrrrrrd",
-      ".rrrrrd.",
-      "..rddd..",
-    ];
-    var APPLE_COLORS = { r: "#EF4444", d: "#B91C1C", w: "#FECACA", g: "#22C55E", b: "#7C4A1E" };
-    function drawApple(x, y) {
-      for (var r = 0; r < 8; r++) for (var c = 0; c < 8; c++) {
-        var k = APPLE[r].charAt(c);
-        if (k === ".") continue;
-        ctx.fillStyle = APPLE_COLORS[k];
-        ctx.fillRect(x + c, y + r, 1, 1);
-      }
-    }
+    function drawApple(x, y) { pixelArt(ctx, APPLE, APPLE_COLORS, x, y); }
 
     function draw(now) {
       ctx.fillStyle = C0;
@@ -3306,9 +3328,9 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
         ctx.textAlign = "right"; ctx.fillStyle = "#94A3B8"; ctx.font = "700 26px system-ui, sans-serif"; ctx.fillText("RECORD", W - BX, 48);
         ctx.fillStyle = "#FBBF24"; ctx.font = "800 44px system-ui, sans-serif"; ctx.fillText(String(Math.max(best, score)), W - BX, 100);
       }
-      if (g && g.streak >= 1 && !duel) {
+      if (g && g.streak >= 1 && !(duel && duelFinal)) {
         ctx.textAlign = "center"; ctx.fillStyle = "#22D3EE"; ctx.font = "800 28px system-ui, sans-serif";
-        ctx.fillText("COMBO ×" + BBE.comboMult(g.streak + 1).toFixed(1).replace(".0", "") + " SI TU ENCHAÎNES", W / 2, 140);
+        ctx.fillText("COMBO ×" + BBE.comboMult(g.streak + 1).toFixed(1).replace(".0", "") + (duel ? "" : " SI TU ENCHAÎNES"), duel ? 200 : W / 2, duel ? 136 : 140);   // en duel : libellé court, sous le score
       }
       // plateau
       ctx.fillStyle = "#111A2E"; roundRect(BX - 10, BY - 10, N * CELL + 20, N * CELL + 20, 22); ctx.fill();
@@ -3546,18 +3568,6 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     function togglePause() { if (state === "playing") state = "paused"; else if (state === "paused") state = "playing"; }
 
     function css(n) { return getComputedStyle($("view-space")).getPropertyValue(n).trim(); }
-    // Vaisseau 12 x 9 en pixel art : nez, cockpit, ailes à pointes rouges, deux réacteurs.
-    var SHIP = [
-      ".....nn.....",
-      ".....cc.....",
-      "....bccb....",
-      "...bbCCbb...",
-      "..sbbbbbbs..",
-      ".rsbbbbbbsr.",
-      "rrsbbssbbsrr",
-      "r..ee..ee..r",
-    ];
-    var SHIP_C = { n: "#F8FAFC", c: "#22D3EE", C: "#0E7490", b: "#CBD5E1", s: "#64748B", r: "#F43F5E", e: "#475569" };
     var BONUS_LOOK = {
       triple: { col: "#38BDF8", label: "3X", icon: ["#.#.#", "#.#.#", "#.#.#", ".....", "..#.."] },
       rapid:  { col: "#FBBF24", label: "TIR", icon: ["..##.", ".##..", "####.", "..##.", ".##.."] },
@@ -3620,10 +3630,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       var sx = Math.round(g.ship.x), sy = SP.SHIP_Y - 1;
       if (!blink) {
         sprite(SHIP, SHIP_C, sx, sy);
-        // flammes des réacteurs, animées
-        var f = Math.floor(g.t / 70) % 3;
-        ctx.fillStyle = "#F59E0B"; ctx.fillRect(sx + 3, sy + 8, 2, 1 + f % 2); ctx.fillRect(sx + 7, sy + 8, 2, 1 + (f + 1) % 2);
-        ctx.fillStyle = "#FDE68A"; ctx.fillRect(sx + 3, sy + 8, 2, 1); ctx.fillRect(sx + 7, sy + 8, 2, 1);
+        drawShipFlames(ctx, sx, sy, g.t);   // flammes des réacteurs, animées
       }
       if (g.power.shield > 0) {
         ctx.save(); ctx.globalAlpha = 0.35 + 0.15 * Math.sin(g.t / 120);
@@ -3836,27 +3843,46 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       ctx.fillText(a + " " + st.players[0].score, 4, 15);
       var rt = st.players[1].score + " " + b; ctx.fillText(rt, 236 - rt.length * 8, 15);
       ctx.fillRect(0, HUD - 1, 240, 1);
-      st.food.forEach(function (f) { ctx.fillRect(f.x * CELL + 4, HUD + f.y * CELL + 1, 2, 8); ctx.fillRect(f.x * CELL + 1, HUD + f.y * CELL + 4, 8, 2); });
+      // quadrillage discret, comme en solo
+      ctx.save(); ctx.globalAlpha = 0.09;
+      for (var gx = CELL; gx < 240; gx += CELL) ctx.fillRect(gx, HUD, 1, 264 - HUD);
+      for (var gy = HUD + CELL; gy < 264; gy += CELL) ctx.fillRect(0, gy, 240, 1);
+      ctx.restore();
+      st.food.forEach(function (f) { pixelArt(ctx, APPLE, APPLE_COLORS, f.x * CELL + 1, HUD + f.y * CELL + 1); });
       st.players.forEach(function (p, i) {
-        p.body.forEach(function (cell, k) {
-          var x = cell.x * CELL, y = HUD + cell.y * CELL;
-          if (!p.alive) { ctx.strokeStyle = c.mid; ctx.strokeRect(x + 1.5, y + 1.5, CELL - 3, CELL - 3); return; }
-          if (i === 0) { ctx.fillStyle = c.ink; ctx.fillRect(x, y, CELL, CELL); }
-          else { ctx.fillStyle = c.mid; ctx.fillRect(x + 1, y + 1, CELL - 2, CELL - 2); ctx.fillStyle = c.ink; ctx.fillRect(x + 3, y + 3, CELL - 6, CELL - 6); }
-          if (k === 0) { ctx.fillStyle = c.lcd; ctx.fillRect(x + 3, y + 3, 2, 2); ctx.fillRect(x + 6, y + 3, 2, 2); }
-        });
+        var main = i === 0 ? c.ink : c.mid, edge = i === 0 ? c.mid : c.ink;
+        for (var k = p.body.length - 1; k >= 0; k--) {
+          var cell = p.body[k], x = cell.x * CELL, y = HUD + cell.y * CELL;
+          if (!p.alive) { ctx.strokeStyle = c.mid; ctx.strokeRect(x + 1.5, y + 1.5, CELL - 3, CELL - 3); continue; }
+          if (k > 0) { ctx.fillStyle = edge; ctx.fillRect(x + 1, y + 1, CELL - 2, CELL - 2); ctx.fillStyle = main; ctx.fillRect(x + 2, y + 2, CELL - 4, CELL - 4); continue; }
+          // tête pleine, yeux tournés dans le sens de la marche (comme en solo)
+          ctx.fillStyle = main; ctx.fillRect(x, y, CELL, CELL);
+          var nx = p.body[1] ? cell.x - p.body[1].x : 0, ny = p.body[1] ? cell.y - p.body[1].y : -1;
+          nx = Math.max(-1, Math.min(1, nx)); ny = Math.max(-1, Math.min(1, ny));
+          var ex = nx === 1 ? 6 : nx === -1 ? 2 : 3, ey = ny === 1 ? 6 : ny === -1 ? 2 : 3;
+          ctx.fillStyle = c.lcd; ctx.fillRect(x + ex, y + ey, 2, 2);
+          if (nx !== 0) ctx.fillRect(x + ex, y + 9 - ey, 2, 2); else ctx.fillRect(x + 9 - ex, y + ey, 2, 2);
+        }
       });
       ctx.fillStyle = c.ink;
       if (st.over) banner(c, resultWord(st), HUD + 8, 160);
     }
 
     function drawSpace(c) {
-      var W = 144, H = 208, HUD = 16;
-      ctx.fillText("SC " + st.score + " V" + st.wave, 4, 11);
-      var lv = "";
-      st.ships.forEach(function (s, i) { lv += (i === you ? "*" : "") + s.lives + " "; });
-      ctx.fillText(lv, W - 4 - lv.length * 8, 11);
-      ctx.fillRect(0, HUD - 1, W, 1);
+      var W = 144, H = 208, HUD = 16, now = Date.now();
+      // étoiles qui défilent (décor du solo)
+      ctx.fillStyle = "#334155";
+      for (var sn = 0; sn < 18; sn++) ctx.fillRect((sn * 37) % W, (((sn * 53 + now / 40) % (H - HUD)) + HUD) | 0, 1, 1);
+      ctx.fillStyle = c.ink; ctx.fillText(String(st.score), 3, 11);
+      var wv = "V" + st.wave; ctx.fillStyle = c.mid; ctx.fillText(wv, Math.round((W - wv.length * 8) / 2), 11);
+      // vies en cœurs : les tiennes en rouge, celles du coéquipier en violet
+      var hx = W - 7;
+      [you === 1 ? 1 : 0, you === 1 ? 0 : 1].forEach(function (si) {
+        var sh = st.ships[si]; if (!sh) return;
+        for (var h = 0; h < sh.lives; h++) { pixelArt(ctx, ["..#..", ".###.", "#####", "#.#.#"], { "#": si === you ? "#F43F5E" : "#E879F9" }, hx, 4); hx -= 7; }
+        hx -= 3;
+      });
+      ctx.fillStyle = c.mid; ctx.fillRect(0, HUD - 1, W, 1);
       st.enemies.forEach(function (e) {
         var x = Math.round(e[0]), y = Math.round(e[1]);
         ctx.fillStyle = "#F43F5E";
@@ -3870,9 +3896,9 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       st.ships.forEach(function (s, i) {
         if (s.lives <= 0) return;
         if (s.invuln && Math.floor(Date.now() / 100) % 2 === 0) return;
-        ctx.fillStyle = i === you ? c.ink : c.mid;
-        var sx = Math.round(s.x), sy = H - 16;
-        ctx.fillRect(sx + 5, sy, 2, 3); ctx.fillRect(sx + 3, sy + 3, 6, 2); ctx.fillRect(sx, sy + 5, 12, 3);
+        var sx = Math.round(s.x), sy = H - 17;
+        pixelArt(ctx, SHIP, i === you ? SHIP_C : SHIP_C2, sx, sy);
+        drawShipFlames(ctx, sx, sy, now);
       });
       ctx.fillStyle = c.ink;
       if (st.over) banner(c, "FIN : " + st.score, 60, 112);
@@ -3948,7 +3974,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       if (!t0) return;
       var t = e.changedTouches[0], dx = t.clientX - t0.x, dy = t.clientY - t0.y;
       if (kind === "snake") {
-        if (Math.abs(dx) < 18 && Math.abs(dy) < 18) return;
+        if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
         dir(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "R" : "L") : (dy > 0 ? "D" : "U"));
         t0.x = t.clientX; t0.y = t.clientY;
       } else if (kind === "space") {
