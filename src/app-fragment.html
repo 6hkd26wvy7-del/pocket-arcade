@@ -644,6 +644,8 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
   var tierData = null, unlockQueue = [], lastTierSync = 0;
   function emblem(game, tier, size, cls, uid) {
     var d = el("span", cls || "");
+    game = String(game).replace(/[^a-z]/g, ""); tier = Number(tier) | 0; /* insérés dans du SVG : jamais de texte libre */
+    if (uid) uid = String(uid).replace(/[^A-Za-z0-9_-]/g, "");
     try { d.innerHTML = window.BG_BADGES.badge(game, tier, size, uid || (game + tier + Math.random().toString(36).slice(2, 5))); } catch (e) { d.textContent = "★"; }
     return d;
   }
