@@ -30,7 +30,7 @@ node tests/logique/space.test.mjs                                 # 8
 python3 sql/test/test_migrations.py                               # 110 (pip install pgserver psycopg2-binary)
 python3 sql/test/test_installation_et_moteur.py                   # moteur JS = SQL sur 300 parties
 python3 sql/test/test_execution_morcelee.py                       # pip install sqlparse
-cd tests/navigateur && npm test                                   # 15 (Chromium + WebKit iPhone)
+cd tests/navigateur && npm test                                   # 16 (Chromium + WebKit iPhone)
 node tests/navigateur/en-ligne.mjs                                # site TEST publié
 ```
 Node : `export PATH=~/.local/node/bin:$PATH`. Python des tests SQL : un venv avec `pgserver psycopg2-binary sqlparse`.
@@ -41,10 +41,8 @@ Exécuter le fichier entier d'un seul bloc (connecteur Supabase `execute_sql`), 
 plusieurs morceaux ou si une donnée existante change.
 
 ## État au 15/10/2026 (soir) — à reprendre
-- **Base TEST : v14 appliquée** (9×9 en essai, réglage `game_settings.boyblocks9` activé ; données intactes vérifiées).
-- **Site TEST publié = commit `4823f00` (8×8 seulement).** Le commit `925443a` (9×9 côté site) est sur la branche
-  `recup/migrations-v6-v9`, **pas encore dans `main`**. La base v14 reste compatible avec ce site (8×8 inchangé).
-- **Serveur de duels : v4 `4d9f8025` en ligne ; v5 (salles « Y » = duel 9×9) prête dans `server/`, pas déployée.**
-- Pour finir l'essai 9×9 : `wrangler deploy` (v5), `make_test_release.py`, fast-forward `main`, `en-ligne.mjs`.
-- Empreinte distante v14 : `81c4fbed…` (formule `md5(string_agg(proname||':'||md5(prosrc)))`) ; à recalculer en
-  local avec la même formule (l'ancienne valeur `67358758…` utilisait une autre formule). Rejeu 9×9 distant = attendu.
+- Base TEST v14 (9×9 en essai). Site TEST publié = `main` à jour (9×9 + multijoueur harmonisé). Serveur de duels v5
+  `7b552562` (salles Y = duel 9×9). La production n'utilise pas le serveur de duels (pas d'`ARENA_URL` dans `config.js`).
+- Multijoueur harmonisé avec le solo (visuel/tactile seulement, règles inchangées). Bonus Space Attack **pas** portés en
+  co-op : il faudrait les ajouter au moteur serveur `server/space-engine.js` (changement de mécanique, sur accord).
+- Empreinte distante v14 : `81c4fbed…` (formule `md5(string_agg(proname||':'||md5(prosrc)))`) ; rejeu 9×9 distant = attendu.

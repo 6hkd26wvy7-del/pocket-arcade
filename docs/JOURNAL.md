@@ -6,6 +6,14 @@ Le plus récent en haut. Chaque entrée : ce qui a été fait, où, et ce qui re
 
 ---
 
+## 15/10/2026 (soir, suite) — multijoueur harmonisé avec le solo (TEST)
+
+- Snake 1V1 : quadrillage discret, pommes du solo, yeux dans le sens de la marche, glissé aussi sensible qu'en solo.
+- Space Attack co-op : vaisseaux pixel art du solo (le tien bleu, coéquipier violet), flammes, étoiles, vies en cœurs.
+- BoyBlocks 1V1 : déjà même moteur, dessin et aimant que le solo ; ajout de l'indication de combo.
+- Règles et équité inchangées ; aucune donnée touchée. Serveur v5 déployé (`7b552562`), site TEST publié (`9688002`).
+- Reste : bonus Space Attack en co-op (demande un changement du moteur serveur, sur accord).
+
 ## 15/10/2026 (soir) — BoyBlocks 9×9 en essai (pause de session)
 
 - Moteur BoyBlocks 8/9 (client, serveur, base), placement aimanté iPhone, classement `boyblocks9` séparé,
