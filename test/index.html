@@ -1364,20 +1364,37 @@ body.ingame #g-exit { display: inline-block; position: fixed; z-index: 30; left:
       pbeta.append(rowb2);
 
       var pbk = panel("SAUVEGARDE");
-      pbk.append(el("p", "small", "Télécharge toutes les données (comptes, scores, BOYCOINS, amis…) dans un fichier. Les mots de passe n'y sont pas. Garde le fichier en lieu sûr."));
+      pbk.append(el("p", "small", "Télécharge toutes les données de jeu (profils, scores, XP, BOYCOINS, badges, amis, messages…) dans un fichier, avec un contrôle automatique. Les emails et mots de passe restent chez Supabase et ne sont pas dans ce fichier. Garde le fichier en lieu sûr."));
       var rowbk = el("div", "row");
       button(rowbk, "TÉLÉCHARGER LA SAUVEGARDE", false, async function () {
         setMsg(msg, "Préparation…");
         var ex = await sb.rpc("staff_export");
         if (ex.error) { setMsg(msg, rewardError(ex.error), true); return; }
-        var blob = new Blob([JSON.stringify(ex.data)], { type: "application/json" });
+        var text = JSON.stringify(ex.data);
+        // Vérification : on relit le texte qui va être enregistré et on recompte chaque table.
+        var chk;
+        try { chk = JSON.parse(text); } catch (e) { setMsg(msg, "Sauvegarde illisible : rien n'a été téléchargé.", true); return; }
+        var bad = [], total = 0, tabs = chk.integrity ? Object.keys(chk.integrity) : [];
+        if (!chk.data || !tabs.length) { setMsg(msg, "Sauvegarde incomplète : rien n'a été téléchargé.", true); return; }
+        tabs.forEach(function (k) {
+          var n = Array.isArray(chk.data[k]) ? chk.data[k].length : -1;
+          if (n !== chk.integrity[k].rows) bad.push(k);
+          total += Math.max(n, 0);
+        });
+        if (bad.length || total !== chk.total_rows) { setMsg(msg, "Contrôle d'intégrité en échec (" + bad.join(", ") + ") : rien n'a été téléchargé.", true); return; }
+        var sha = "";
+        try {
+          var buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+          sha = Array.prototype.map.call(new Uint8Array(buf), function (x) { return ("0" + x.toString(16)).slice(-2); }).join("").slice(0, 12);
+        } catch (e) { /* facultatif */ }
+        var blob = new Blob([text], { type: "application/json" });
         var a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
         a.download = "boygames-sauvegarde-" + new Date().toISOString().slice(0, 10) + ".json";
         document.body.append(a);
         a.click();
         a.remove();
-        setMsg(msg, "Sauvegarde téléchargée.");
+        setMsg(msg, "Sauvegarde vérifiée et téléchargée : " + total + " lignes dans " + tabs.length + " tables (dont " + chk.integrity.messages.rows + " messages, " + chk.integrity.profiles.rows + " profils)." + (sha ? " Empreinte " + sha + "." : ""));
       });
       pbk.append(rowbk);
     }
