@@ -95,4 +95,13 @@ await t("code sans lettre de jeu valide: refus au niveau du routeur", async () =
   const r = await worker.fetch({ url: "https://x/play/ZZZZZ", headers: { get: () => "websocket" } }, { ARENA: {} });
   assert.equal(r.status, 200); // simple page d'accueil, pas de salle
 });
+await t("routeur: les codes S, P, B et X (BoyBlocks) ouvrent bien une salle", async () => {
+  const { default: worker } = await import("../worker.js");
+  for (const code of ["SABCD", "PABCD", "BABCD", "XABCD"]) {
+    let reached = null;
+    const ARENA = { idFromName: (n) => n, get: (id) => ({ fetch: () => { reached = id; return new Response("salle", { status: 200 }); } }) };
+    await worker.fetch({ url: "https://x/play/" + code, headers: { get: (h) => (h === "Upgrade" ? "websocket" : null) } }, { ARENA });
+    assert.equal(reached, code, "le code " + code + " doit arriver dans une salle");
+  }
+});
 console.log(n + " tests OK"); process.exit(0);

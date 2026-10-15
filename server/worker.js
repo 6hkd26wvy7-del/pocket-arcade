@@ -110,7 +110,7 @@ async function checkAccess(token, env, fetchFn) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    const m = url.pathname.match(/^\/play\/([SPB][A-Z0-9]{3,7})$/);
+    const m = url.pathname.match(/^\/play\/([SPBX][A-Z0-9]{3,7})$/);
     if (!m) return new Response("BOYGAMES arena server v4 (duel BoyBlocks)", { status: 200 });
     if (request.headers.get("Upgrade") !== "websocket") return new Response("Expected websocket", { status: 426 });
     const allowed = String(env.ALLOWED_ORIGINS || "").split(",").map((s) => s.trim()).filter(Boolean);
