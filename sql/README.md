@@ -30,4 +30,5 @@ par le site doit recevoir un `grant execute ... to authenticated` explicite **et
 pip install pgserver psycopg2-binary
 python3 sql/test/test_migrations.py              # chemin réel de boygam-test : v1-v5, v6a, puis les 2 migrations (52 vérifications)
 python3 sql/test/test_installation_et_moteur.py  # installation neuve + moteur JS = rejeu SQL sur 300 parties (Node requis)
+python3 sql/test/test_execution_morcelee.py      # exécution en plusieurs morceaux : arrêt avant toute modification (pip install sqlparse)
 ```

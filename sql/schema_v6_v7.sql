@@ -33,23 +33,29 @@ begin
   end loop;
 end $$;
 
--- Photographie avant migration
-create temp table _mig_before on commit drop as
-select 'profiles' as t, count(*)::numeric as n from public.profiles
-union all select 'scores', count(*) from public.scores
-union all select 'messages', count(*) from public.messages
-union all select 'friendships', count(*) from public.friendships
-union all select 'bc_ledger', count(*) from public.bc_ledger
-union all select 'notifications', count(*) from public.notifications
-union all select 'user_items', count(*) from public.user_items
-union all select 'beta_members', count(*) from public.beta_members
-union all select 'user_roles', count(*) from public.user_roles
-union all select 'season_claims', count(*) from public.season_claims
-union all select 'player_stats', count(*) from public.player_stats
-union all select 'sum_bc', coalesce(sum(bc), 0) from public.player_stats
-union all select 'sum_xp', coalesce(sum(xp), 0) from public.player_stats
-union all select 'sum_scores', coalesce(sum(score), 0) from public.scores
-union all select 'badges_deja_obtenus', count(*) from public.user_badges where badge_code not in ('beta_founder','founder');
+-- Photographie avant migration, gardée dans la transaction (pas de table temporaire).
+-- Garde-fou : si l'éditeur exécutait le script en plusieurs morceaux, le script s'arrête ici, avant toute modification.
+do $$
+begin
+  perform set_config('boygames.mig_tx', txid_current()::text, true);
+  perform set_config('boygames.mig_before', (jsonb_build_object(
+    'profiles', (select count(*) from public.profiles), 'scores', (select count(*) from public.scores),
+    'messages', (select count(*) from public.messages), 'friendships', (select count(*) from public.friendships),
+    'bc_ledger', (select count(*) from public.bc_ledger), 'notifications', (select count(*) from public.notifications),
+    'user_items', (select count(*) from public.user_items), 'beta_members', (select count(*) from public.beta_members),
+    'user_roles', (select count(*) from public.user_roles), 'season_claims', (select count(*) from public.season_claims),
+    'player_stats', (select count(*) from public.player_stats),
+    'sum_bc', (select coalesce(sum(bc), 0) from public.player_stats), 'sum_xp', (select coalesce(sum(xp), 0) from public.player_stats),
+    'sum_scores', (select coalesce(sum(score), 0) from public.scores),
+    'badges_deja_obtenus', (select count(*) from public.user_badges where badge_code not in ('beta_founder','founder'))))::text, true);
+end $$;
+do $$
+begin
+  if coalesce(current_setting('boygames.mig_tx', true), '') <> txid_current()::text
+     or coalesce(current_setting('boygames.mig_before', true), '') = '' then
+    raise exception 'EXECUTION EN PLUSIEURS MORCEAUX : ce script doit etre lance en entier, d''un seul bloc. Rien n''a ete modifie.';
+  end if;
+end $$;
 
 -- BOYGAMES schema v6 — sauvegarde complète, contrôle duels, fin des transferts de BC,
 -- avatars, badge choisi, blocage, fiches d'amis, badges exclusifs de bêta.
@@ -619,30 +625,24 @@ end $$;
 
 -- Contrôle après migration : rien ne doit avoir changé (sauf les badges exclusifs, uniquement ajoutés)
 do $$
-declare r record; now_n numeric;
+declare b jsonb; a jsonb := jsonb_build_object(
+    'profiles', (select count(*) from public.profiles), 'scores', (select count(*) from public.scores),
+    'messages', (select count(*) from public.messages), 'friendships', (select count(*) from public.friendships),
+    'bc_ledger', (select count(*) from public.bc_ledger), 'notifications', (select count(*) from public.notifications),
+    'user_items', (select count(*) from public.user_items), 'beta_members', (select count(*) from public.beta_members),
+    'user_roles', (select count(*) from public.user_roles), 'season_claims', (select count(*) from public.season_claims),
+    'player_stats', (select count(*) from public.player_stats),
+    'sum_bc', (select coalesce(sum(bc), 0) from public.player_stats), 'sum_xp', (select coalesce(sum(xp), 0) from public.player_stats),
+    'sum_scores', (select coalesce(sum(score), 0) from public.scores),
+    'badges_deja_obtenus', (select count(*) from public.user_badges where badge_code not in ('beta_founder','founder')));
 begin
-  for r in select t, n from _mig_before loop
-    now_n := case r.t
-      when 'profiles' then (select count(*) from public.profiles)
-      when 'scores' then (select count(*) from public.scores)
-      when 'messages' then (select count(*) from public.messages)
-      when 'friendships' then (select count(*) from public.friendships)
-      when 'bc_ledger' then (select count(*) from public.bc_ledger)
-      when 'notifications' then (select count(*) from public.notifications)
-      when 'user_items' then (select count(*) from public.user_items)
-      when 'beta_members' then (select count(*) from public.beta_members)
-      when 'user_roles' then (select count(*) from public.user_roles)
-      when 'season_claims' then (select count(*) from public.season_claims)
-      when 'player_stats' then (select count(*) from public.player_stats)
-      when 'sum_bc' then (select coalesce(sum(bc), 0) from public.player_stats)
-      when 'sum_xp' then (select coalesce(sum(xp), 0) from public.player_stats)
-      when 'sum_scores' then (select coalesce(sum(score), 0) from public.scores)
-      when 'badges_deja_obtenus' then (select count(*) from public.user_badges where badge_code not in ('beta_founder','founder'))
-    end;
-    if now_n is distinct from r.n then
-      raise exception 'GARDE-FOU: % a change (% -> %). Migration annulee, rien n''a ete modifie.', r.t, r.n, now_n;
-    end if;
-  end loop;
+  if coalesce(current_setting('boygames.mig_tx', true), '') <> txid_current()::text then
+    raise exception 'EXECUTION EN PLUSIEURS MORCEAUX : relancer le script en entier, d''un seul bloc.';
+  end if;
+  b := current_setting('boygames.mig_before')::jsonb;
+  if a is distinct from b then
+    raise exception 'GARDE-FOU: des donnees existantes auraient change (% -> %). Migration annulee, rien n''a ete modifie.', b, a;
+  end if;
 end $$;
 
 commit;

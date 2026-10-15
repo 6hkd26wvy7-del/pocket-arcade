@@ -14,11 +14,24 @@ do $$ begin
   end if;
 end $$;
 
-create temp table _m8 on commit drop as select
-  (select count(*) from public.profiles) profiles, (select count(*) from public.scores) scores,
-  (select count(*) from public.user_badges) user_badges, (select count(*) from public.bc_ledger) bc_ledger,
-  (select count(*) from public.messages) messages, (select count(*) from public.friendships) friendships,
-  (select coalesce(sum(bc),0) from public.player_stats) sum_bc, (select coalesce(sum(xp),0) from public.player_stats) sum_xp;
+-- Photographie avant migration, gardée dans la transaction (pas de table temporaire).
+-- Garde-fou : si l'éditeur exécutait le script en plusieurs morceaux, le script s'arrête ici, avant toute modification.
+do $$
+begin
+  perform set_config('boygames.mig_tx', txid_current()::text, true);
+  perform set_config('boygames.mig_before', (jsonb_build_object(
+    'profiles', (select count(*) from public.profiles), 'scores', (select count(*) from public.scores),
+    'user_badges', (select count(*) from public.user_badges), 'bc_ledger', (select count(*) from public.bc_ledger),
+    'messages', (select count(*) from public.messages), 'friendships', (select count(*) from public.friendships),
+    'sum_bc', (select coalesce(sum(bc), 0) from public.player_stats), 'sum_xp', (select coalesce(sum(xp), 0) from public.player_stats)))::text, true);
+end $$;
+do $$
+begin
+  if coalesce(current_setting('boygames.mig_tx', true), '') <> txid_current()::text
+     or coalesce(current_setting('boygames.mig_before', true), '') = '' then
+    raise exception 'EXECUTION EN PLUSIEURS MORCEAUX : ce script doit etre lance en entier, d''un seul bloc. Rien n''a ete modifie.';
+  end if;
+end $$;
 
 -- BOYGAMES schema v8 — BOYBLOCKS : parties vérifiées côté base (aucun score envoyé par le téléphone n'est cru).
 -- Principe : le serveur donne la graine (le "tirage" des pièces), le joueur envoie la liste de ses coups,
@@ -388,13 +401,22 @@ end $$;
 revoke all on function public.sync_tiers(), public.my_tiers(), public.set_favorites(text[]), public.public_tiers(text) from public, anon;
 grant execute on function public.sync_tiers(), public.my_tiers(), public.set_favorites(text[]), public.public_tiers(text) to authenticated;
 
-do $$ declare b record; a record; begin
-  select * into b from _m8;
-  select (select count(*) from public.profiles) profiles, (select count(*) from public.scores) scores,
-    (select count(*) from public.user_badges) user_badges, (select count(*) from public.bc_ledger) bc_ledger,
-    (select count(*) from public.messages) messages, (select count(*) from public.friendships) friendships,
-    (select coalesce(sum(bc),0) from public.player_stats) sum_bc, (select coalesce(sum(xp),0) from public.player_stats) sum_xp into a;
-  if a is distinct from b then raise exception 'GARDE-FOU : des données existantes auraient changé (% -> %). Rien n''a été appliqué.', b, a; end if;
+do $$
+declare b jsonb; a jsonb := jsonb_build_object(
+    'profiles', (select count(*) from public.profiles), 'scores', (select count(*) from public.scores),
+    'user_badges', (select count(*) from public.user_badges), 'bc_ledger', (select count(*) from public.bc_ledger),
+    'messages', (select count(*) from public.messages), 'friendships', (select count(*) from public.friendships),
+    'sum_bc', (select coalesce(sum(bc), 0) from public.player_stats), 'sum_xp', (select coalesce(sum(xp), 0) from public.player_stats));
+begin
+  if coalesce(current_setting('boygames.mig_tx', true), '') <> txid_current()::text then
+    raise exception 'EXECUTION EN PLUSIEURS MORCEAUX : relancer le script en entier, d''un seul bloc.';
+  end if;
+  b := current_setting('boygames.mig_before')::jsonb;
+  if a is distinct from b then
+    raise exception 'GARDE-FOU : des donnees existantes auraient change (% -> %). Rien n''a ete applique.', b, a;
+  end if;
+end $$;
+do $$ begin
   if has_function_privilege('anon', 'public.bb_replay(bigint,jsonb,boolean)', 'execute')
      or has_function_privilege('authenticated', 'public.bb_replay(bigint,jsonb,boolean)', 'execute')
      or has_function_privilege('authenticated', 'public.bb_award(uuid,integer)', 'execute')
