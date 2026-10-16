@@ -26,7 +26,10 @@ window.supabase = { createClient: function(){
      case 'submit_continued_score': window.__cont=a; return ok({xp:5,bc:0,level:5,level_up:false,ranked:false});
      case 'submit_score': window.__ranked=(window.__ranked||[]).concat([a]); return ok({xp:6,bc:2,level:5,level_up:false,new_badges:[]});
      case 'my_missions': return ok([]);
-     case 'my_role': return ok(null);
+     case 'my_role': return ok(window.__role||null);
+     case 'beta_survey_get': return ok(window.__survey||null);
+     case 'beta_survey_save': window.__saves=(window.__saves||0)+1; window.__survey={answers:JSON.parse(JSON.stringify(a.p_answers)),comment:a.p_comment,completed_at:a.p_complete?new Date().toISOString():(window.__survey&&window.__survey.completed_at)||null}; return ok({ok:true,completed_at:window.__survey.completed_at});
+     case 'staff_beta_survey': return ok(window.__staffRows||[]);
      case 'my_notifications': return ok([]);
      case 'get_maintenance': return ok({on:false,message:''});
      case 'my_friends': return ok(friends);

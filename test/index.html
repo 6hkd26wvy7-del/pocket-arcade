@@ -442,6 +442,37 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
 .bugdet pre { white-space: pre-wrap; word-break: break-word; font-size: 11px; }
 .pill { display: inline-block; padding: 1px 7px; border-radius: 99px; font-size: 10px; border: 1px solid var(--line); margin-right: 4px; }
 .pill.blocker { border-color: #F43F5E; color: #FB7185; } .pill.high { border-color: #F59E0B; color: #FBBF24; }
+/* Questionnaire bêta + retours (administration) */
+.sv-nudge { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--text); border-color: var(--primary); }
+.sv-nudge b { display: block; font-family: var(--display); font-size: 16px; }
+.sv-nudge span { color: var(--muted); font-size: 13px; }
+.sv-prog { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; margin: 6px 0 14px; }
+.sv-prog i { display: block; height: 100%; background: var(--primary); border-radius: 3px; transition: width .2s; }
+.sv-sec { color: var(--cyan); font-weight: 700; font-size: 13px; letter-spacing: .04em; text-transform: uppercase; margin: 0; }
+.sv-q { font-family: var(--display); font-size: 20px; line-height: 1.3; margin: 6px 0 4px; }
+.sv-hint { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+.sv-opts { display: flex; flex-direction: column; gap: 8px; }
+.sv-opt { min-height: 52px; padding: 12px 16px; text-align: left; border-radius: 14px; border: 2px solid var(--line); background: var(--card-hi);
+  color: var(--text); font: 600 16px var(--body); cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.sv-opt[aria-pressed="true"] { border-color: var(--primary); background: rgba(124, 58, 237, .22); }
+.sv-opt[aria-pressed="true"]::after { content: " ✓"; color: var(--primary-hi); }
+.sv-nav { display: flex; gap: 8px; margin-top: 16px; flex-wrap: nowrap; }
+.sv-nav .btn { flex: 1; }
+.sv-skip { background: none; border: 0; color: var(--muted); font: 600 14px var(--body); text-decoration: underline; padding: 10px; cursor: pointer; }
+#view-questionnaire textarea { width: 100%; min-height: 120px; border-radius: 12px; border: 2px solid var(--line); background: var(--card-hi); color: var(--text); font: 16px var(--body); padding: 10px; box-sizing: border-box; }
+.rt-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.rt-kpi { background: var(--card-hi); border-radius: 12px; padding: 10px; text-align: center; }
+.rt-kpi b { display: block; font-family: var(--display); font-size: 26px; }
+.rt-kpi span { color: var(--muted); font-size: 12px; }
+.rt-row { display: grid; grid-template-columns: minmax(0, 1fr) 72px; gap: 4px 8px; align-items: center; margin: 6px 0; font-size: 14px; }
+.rt-row .lab { color: var(--text); overflow-wrap: anywhere; }
+.rt-row .val { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; }
+.rt-row .track { grid-column: 1 / -1; height: 10px; background: var(--line); border-radius: 0 4px 4px 0; }
+.rt-row .fill { height: 100%; background: var(--primary); border-radius: 0 4px 4px 0; min-width: 2px; }
+.rt-q { margin: 14px 0 4px; font-weight: 700; font-size: 15px; }
+.rt-n { color: var(--muted); font-size: 12px; font-weight: 600; }
+.rt-com { border-left: 3px solid var(--primary); padding: 4px 10px; margin: 10px 0; }
+.rt-com small { color: var(--muted); display: block; }
 </style>
 </head>
 <body>
@@ -469,6 +500,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
   <main>
     <section id="view-menu" hidden>
       <p id="menu-status" class="greet"></p>
+      <a id="menu-survey" class="panel sv-nudge" href="#questionnaire" hidden></a>
       <h2 id="games-title">Jouer</h2>
       <div id="game-list"></div>
       <div class="ad-slot" data-slot="home" hidden></div>
@@ -509,6 +541,19 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       <div id="fr-profile" class="panel" hidden></div>
       <div id="fr-chat" class="panel" hidden></div>
       <p id="fr-msg" class="msg" role="status"></p>
+    </section>
+
+    <section id="view-questionnaire" hidden>
+      <h2>Questionnaire bêta</h2>
+      <div id="sv-body" class="panel"></div>
+      <p id="sv-msg" class="msg" role="status"></p>
+    </section>
+
+    <section id="view-retours" hidden>
+      <h2>Retours bêta</h2>
+      <p class="small"><a href="#admin">&larr; Administration</a></p>
+      <div id="rt-body"></div>
+      <p id="rt-msg" class="msg" role="status"></p>
     </section>
 
     <section id="view-marketing" hidden>
@@ -1351,6 +1396,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       st.append(a, " pour garder tes scores.");
     }
     renderMeCard();
+    renderSurveyNudge();
     renderSeason();
     renderMissions();
     renderNews();
@@ -1770,6 +1816,288 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
   /* ---------- Marketing (équipe) : file de validation des vidéos ---------- */
   var mkFilter = "a_valider";
   var MK_STATUS = { a_valider: "À VALIDER", validee: "VALIDÉE", refusee: "REFUSÉE", publiee: "PUBLIÉE", erreur: "ERREUR" };
+  /* ---------- Questionnaire des bêta-testeurs ---------- */
+  // Les questions vivent ici (la base ne garde que les identifiants). Pour changer une question : modifier cette liste.
+  // Option : [identifiant, texte, libellé du problème] — un 3e élément = la réponse signale un problème (classement des retours).
+  // gate : question d'entrée de section (« Pas encore » saute la section : jeu non testé).
+  var SURVEY_VERSION = 1;
+  var SURVEY = [
+    { id: "compte", title: "Inscription et accueil", qs: [
+      { id: "q_inscription", text: "Créer ton compte et te connecter, c'était…", opts: [["tres_facile", "Très facile"], ["facile", "Facile"], ["complique", "Un peu compliqué", "Inscription compliquée"], ["difficile", "Difficile", "Inscription difficile"], ["echec", "Je n'ai pas réussi du premier coup", "Inscription ratée au premier essai"]] },
+      { id: "q_inscription_pb", many: true, text: "As-tu eu un de ces soucis de compte ?", opts: [["mail", "E-mail de confirmation pas reçu", "E-mail de confirmation pas reçu"], ["mdp", "Mot de passe refusé", "Mot de passe refusé"], ["pseudo", "Pseudo refusé", "Pseudo refusé"], ["deconnecte", "Déconnecté tout seul", "Déconnexions intempestives"], ["aucun", "Aucun souci"]] },
+      { id: "q_accueil", text: "L'écran d'accueil te paraît…", opts: [["tres_clair", "Très clair"], ["clair", "Clair"], ["confus", "Un peu confus", "Accueil confus"], ["tres_confus", "Vraiment confus", "Accueil très confus"]] },
+      { id: "q_navigation", text: "Trouver les jeux, les classements et ton profil avec la barre du bas…", opts: [["facile", "Facile"], ["ok", "Ça va"], ["difficile", "Difficile", "Navigation difficile"]] }
+    ] },
+    { id: "commandes", title: "Commandes sur téléphone", qs: [
+      { id: "q_tactile", text: "Les commandes au doigt répondent…", opts: [["parfait", "Parfaitement"], ["bien", "Bien"], ["parfois", "Parfois mal", "Commandes parfois imprécises"], ["mal", "Mal", "Commandes qui répondent mal"]] },
+      { id: "q_tactile_pb", many: true, text: "En jouant, est-ce que…", opts: [["defile", "La page défile toute seule", "La page défile pendant le jeu"], ["zoom", "L'écran zoome sans le vouloir", "Zoom involontaire"], ["glisse", "Un glissé n'est pas pris en compte", "Glissés non pris en compte"], ["doigt", "Mon doigt cache le jeu", "Le doigt cache le jeu"], ["aucun", "Rien de tout ça"]] }
+    ] },
+    { id: "snake", title: "Snake", gate: "As-tu joué à Snake ?", qs: [
+      { id: "q_snake_fun", text: "Snake, tu trouves ça…", opts: [["genial", "Génial"], ["bien", "Bien"], ["moyen", "Moyen"], ["bof", "Pas terrible", "Snake peu amusant"]] },
+      { id: "q_snake_speed", text: "La vitesse du serpent est…", opts: [["trop_lent", "Trop lente", "Snake trop lent"], ["un_peu_lent", "Un peu lente"], ["parfaite", "Parfaite"], ["un_peu_rapide", "Un peu rapide"], ["trop_rapide", "Trop rapide", "Snake trop rapide"]] },
+      { id: "q_snake_pb", many: true, text: "Dans Snake, as-tu remarqué…", opts: [["pomme", "Pomme difficile à voir", "Pomme difficile à voir"], ["virage", "Des virages ratés", "Virages ratés dans Snake"], ["injuste", "Une mort injuste", "Morts injustes dans Snake"], ["aucun", "Rien à signaler"]] }
+    ] },
+    { id: "boyblocks", title: "BOYBLOCKS", gate: "As-tu joué à BOYBLOCKS ?", qs: [
+      { id: "q_bb_fun", text: "BOYBLOCKS, tu trouves ça…", opts: [["genial", "Génial"], ["bien", "Bien"], ["moyen", "Moyen"], ["bof", "Pas terrible", "BOYBLOCKS peu amusant"]] },
+      { id: "q_bb_place", text: "Poser les pièces au doigt, c'est…", opts: [["tres_facile", "Très facile"], ["facile", "Facile"], ["imprecis", "Imprécis", "Pose des pièces imprécise"], ["difficile", "Difficile", "Pose des pièces difficile"]] },
+      { id: "q_bb_grid", text: "Quelle grille préfères-tu ?", opts: [["g8", "8 × 8"], ["g9", "9 × 9"], ["egal", "Les deux me vont"], ["pas_essaye", "Je n'ai pas essayé la 9 × 9"]] }
+    ] },
+    { id: "space", title: "Space Attack", gate: "As-tu joué à Space Attack ?", qs: [
+      { id: "q_space_fun", text: "Space Attack, tu trouves ça…", opts: [["genial", "Génial"], ["bien", "Bien"], ["moyen", "Moyen"], ["bof", "Pas terrible", "Space Attack peu amusant"]] },
+      { id: "q_space_bonus", text: "Les bonus (tir triple, laser, bouclier…) sont…", opts: [["clairs", "Utiles et clairs"], ["utiles", "Utiles"], ["flous", "Pas très clairs", "Bonus Space Attack peu clairs"], ["pas_vu", "Je ne les ai pas remarqués", "Bonus Space Attack pas remarqués"]] },
+      { id: "q_space_diff", text: "La difficulté de Space Attack est…", opts: [["facile", "Trop facile", "Space Attack trop facile"], ["bien", "Bien dosée"], ["dur", "Trop difficile", "Space Attack trop difficile"]] }
+    ] },
+    { id: "duels", title: "Jeux à deux en ligne", gate: "As-tu joué en ligne contre (ou avec) un ami ?", qs: [
+      { id: "q_duel_fun", text: "Les parties à deux, tu trouves ça…", opts: [["genial", "Génial"], ["bien", "Bien"], ["moyen", "Moyen"], ["bof", "Pas terrible", "Parties à deux peu amusantes"]] },
+      { id: "q_duel_pb", many: true, text: "Pendant ces parties, as-tu eu…", opts: [["coupure", "Une connexion perdue", "Connexion perdue en duel"], ["lag", "Du décalage (lag)", "Décalage en duel"], ["rejoindre", "Un ami qui n'arrive pas à rejoindre", "Impossible de rejoindre une salle"], ["demarre", "Une partie qui ne démarre pas", "Partie en ligne qui ne démarre pas"], ["aucun", "Aucun problème"]] }
+    ] },
+    { id: "boybot", title: "BOYBOT 🤖", gate: "As-tu joué avec BOYBOT, le joueur virtuel ?", qs: [
+      { id: "q_boybot", text: "Comme adversaire ou coéquipier, BOYBOT est…", opts: [["facile", "Trop facile", "BOYBOT trop facile"], ["bien", "Bien dosé"], ["fort", "Trop fort", "BOYBOT trop fort"], ["bizarre", "Il joue bizarrement", "BOYBOT joue bizarrement"]] },
+      { id: "q_boybot_human", text: "Il joue comme une vraie personne ?", opts: [["oui", "Oui, c'est crédible"], ["plutot", "Plutôt"], ["non", "Pas vraiment", "BOYBOT peu crédible"]] }
+    ] },
+    { id: "look", title: "Graphismes", qs: [
+      { id: "q_graphics", text: "Les graphismes de BOYGAMES sont…", opts: [["superbes", "Superbes"], ["jolis", "Jolis"], ["corrects", "Corrects"], ["a_revoir", "À revoir", "Graphismes à revoir"]] },
+      { id: "q_graphics_pb", many: true, text: "As-tu remarqué…", opts: [["texte", "Du texte trop petit", "Texte trop petit"], ["couleurs", "Des couleurs peu lisibles", "Couleurs peu lisibles"], ["coupe", "Des éléments coupés à l'écran", "Éléments coupés à l'écran"], ["lent", "Des lenteurs", "Lenteurs"], ["aucun", "Rien de tout ça"]] }
+    ] },
+    { id: "recompenses", title: "Récompenses", qs: [
+      { id: "q_rewards", text: "XP, BOYCOINS et badges te donnent envie de rejouer ?", opts: [["beaucoup", "Beaucoup"], ["un_peu", "Un peu"], ["non", "Pas vraiment", "Récompenses peu motivantes"], ["pas_vu", "Je ne les ai pas remarqués", "Récompenses pas remarquées"]] },
+      { id: "q_reco", text: "Recommanderais-tu BOYGAMES à un ami ?", opts: [["oui", "Oui, sûrement"], ["peut_etre", "Peut-être"], ["non", "Non", "Ne recommanderait pas BOYGAMES"]] }
+    ] }
+  ];
+  var SURVEY_Q = {}; SURVEY.forEach(function (s) { s.qs.forEach(function (q) { SURVEY_Q[q.id] = q; q.sec = s; }); });
+  var SURVEY_COUNT = Object.keys(SURVEY_Q).length;
+
+  var sv = { loaded: false, answers: {}, comment: "", completed_at: null, step: 0, editing: false, saveTimer: null };
+  function svDraftKey() { return "boygames-survey-" + (session && session.user ? session.user.id : "x"); }
+  function svSteps() {   // suite des écrans selon les réponses (une section non testée est sautée)
+    var out = [];
+    SURVEY.forEach(function (s) {
+      if (s.gate) out.push({ gate: s });
+      if (s.gate && sv.answers["g_" + s.id] !== "oui") return;
+      s.qs.forEach(function (q) { out.push({ q: q }); });
+    });
+    out.push({ end: true });
+    return out;
+  }
+  function svAnswered() { return Object.keys(SURVEY_Q).filter(function (k) { var v = sv.answers[k]; return v && (!Array.isArray(v) || v.length); }).length; }
+  async function svLoad() {
+    if (sv.loaded || !sb || !session) return;
+    var r = await sb.rpc("beta_survey_get");
+    if (!r.error && r.data) { sv.answers = r.data.answers || {}; sv.comment = r.data.comment || ""; sv.completed_at = r.data.completed_at; }
+    else { try { var d = JSON.parse(localStorage.getItem(svDraftKey()) || "null"); if (d) { sv.answers = d.answers || {}; sv.comment = d.comment || ""; } } catch (e) { /* ignore */ } }
+    sv.loaded = !r.error;
+  }
+  function svSave(complete) {
+    try { localStorage.setItem(svDraftKey(), JSON.stringify({ answers: sv.answers, comment: sv.comment })); } catch (e) { /* ignore */ }
+    clearTimeout(sv.saveTimer);
+    var go = function () {
+      return sb.rpc("beta_survey_save", { p_answers: sv.answers, p_comment: sv.comment, p_complete: !!complete, p_version: SURVEY_VERSION }).then(function (r) {
+        if (r.error) { setMsg($("sv-msg"), "Réponse gardée sur ce téléphone, envoi au serveur impossible pour l'instant.", true); return false; }
+        setMsg($("sv-msg"), "");
+        if (r.data && r.data.completed_at) sv.completed_at = r.data.completed_at;
+        return true;
+      });
+    };
+    if (complete) { sv.pending = null; return go(); }
+    sv.pending = go;
+    sv.saveTimer = setTimeout(function () { sv.pending = null; go(); }, 700);   // brouillon : enregistré automatiquement
+    return Promise.resolve(true);
+  }
+  // l'appli passe en arrière-plan (ou se ferme) : le brouillon en attente part tout de suite
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden && sv.pending) { clearTimeout(sv.saveTimer); var f = sv.pending; sv.pending = null; f(); }
+  });
+
+  async function renderSurveyNudge() {
+    var box = $("menu-survey");
+    box.hidden = true;
+    if (!online || !session || !profile) return;
+    await svLoad();
+    if (sv.completed_at) return;
+    box.textContent = "";
+    var n = svAnswered();
+    var t = el("div", "");
+    t.append(el("b", "", "📝 Donne ton avis sur la bêta"), el("span", "", n ? "Tu en es à " + n + " réponses sur " + SURVEY_COUNT + ". Reprends quand tu veux." : "Questionnaire rapide : environ 3 minutes, au doigt."));
+    box.append(t);
+    box.hidden = false;
+  }
+
+  async function renderSurvey() {
+    var body = $("sv-body"); body.textContent = ""; setMsg($("sv-msg"), "");
+    if (!online || !session || !profile) {
+      body.append(el("p", "", "Connecte-toi pour répondre au questionnaire des bêta-testeurs."));
+      var a = el("a", "btn", "SE CONNECTER"); a.href = "#compte"; body.append(a); return;
+    }
+    body.append(el("p", "small", "Chargement…"));
+    await svLoad();
+    if (sv.completed_at && !sv.editing) return svThanks();
+    svShow();
+  }
+  function svThanks() {
+    var body = $("sv-body"); body.textContent = "";
+    body.append(el("p", "sv-q", "Merci ! 🙏"));
+    body.append(el("p", "sv-hint", "Tes réponses ont été envoyées le " + new Date(sv.completed_at).toLocaleDateString("fr-FR") + ". Elles aident directement à améliorer BOYGAMES."));
+    var nav = el("div", "sv-nav");
+    var ed = el("button", "btn", "MODIFIER MES RÉPONSES"); ed.type = "button";
+    ed.addEventListener("click", function () { sv.editing = true; sv.step = 0; svShow(); });
+    var home = el("a", "btn alt", "ACCUEIL"); home.href = "#menu";
+    nav.append(ed, home); body.append(nav);
+  }
+  function svShow() {
+    var steps = svSteps(), body = $("sv-body");
+    if (sv.step >= steps.length) sv.step = steps.length - 1;
+    if (sv.step < 0) sv.step = 0;
+    var st = steps[sv.step];
+    body.textContent = "";
+    var prog = el("div", "sv-prog"), bar = el("i"); bar.style.width = Math.round(100 * sv.step / (steps.length - 1)) + "%"; prog.append(bar);
+    prog.setAttribute("role", "progressbar"); prog.setAttribute("aria-valuemin", "0"); prog.setAttribute("aria-valuemax", String(steps.length - 1)); prog.setAttribute("aria-valuenow", String(sv.step));
+    body.append(prog);
+    var next = function () { sv.step++; svShow(); window.scrollTo(0, 0); };
+    var nav = el("div", "sv-nav");
+    var back = el("button", "btn alt", "← RETOUR"); back.type = "button"; back.disabled = sv.step === 0;
+    back.addEventListener("click", function () { sv.step--; svShow(); });
+
+    if (st.end) {
+      body.append(el("p", "sv-sec", "Dernière étape"));
+      body.append(el("p", "sv-q", "Un commentaire, une idée, un bug ?"));
+      body.append(el("p", "sv-hint", svAnswered() + " réponses sur " + SURVEY_COUNT + " (les jeux non testés sont ignorés). Facultatif : écris ce que tu veux."));
+      var ta = el("textarea"); ta.maxLength = 2000; ta.value = sv.comment; ta.setAttribute("aria-label", "Commentaire libre");
+      ta.addEventListener("input", function () { sv.comment = ta.value; svSave(false); });
+      body.append(ta);
+      var send = el("button", "btn", sv.completed_at ? "ENREGISTRER" : "ENVOYER"); send.type = "button";
+      send.addEventListener("click", function () {
+        send.disabled = true; setMsg($("sv-msg"), "Envoi…");
+        svSave(true).then(function (ok) { send.disabled = false; if (ok) { sv.editing = false; svThanks(); renderSurveyNudge(); } });
+      });
+      nav.append(back, send); body.append(nav);
+      return;
+    }
+    var sec = st.gate || st.q.sec;
+    body.append(el("p", "sv-sec", sec.title));
+    var opts = el("div", "sv-opts");
+    if (st.gate) {
+      body.append(el("p", "sv-q", sec.gate));
+      body.append(el("p", "sv-hint", "Si tu ne l'as pas encore essayé, ces questions sont passées."));
+      [["oui", "Oui"], ["non", "Pas encore"]].forEach(function (o) {
+        var b = el("button", "sv-opt", o[1]); b.type = "button"; b.setAttribute("aria-pressed", String(sv.answers["g_" + sec.id] === o[0]));
+        b.addEventListener("click", function () { sv.answers["g_" + sec.id] = o[0]; svSave(false); svShow(); setTimeout(next, 180); });
+        opts.append(b);
+      });
+      body.append(opts); nav.append(back); body.append(nav);
+      return;
+    }
+    var q = st.q, cur = sv.answers[q.id];
+    body.append(el("p", "sv-q", q.text));
+    body.append(el("p", "sv-hint", q.many ? "Plusieurs réponses possibles." : "Une seule réponse."));
+    q.opts.forEach(function (o) {
+      var on = q.many ? Array.isArray(cur) && cur.indexOf(o[0]) >= 0 : cur === o[0];
+      var b = el("button", "sv-opt", o[1]); b.type = "button"; b.setAttribute("aria-pressed", String(on));
+      b.addEventListener("click", function () {
+        if (q.many) {
+          var list = Array.isArray(sv.answers[q.id]) ? sv.answers[q.id].slice() : [];
+          var i = list.indexOf(o[0]);
+          if (i >= 0) list.splice(i, 1);
+          else if (o[0] === "aucun") list = ["aucun"];                       // « aucun » exclut les autres choix
+          else { list = list.filter(function (x) { return x !== "aucun"; }); list.push(o[0]); }
+          sv.answers[q.id] = list; svSave(false); svShow();
+        } else { sv.answers[q.id] = o[0]; svSave(false); svShow(); setTimeout(next, 180); }
+      });
+      opts.append(b);
+    });
+    body.append(opts);
+    var skip = el("button", "sv-skip", "Passer cette question"); skip.type = "button";
+    skip.addEventListener("click", function () { delete sv.answers[q.id]; svSave(false); next(); });
+    if (q.many) { var nx = el("button", "btn", "SUIVANT →"); nx.type = "button"; nx.addEventListener("click", next); nav.append(back, nx); }
+    else nav.append(back);
+    body.append(nav, skip);
+  }
+
+  /* ---------- Retours bêta (administration) ---------- */
+  async function renderRetours() {
+    var body = $("rt-body"); body.textContent = ""; setMsg($("rt-msg"), "");
+    if (!sb || !session || !role) { body.append(el("div", "panel", "Accès réservé à l'équipe.")); return; }
+    setMsg($("rt-msg"), "Chargement…");
+    var r = await sb.rpc("staff_beta_survey");
+    if (r.error) { setMsg($("rt-msg"), "Retours indisponibles (migration v15 non appliquée ?).", true); return; }
+    setMsg($("rt-msg"), "");
+    var rows = r.data || [], sent = rows.filter(function (x) { return x.completed_at; });
+    function panel(title) { var p = el("div", "panel"); p.append(el("h3", "", title)); body.append(p); return p; }
+    function bars(box, items, denom) {   // barres horizontales : une couleur, valeur écrite à côté (pas de couleur seule)
+      var max = Math.max.apply(null, items.map(function (i) { return i.n; }).concat([1]));
+      items.forEach(function (i) {
+        var row = el("div", "rt-row"), pct = denom ? Math.round(100 * i.n / denom) : 0;
+        row.title = i.label + " : " + i.n + (denom ? " sur " + denom + " (" + pct + " %)" : "");
+        row.append(el("span", "lab", i.label), el("span", "val", i.n + (denom ? " · " + pct + " %" : "")));
+        var tr = el("div", "track"), f = el("div", "fill"); f.style.width = (100 * i.n / max) + "%"; tr.append(f); row.append(tr);
+        box.append(row);
+      });
+    }
+    // 1. chiffres clés
+    var k = panel("EN BREF"), kp = el("div", "rt-kpis");
+    [[sent.length, "envoyés"], [rows.length - sent.length, "en cours"], [rows.filter(function (x) { return (x.comment || "").trim(); }).length, "commentaires"]].forEach(function (x) {
+      var d = el("div", "rt-kpi"); d.append(el("b", "", String(x[0])), el("span", "", x[1])); kp.append(d);
+    });
+    k.append(kp);
+    var only = el("label", "small"), cb = el("input"); cb.type = "checkbox"; cb.checked = !!renderRetours.onlySent;
+    only.append(cb, document.createTextNode(" Compter seulement les questionnaires envoyés (sinon : brouillons inclus)"));
+    cb.addEventListener("change", function () { renderRetours.onlySent = cb.checked; renderRetours(); });
+    k.append(only);
+    var base = renderRetours.onlySent ? sent : rows;
+    if (!base.length) { k.append(el("p", "small", "Aucune réponse pour l'instant.")); return; }
+    // 2. problèmes les plus signalés (toutes questions confondues), en nombre de testeurs
+    var pb = {};
+    base.forEach(function (x) {
+      Object.keys(x.answers || {}).forEach(function (qid) {
+        var q = SURVEY_Q[qid]; if (!q) return;
+        var v = x.answers[qid], list = Array.isArray(v) ? v : [v];
+        q.opts.forEach(function (o) { if (o[2] && list.indexOf(o[0]) >= 0) { var key = qid + ":" + o[0]; pb[key] = pb[key] || { label: o[2], n: 0, sec: q.sec.title }; pb[key].n++; } });
+      });
+    });
+    var top = Object.keys(pb).map(function (key) { return pb[key]; }).sort(function (a, b) { return b.n - a.n || a.label.localeCompare(b.label); });
+    var pp = panel("PROBLÈMES LES PLUS SIGNALÉS");
+    pp.append(el("p", "small", "Nombre de testeurs qui ont signalé chaque problème (sur " + base.length + ")."));
+    if (!top.length) pp.append(el("p", "small", "Aucun problème signalé. 🎉"));
+    else bars(pp, top.slice(0, 15).map(function (t) { return { label: t.label + " (" + t.sec + ")", n: t.n }; }), base.length);
+    // 3. réponses question par question
+    SURVEY.forEach(function (s) {
+      var p = panel(s.title.toUpperCase());
+      if (s.gate) {
+        var yes = base.filter(function (x) { return x.answers && x.answers["g_" + s.id] === "oui"; }).length;
+        var no = base.filter(function (x) { return x.answers && x.answers["g_" + s.id] === "non"; }).length;
+        p.append(el("p", "small", "Testé par " + yes + " testeur(s), pas encore par " + no + "."));
+      }
+      s.qs.forEach(function (q) {
+        var answered = base.filter(function (x) { var v = x.answers && x.answers[q.id]; return v && (!Array.isArray(v) || v.length); });
+        var h = el("p", "rt-q", q.text + " "); h.append(el("span", "rt-n", answered.length + " réponse(s)" + (q.many ? ", plusieurs choix possibles" : "")));
+        p.append(h);
+        if (!answered.length) return;
+        bars(p, q.opts.map(function (o) {
+          return { label: o[1], n: answered.filter(function (x) { var v = x.answers[q.id]; return Array.isArray(v) ? v.indexOf(o[0]) >= 0 : v === o[0]; }).length };
+        }), answered.length);
+      });
+    });
+    // 4. commentaires
+    var pc = panel("COMMENTAIRES");
+    var coms = base.filter(function (x) { return (x.comment || "").trim(); });
+    if (!coms.length) pc.append(el("p", "small", "Pas encore de commentaire."));
+    coms.forEach(function (x) {
+      var d = el("div", "rt-com"); d.append(el("small", "", x.pseudo + " · " + new Date(x.updated_at).toLocaleDateString("fr-FR") + (x.completed_at ? "" : " · brouillon")), el("p", "", x.comment));
+      pc.append(d);
+    });
+    // 5. réponses par testeur
+    var pt = panel("PAR TESTEUR");
+    base.forEach(function (x) {
+      var det = el("details"), sum = el("summary", "", x.pseudo + (x.completed_at ? " — envoyé le " + new Date(x.completed_at).toLocaleDateString("fr-FR") : " — brouillon"));
+      det.append(sum);
+      Object.keys(SURVEY_Q).forEach(function (qid) {
+        var v = x.answers && x.answers[qid]; if (!v || (Array.isArray(v) && !v.length)) return;
+        var q = SURVEY_Q[qid], lab = (Array.isArray(v) ? v : [v]).map(function (id) { var o = q.opts.find(function (o2) { return o2[0] === id; }); return o ? o[1] : id; }).join(", ");
+        det.append(el("p", "small", q.text + " → " + lab));
+      });
+      pt.append(det);
+    });
+  }
+
   async function renderMarketing() {
     var body = $("mk-body"), msg = $("mk-msg");
     setMsg(msg, ""); body.textContent = "";
@@ -1954,6 +2282,10 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
         act(sb.rpc("staff_game_settings_set", { p_key: "boyblocks9", p_value: { enabled: on } }), on ? "9×9 activé." : "Retour au 8×8 : le 9×9 n'est plus proposé.").then(function (ok) { if (ok) loadMonet().then(renderAdmin); });
       });
       p9.append(b9);
+
+      var prt = panel("RETOURS BÊTA");
+      prt.append(el("p", "small", "Réponses des testeurs au questionnaire : statistiques, problèmes les plus signalés, commentaires."));
+      var art = el("a", "btn", "OUVRIR LES RETOURS"); art.href = "#retours"; prt.append(art);
 
       var pmk = panel("MARKETING");
       pmk.append(el("p", "small", "Vidéos fabriquées chaque jour à partir de vraies parties : aperçu, validation, calendrier. Rien n'est publié sans validation."));
@@ -2319,6 +2651,11 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     $("acc-pseudo").textContent = profile.pseudo;
     $("acc-mail").textContent = session.user.email || "";
     $("acc-country").textContent = profile.country === "FR" ? "PAYS : FRANCE" : "PAYS : AUTRE";
+    var sl = el("p", "", "");
+    var sa = el("a", "btn alt", "QUESTIONNAIRE BÊTA");
+    sa.href = "#questionnaire";
+    sl.append(sa);
+    $("acc-level").after(sl);
     if (role) {
       var al = el("p", "", "");
       var aa = el("a", "btn", "ADMINISTRATION");
@@ -4536,7 +4873,7 @@ return {SIZE: SIZE, SIZES: SIZES, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid
   });
 
   /* ---------- Router ---------- */
-  var VIEWS = ["menu", "scores", "amis", "boutique", "compte", "admin", "marketing", "snake", "arena", "blocks", "boyblocks", "space"];
+  var VIEWS = ["menu", "scores", "amis", "boutique", "compte", "admin", "marketing", "questionnaire", "retours", "snake", "arena", "blocks", "boyblocks", "space"];
 
   function route() {
     var h = (location.hash || "#menu").slice(1);
@@ -4549,7 +4886,7 @@ return {SIZE: SIZE, SIZES: SIZES, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid
     if (h !== "amis") stopChatTimer();
     current = h;
     VIEWS.forEach(function (v) { $("view-" + v).hidden = v !== h; });
-    var tabOf = { boutique: "compte", admin: "compte", marketing: "compte", arena: "menu", snake: "menu", blocks: "menu", boyblocks: "menu", space: "menu" };
+    var tabOf = { boutique: "compte", admin: "compte", marketing: "compte", questionnaire: "compte", retours: "compte", arena: "menu", snake: "menu", blocks: "menu", boyblocks: "menu", space: "menu" };
     document.querySelectorAll("[data-nav]").forEach(function (a) {
       var on = a.getAttribute("data-nav") === (tabOf[h] || h);
       a.classList.toggle("on", on);
@@ -4562,6 +4899,8 @@ return {SIZE: SIZE, SIZES: SIZES, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid
     if (h === "amis") renderFriends();
     if (h === "admin") renderAdmin();
     if (h === "marketing") renderMarketing();
+    if (h === "questionnaire") renderSurvey();
+    if (h === "retours") renderRetours();
     if (h !== "snake") loadMaint();
     if (h === "compte") renderAccount();
     if (h === "snake") snake.enter();

@@ -31,6 +31,8 @@ try:
     run_file(c, f"{REPO}/schema_v12_monetisation.sql"); run_file(c, f"{REPO}/schema_v12_monetisation.sql")
     run_file(c, f"{REPO}/schema_v13_marketing.sql"); run_file(c, f"{REPO}/schema_v13_marketing.sql")
     run_file(c, f"{REPO}/schema_v14_boyblocks_9x9.sql"); run_file(c, f"{REPO}/schema_v14_boyblocks_9x9.sql")
+    run_file(c, f"{REPO}/schema_v15_questionnaire.sql"); run_file(c, f"{REPO}/schema_v15_questionnaire.sql")
+    run_file(c, f"{REPO}/schema_v6_v7.sql")   # la liste blanche relancée garde les fonctions du questionnaire
     sql("update public.app_settings set value = 'false' where key = 'maintenance'") if sql("select to_regclass('public.app_settings')")[0][0] else None
     print("app_settings:", sql("select * from public.app_settings"))
 
@@ -245,6 +247,22 @@ console.log(JSON.stringify({moves:g.log,score:g.score}));""" % os.path.join(os.p
     as_user(c, U1, """select staff_game_settings_set('boyblocks9', '{"enabled": true}'::jsonb)""")
     t("paliers 9x9 définis", lambda: sql("select count(*) from badge_tracks where game = 'boyblocks9'")[0][0])
     t("favori « boyblocks9 » accepté s'il est débloqué", lambda: (as_user(c, U2, "select sync_tiers()"), sql("insert into user_tiers (user_id, game, tier) values (%s, 'boyblocks9', 0) on conflict do nothing", (U2,)), as_user(c, U2, "select set_favorites(array['boyblocks9:0'])"), sql("select favorites from profiles where id = %s", (U2,))[0][0])[3])
+
+    print("== v15 : questionnaire bêta")
+    t("pas encore de réponses", lambda: as_user(c, U2, "select beta_survey_get()")[0][0] is None or (_ for _ in ()).throw(Exception("pas vide")))
+    t("brouillon enregistré", lambda: as_user(c, U2, """select beta_survey_save('{"q_snake_speed": "trop_rapide", "q_tactile_pb": ["zoom", "defile"], "g_space": "non"}'::jsonb, '', false, 1)->>'ok'""")[0][0])
+    t("brouillon relu (non envoyé)", lambda: (lambda r: (r["answers"]["q_tactile_pb"], r["completed_at"]))(as_user(c, U2, "select beta_survey_get()")[0][0]))
+    t("envoi avec commentaire", lambda: as_user(c, U2, """select beta_survey_save('{"q_snake_speed": "parfaite", "q_tactile_pb": ["zoom"]}'::jsonb, 'Super jeu !', true, 1)->>'completed_at' is not null""")[0][0])
+    t("modification après envoi : une seule ligne, réponse remplacée", lambda: (as_user(c, U2, """select beta_survey_save('{"q_snake_speed": "un_peu_rapide"}'::jsonb, 'Super jeu !', false, 1)"""),
+        sql("select count(*), max(answers->>'q_snake_speed'), bool_and(completed_at is not null) from beta_survey where user_id = %s", (U2,))[0])[1])
+    t("valeur libre refusée (pas de texte arbitraire)", lambda: must_fail(lambda: as_user(c, U2, """select beta_survey_save('{"q_snake_speed": "<script>"}'::jsonb)"""), "invalid answers"))
+    t("clé invalide refusée", lambda: must_fail(lambda: as_user(c, U2, """select beta_survey_save('{"Q SNAKE": "x"}'::jsonb)"""), "invalid answers"))
+    t("liste trop longue refusée", lambda: must_fail(lambda: as_user(c, U2, """select beta_survey_save('{"q": ["a","b","c","d","e","f","g","h","i","j","k"]}'::jsonb)"""), "invalid answers"))
+    t("commentaire trop long refusé", lambda: must_fail(lambda: as_user(c, U2, "select beta_survey_save('{}'::jsonb, repeat('x', 2001))"), "comment too long"))
+    t("visiteur refusé", lambda: must_fail(lambda: as_user(c, None, "select beta_survey_save('{}'::jsonb)"), "permission denied"))
+    t("réponses d'équipe refusées à un joueur", lambda: must_fail(lambda: as_user(c, U2, "select staff_beta_survey()"), "forbidden"))
+    t("table illisible en direct", lambda: must_fail(lambda: as_user(c, U2, "select * from beta_survey"), "permission denied"))
+    t("équipe : réponses avec pseudo", lambda: [(r["pseudo"], r["answers"], r["comment"]) for r in as_user(c, U1, "select staff_beta_survey()")[0][0]])
 
     print("== v9 : badges à paliers")
     t("sync_tiers tintintest", lambda: as_user(c, U1, "select sync_tiers()")[0][0])

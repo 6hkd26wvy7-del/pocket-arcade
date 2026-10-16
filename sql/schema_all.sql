@@ -2137,7 +2137,7 @@ revoke insert, update, delete, truncate on public.bug_reports from anon, authent
 -- Désormais : AUCUNE fonction n'est appelable, sauf la liste blanche ci-dessous.
 do $$
 declare r record;
-  api text[] := array['arena_check', 'block_user', 'boyblocks_finish', 'boyblocks_start', 'boyblocks_start_v2', 'boyblocks_start_v3', 'game_settings_public', 'my_tiers', 'public_tiers', 'set_favorites', 'sync_tiers', 'buy_item', 'claim_daily', 'claim_mission', 'claim_season_rewards', 'conversation', 'delete_my_account', 'economy_public', 'equip_item', 'get_maintenance', 'leaderboard', 'leaderboard_friends', 'leaderboard_season', 'mark_notifications_read', 'me', 'monetization_public', 'my_access', 'my_blocks', 'my_friends', 'my_missions', 'my_notifications', 'my_role', 'my_season_rewards', 'my_standing', 'public_profile', 'remove_friend', 'report_user', 'rewarded_continue', 'respond_friend_request', 'send_friend_request', 'send_message', 'set_avatar', 'set_featured_badge', 'submit_bug_report', 'submit_continued_score', 'submit_score', 'unblock_user'];
+  api text[] := array['arena_check', 'beta_survey_get', 'beta_survey_save', 'block_user', 'boyblocks_finish', 'boyblocks_start', 'boyblocks_start_v2', 'boyblocks_start_v3', 'game_settings_public', 'my_tiers', 'public_tiers', 'set_favorites', 'sync_tiers', 'buy_item', 'claim_daily', 'claim_mission', 'claim_season_rewards', 'conversation', 'delete_my_account', 'economy_public', 'equip_item', 'get_maintenance', 'leaderboard', 'leaderboard_friends', 'leaderboard_season', 'mark_notifications_read', 'me', 'monetization_public', 'my_access', 'my_blocks', 'my_friends', 'my_missions', 'my_notifications', 'my_role', 'my_season_rewards', 'my_standing', 'public_profile', 'remove_friend', 'report_user', 'rewarded_continue', 'respond_friend_request', 'send_friend_request', 'send_message', 'set_avatar', 'set_featured_badge', 'submit_bug_report', 'submit_continued_score', 'submit_score', 'unblock_user'];
   anon_ok text[] := array['get_maintenance','leaderboard','leaderboard_season','monetization_public','game_settings_public'];
 begin
   revoke execute on all functions in schema public from public, anon, authenticated;
@@ -3676,3 +3676,74 @@ grant execute on function public.boyblocks_start_v3(int), public.boyblocks_finis
   public.staff_game_settings_set(text, jsonb), public.game_settings_public() to authenticated;
 grant execute on function public.game_settings_public() to anon;
 
+-- BOYGAMES schema v15 — questionnaire des bêta-testeurs. Voir schema_v15_questionnaire.sql.
+-- ============ Table ============
+create table if not exists public.beta_survey (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  version int not null default 1,
+  answers jsonb not null default '{}'::jsonb,        -- { "q_snake_speed": "parfaite", "q_tactile_pb": ["zoom", "defile"], ... }
+  comment text not null default '' check (char_length(comment) <= 2000),
+  completed_at timestamptz,                          -- null = brouillon (questionnaire pas encore envoyé)
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  saves int not null default 0
+);
+alter table public.beta_survey enable row level security;
+revoke all on public.beta_survey from anon, authenticated;
+
+-- ============ Fonctions du site ============
+-- Ses propres réponses (pour reprendre ou modifier).
+create or replace function public.beta_survey_get() returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare uid uuid := auth.uid(); r public.beta_survey;
+begin
+  if uid is null then raise exception 'not authenticated'; end if;
+  select * into r from public.beta_survey where user_id = uid;
+  if not found then return null; end if;
+  return jsonb_build_object('version', r.version, 'answers', r.answers, 'comment', r.comment,
+    'completed_at', r.completed_at, 'updated_at', r.updated_at);
+end $$;
+
+-- Enregistre (ou remplace) ses réponses. p_complete = true quand le testeur appuie sur « Envoyer ».
+-- Contrôles : identifiants courts (lettres, chiffres, _), choix simple ou liste de 10 choix au plus.
+create or replace function public.beta_survey_save(p_answers jsonb, p_comment text default '', p_complete boolean default false, p_version int default 1)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare uid uuid := auth.uid(); k text; v jsonb; x jsonb; c text := trim(coalesce(p_comment, '')); r public.beta_survey;
+begin
+  perform public.guard_action(uid);
+  if p_answers is null or jsonb_typeof(p_answers) <> 'object' then raise exception 'invalid answers'; end if;
+  if (select count(*) from jsonb_object_keys(p_answers)) > 60 then raise exception 'invalid answers'; end if;
+  if p_version is null or p_version not between 1 and 99 then raise exception 'invalid version'; end if;
+  if char_length(c) > 2000 then raise exception 'comment too long'; end if;
+  for k, v in select * from jsonb_each(p_answers) loop
+    if k !~ '^[a-z][a-z0-9_]{1,23}$' then raise exception 'invalid answers'; end if;
+    if jsonb_typeof(v) = 'string' then
+      if (v #>> '{}') !~ '^[a-z0-9_]{1,24}$' then raise exception 'invalid answers'; end if;
+    elsif jsonb_typeof(v) = 'array' then
+      if jsonb_array_length(v) > 10 then raise exception 'invalid answers'; end if;
+      for x in select * from jsonb_array_elements(v) loop
+        if jsonb_typeof(x) <> 'string' or (x #>> '{}') !~ '^[a-z0-9_]{1,24}$' then raise exception 'invalid answers'; end if;
+      end loop;
+    elsif jsonb_typeof(v) <> 'null' then raise exception 'invalid answers';
+    end if;
+  end loop;
+  insert into public.beta_survey as s (user_id, version, answers, comment, completed_at, saves)
+  values (uid, p_version, p_answers, c, case when p_complete then now() end, 1)
+  on conflict (user_id) do update set version = excluded.version, answers = excluded.answers, comment = excluded.comment,
+    completed_at = case when p_complete then now() else s.completed_at end, updated_at = now(), saves = s.saves + 1
+  returning * into r;
+  return jsonb_build_object('ok', true, 'completed_at', r.completed_at, 'updated_at', r.updated_at);
+end $$;
+
+-- ============ Administration (équipe) ============
+-- Toutes les réponses, avec le pseudo du testeur. Les statistiques sont calculées par la page « Retours bêta ».
+create or replace function public.staff_beta_survey() returns jsonb language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_staff() then raise exception 'forbidden'; end if;
+  return coalesce((select jsonb_agg(jsonb_build_object('pseudo', coalesce(public.pseudo_of(s.user_id), '?'), 'version', s.version,
+      'answers', s.answers, 'comment', s.comment, 'completed_at', s.completed_at, 'updated_at', s.updated_at) order by s.updated_at desc)
+    from public.beta_survey s), '[]'::jsonb);
+end $$;
+
+-- ============ Droits ============
+revoke all on function public.beta_survey_get(), public.beta_survey_save(jsonb, text, boolean, int), public.staff_beta_survey() from public, anon;
+grant execute on function public.beta_survey_get(), public.beta_survey_save(jsonb, text, boolean, int), public.staff_beta_survey() to authenticated;

@@ -6,6 +6,20 @@ Le plus récent en haut. Chaque entrée : ce qui a été fait, où, et ce qui re
 
 ---
 
+## 16/10/2026 — questionnaire des bêta-testeurs (TEST)
+
+- Questionnaire intégré (`#questionnaire`) : une question par écran, gros boutons au doigt, barre de progression,
+  23 questions en 9 parties (dont inscription/connexion, vitesse de Snake, BOYBOT), sections de jeu sautées si
+  « Pas encore » testé, chaque question peut être passée, commentaire libre. Brouillon enregistré automatiquement
+  (et envoyé tout de suite si l'appli passe en arrière-plan), réponses modifiables après envoi.
+- Accès : rappel discret sur l'accueil tant que le questionnaire n'est pas envoyé ; bouton dans Profil.
+- Administration → Retours bêta (`#retours`) : chiffres clés, problèmes les plus signalés (en nombre de testeurs),
+  barres par question, commentaires, réponses par testeur ; filtre « envoyés seulement ».
+- Base : migration v15 (`beta_survey`, `beta_survey_get/save`, `staff_beta_survey`) appliquée sur TEST après
+  sauvegarde vérifiée (id 6) ; données intactes (4 profils, 70 scores, 457 BC). Moteurs, BOYBOT et serveur non touchés.
+- La liste d'origine de 19 questions n'a pas été retrouvée : questions reconstituées (voir `docs/QUESTIONNAIRE.md`),
+  à remplacer facilement si besoin.
+
 ## 16/10/2026 — BOYBOT 🤖, joueur virtuel (TEST)
 
 - Architecture : BOYBOT vit dans la salle de jeu du serveur (place 2). À chaque tour il envoie les mêmes ordres

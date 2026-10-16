@@ -21,6 +21,7 @@ const TESTS = {
   "bb9.mjs": ["bouton grille : GRILLE 9×9", "\"size\":9", "envoyés identiques: true", "essai désactivé : bouton caché true"],
   "multi-visuel.mjs": ["multi-visuel OK"],
   "boybot.mjs": ["boybot OK"],
+  "questionnaire.mjs": ["questionnaire OK"],
   "iphone.mjs": ["envoyés identiques: true", "Score vérifié et enregistré", "protection ok", "accueil ok"],
 };
 let bad = 0;
