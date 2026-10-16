@@ -35,6 +35,12 @@ window.supabase = { createClient: function(){
      case 'beta_mission_set': window.__beta.missions[a.p_code]={status:a.p_status,note:a.p_note}; return ok({ok:true,eligible:false});
      case 'staff_beta_overview': return ok(window.__overview||{version:1,codes:['compte','snake'],required:['compte','snake'],beta_on:false,testers:[]});
      case 'staff_beta_validate': window.__validated=a; return ok({ok:true,badge_added:true});
+     case 'my_access': return ok(window.__access||null);
+     case 'beta_redeem': window.__redeemed=(window.__redeemed||[]).concat([a.p_code]); if(String(a.p_code).replace(/[^A-Z0-9]/gi,'').toUpperCase()===(window.__goodCode||'AB12CD34')){ window.__access={beta_on:true,allowed:true}; return ok({ok:true,status:'joined'}); } return ok({ok:false,status:'invalid'});
+     case 'staff_beta_invite_create': window.__invites=(window.__invites||[]).concat([{code:'K7P2Q9XZ',note:a.p_note,created_at:new Date().toISOString(),expires_at:new Date(Date.now()+a.p_days*864e5).toISOString(),max_uses:a.p_max_uses,uses:0,revoked:false,by:'Quentin',players:[]}]); return ok({code:'K7P2Q9XZ',expires_at:'',max_uses:a.p_max_uses});
+     case 'staff_beta_invites': return ok(window.__invites||[]);
+     case 'staff_beta_invite_revoke': return ok(null);
+     case 'staff_beta_list': return ok([{pseudo:'Joh'}]);
      case 'my_notifications': return ok([]);
      case 'get_maintenance': return ok({on:false,message:''});
      case 'my_friends': return ok(friends);

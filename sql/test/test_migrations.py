@@ -36,6 +36,7 @@ try:
     run_file(c, f"{REPO}/schema_v16_espace_beta.sql"); run_file(c, f"{REPO}/schema_v16_espace_beta.sql")
     badges_apres = sql("select count(*) from user_badges")[0][0]
     run_file(c, f"{REPO}/schema_v17_plafond_space.sql"); run_file(c, f"{REPO}/schema_v17_plafond_space.sql")
+    run_file(c, f"{REPO}/schema_v18_invitations.sql"); run_file(c, f"{REPO}/schema_v18_invitations.sql")
     run_file(c, f"{REPO}/schema_v6_v7.sql")   # la liste blanche relancée garde les fonctions du questionnaire
     sql("update public.app_settings set value = 'false' where key = 'maintenance'") if sql("select to_regclass('public.app_settings')")[0][0] else None
     print("app_settings:", sql("select * from public.app_settings"))
@@ -267,6 +268,35 @@ console.log(JSON.stringify({moves:g.log,score:g.score}));""" % os.path.join(os.p
     t("réponses d'équipe refusées à un joueur", lambda: must_fail(lambda: as_user(c, U2, "select staff_beta_survey()"), "forbidden"))
     t("table illisible en direct", lambda: must_fail(lambda: as_user(c, U2, "select * from beta_survey"), "permission denied"))
     t("équipe : réponses avec pseudo", lambda: [(r["pseudo"], r["answers"], r["comment"]) for r in as_user(c, U1, "select staff_beta_survey()")[0][0]])
+
+    print("== v18 : invitations bêta")
+    sql("update app_settings set value = '{\"on\": true}' where key = 'beta'")
+    inv = as_user(c, U1, "select staff_beta_invite_create(2, 7, 'Mathis et Léa')")[0][0]
+    t("code créé (8 caractères lisibles)", lambda: (inv["code"], inv["max_uses"]) if len(inv["code"]) == 8 and inv["code"].isalnum() else (_ for _ in ()).throw(Exception(inv)))
+    t("création refusée à un joueur", lambda: must_fail(lambda: as_user(c, U3, "select staff_beta_invite_create(1, 7, '')"), "forbidden"))
+    t("valeurs hors bornes refusées", lambda: must_fail(lambda: as_user(c, U1, "select staff_beta_invite_create(51, 7, '')"), "invalid value"))
+    sql("delete from beta_members where user_id = %s", (U3,))
+    t("hors bêta : accès refusé avant le code", lambda: must_fail(lambda: as_user(c, U3, "select beta_space()"), "beta"))
+    t("mauvais code = refus enregistré", lambda: as_user(c, U3, "select beta_redeem('ZZZZZZZZ')->>'status'")[0][0])
+    t("bon code (minuscules et tiret acceptés) = admis", lambda: as_user(c, U3, "select beta_redeem(%s)->>'status'", (inv["code"][:4].lower() + "-" + inv["code"][4:],))[0][0])
+    t("après le code : accès à l'espace bêta", lambda: as_user(c, U3, "select beta_space()->>'version'")[0][0])
+    t("deuxième utilisation par le même = déjà admis, compteur inchangé", lambda: (as_user(c, U3, "select beta_redeem(%s)->>'status'", (inv["code"],))[0][0], sql("select uses from beta_invites where code = %s", (inv["code"],))[0][0]))
+    t("liste équipe : usages et pseudo", lambda: [(x["uses"], x["players"]) for x in as_user(c, U1, "select staff_beta_invites()")[0][0] if x["code"] == inv["code"]])
+    t("liste refusée à un joueur", lambda: must_fail(lambda: as_user(c, U3, "select staff_beta_invites()"), "forbidden"))
+    t("table des codes illisible en direct", lambda: must_fail(lambda: as_user(c, U3, "select * from beta_invites"), "permission denied"))
+    t("visiteur refusé", lambda: must_fail(lambda: as_user(c, None, "select beta_redeem('ABCDEFGH')"), "permission denied"))
+    one = as_user(c, U1, "select staff_beta_invite_create(1, 1, '')")[0][0]["code"]
+    sql("update beta_invites set uses = 1 where code = %s", (one,))
+    sql("delete from beta_members where user_id = %s", (U3,))
+    t("code épuisé refusé", lambda: as_user(c, U3, "select beta_redeem(%s)->>'status'", (one,))[0][0])
+    sql("update beta_invites set uses = 0, expires_at = now() - interval '1 minute' where code = %s", (one,))
+    t("code expiré refusé", lambda: as_user(c, U3, "select beta_redeem(%s)->>'status'", (one,))[0][0])
+    as_user(c, U1, "select staff_beta_invite_revoke(%s)", (inv["code"],))
+    t("code révoqué refusé", lambda: as_user(c, U3, "select beta_redeem(%s)->>'status'", (inv["code"],))[0][0])
+    for _ in range(10): as_user(c, U3, "select beta_redeem('YYYYYYYY')")
+    t("anti-devinette : 10 essais ratés par heure", lambda: as_user(c, U3, "select beta_redeem('XXXXXXXX')->>'status'")[0][0])
+    sql("delete from beta_invite_fails"); sql("insert into beta_members (user_id) values (%s) on conflict do nothing", (U3,))
+    sql("update app_settings set value = '{\"on\": false}' where key = 'beta'")
 
     print("== v17 : plafond Space Attack")
     t("score Space 45 000 accepté (bloqué à 20 000 avant)", lambda: (sql("update scores set created_at = now() - interval '1 minute' where user_id = %s", (U2,)), as_user(c, U2, "select submit_score('space', 45000)->>'xp'")[0][0])[1])

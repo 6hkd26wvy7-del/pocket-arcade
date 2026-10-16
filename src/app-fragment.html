@@ -1284,11 +1284,38 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     loadMe();
   }
 
+  /* ---------- Invitation bêta (lien …/?invite=CODE ou code tapé dans le profil) ---------- */
+  var INVITE_KEY = "boygames-invite", inviteNotice = "";
+  (function captureInvite() {   // le code du lien est gardé sur l'appareil jusqu'à la connexion, puis retiré de l'adresse
+    var m = (location.search + "&" + location.hash).match(/[?&#]invite=([A-Za-z0-9-]{4,12})/);
+    if (!m) return;
+    try { localStorage.setItem(INVITE_KEY, m[1].toUpperCase()); } catch (e) { /* ignore */ }
+    try { history.replaceState(null, "", location.pathname + (location.hash && !/invite=/.test(location.hash) ? location.hash : "#compte")); } catch (e) { /* ignore */ }
+  })();
+  function pendingInvite() { try { return localStorage.getItem(INVITE_KEY) || ""; } catch (e) { return ""; } }
+  var INVITE_TEXT = { joined: "Invitation acceptée : bienvenue dans la bêta de BOYGAMES !", already: "", invalid: "Code d'invitation inconnu ou annulé.",
+    expired: "Ce code d'invitation a expiré. Demande-en un nouveau.", used: "Ce code d'invitation a déjà été utilisé.", too_many: "Trop d'essais. Réessaie dans une heure." };
+  async function redeemInvite(code) {
+    var r = await sb.rpc("beta_redeem", { p_code: code });
+    if (r.error) return { ok: false, text: rewardError(r.error) };
+    return { ok: !!r.data.ok, status: r.data.status, text: INVITE_TEXT[r.data.status] || "" };
+  }
+  async function usePendingInvite() {
+    var code = pendingInvite();
+    if (!code || !sb || !session) return;
+    var res = await redeemInvite(code);
+    if (res.status === "too_many") { inviteNotice = res.text; return; }    // on garde le code pour plus tard
+    try { localStorage.removeItem(INVITE_KEY); } catch (e) { /* ignore */ }
+    inviteNotice = res.text;
+    if (res.status === "joined") await loadMe();
+  }
+
   async function refreshAuth(s) {
     session = s;
     await loadProfile();
     await syncBest();
     await loadMe();
+    await usePendingInvite();
     await loadMonet();
     renderNav();
     if (session && !profile && current !== "compte") { location.hash = "#compte"; return; }
@@ -1365,7 +1392,8 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     if (!online) {
       st.textContent = "Tu joues sans compte. Ton score reste sur cet appareil.";
     } else if (profile) {
-      st.textContent = "Salut " + profile.pseudo + " ! Tes scores sont gardés sur ton compte.";
+      st.textContent = inviteNotice || ("Salut " + profile.pseudo + " ! Tes scores sont gardés sur ton compte.");
+      inviteNotice = "";
     } else {
       st.append("Tu joues sans compte. ");
       var a = document.createElement("a");
@@ -2469,6 +2497,47 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       button(rowb2, "AJOUTER", false, async function () { if (await act(sb.rpc("staff_beta_add", { p_pseudo: bpseudo.value }), "Testeur ajouté.")) renderAdmin(); });
       button(rowb2, "RETIRER", true, async function () { if (await act(sb.rpc("staff_beta_remove", { p_pseudo: bpseudo.value }), "Testeur retiré.")) renderAdmin(); });
       pbeta.append(rowb2);
+      // Invitations : lien ou code, à usage unique ou multiple, durée limitée, révocable
+      pbeta.append(el("h3", "", "INVITATIONS"));
+      var iu = field(pbeta, "NOMBRE D'UTILISATIONS (1 À 50)"); iu.type = "number"; iu.min = 1; iu.max = 50; iu.value = 1;
+      var id = field(pbeta, "VALABLE (JOURS, 1 À 90)"); id.type = "number"; id.min = 1; id.max = 90; id.value = 14;
+      var inote = field(pbeta, "NOTE (POUR QUI ?)"); inote.maxLength = 80;
+      var invOut = el("div", "");
+      function inviteLink(code) { return location.origin + location.pathname + "?invite=" + code; }
+      function shareRow(code) {
+        var row = el("div", "row");
+        button(row, "COPIER LE LIEN", false, function () {
+          var link = inviteLink(code);
+          (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(function () { setMsg(msg, "Lien copié : " + link); }, function () { window.prompt("Copie ce lien :", link); });
+        });
+        if (navigator.share) button(row, "PARTAGER", true, function () { navigator.share({ title: "BOYGAMES bêta", text: "Ton invitation à la bêta de BOYGAMES (code " + code + ")", url: inviteLink(code) }).catch(function () { /* annulé */ }); });
+        return row;
+      }
+      var rowi = el("div", "row");
+      button(rowi, "CRÉER UNE INVITATION", false, async function () {
+        var r = await sb.rpc("staff_beta_invite_create", { p_max_uses: parseInt(iu.value, 10) || 1, p_days: parseInt(id.value, 10) || 14, p_note: inote.value });
+        if (r.error) { setMsg(msg, rewardError(r.error), true); return; }
+        invOut.textContent = "";
+        invOut.append(el("p", "bt-pct", r.data.code), el("p", "small", inviteLink(r.data.code)), shareRow(r.data.code));
+        setMsg(msg, "Invitation créée. Envoie le lien (ou le code) au testeur.");
+        listInvites();
+      });
+      pbeta.append(rowi, invOut);
+      var invList = el("div", ""); pbeta.append(invList);
+      async function listInvites() {
+        var li = await sb.rpc("staff_beta_invites");
+        invList.textContent = "";
+        if (li.error) { invList.append(el("p", "small", "Invitations indisponibles (migration v18 non appliquée ?).")); return; }
+        (li.data || []).forEach(function (x) {
+          var dead = x.revoked || new Date(x.expires_at) < new Date() || x.uses >= x.max_uses;
+          var d = el("div", "su-t");
+          d.append(el("p", "", x.code + " — " + x.uses + "/" + x.max_uses + " utilisé(s)" + (x.revoked ? " · annulé" : new Date(x.expires_at) < new Date() ? " · expiré" : " · jusqu'au " + new Date(x.expires_at).toLocaleDateString("fr-FR")) + (x.note ? " · " + x.note : "")));
+          if (x.players.length) d.append(el("p", "small", "Admis : " + x.players.join(", ")));
+          if (!dead) { var r2 = shareRow(x.code); button(r2, "ANNULER", true, async function () { if (!window.confirm("Annuler l'invitation " + x.code + " ? Les testeurs déjà admis restent membres.")) return; if (await act(sb.rpc("staff_beta_invite_revoke", { p_code: x.code }), "Invitation annulée.")) listInvites(); }); d.append(r2); }
+          invList.append(d);
+        });
+      }
+      listInvites();
 
       var p9 = panel("BOYBLOCKS 9×9 (ESSAI)");
       p9.append(el("p", "small", "Grille 9×9 proposée aux joueurs (solo et duels), avec son propre classement. Désactiver = retour au 8×8 pour tous ; les scores 9×9 sont conservés."));
@@ -2746,6 +2815,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       renderMe();
     }
     if (accNotice) { setMsg(msg, accNotice); accNotice = ""; }
+    if (inviteNotice) { setMsg(msg, inviteNotice); inviteNotice = ""; }
   }
 
   var authMode = "signup";
@@ -2762,6 +2832,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
 
   function renderAuthForm() {
     var body = $("acc-body"), msg = $("acc-msg");
+    if (pendingInvite()) setTimeout(function () { var p = el("p", "bt-ev", "🎟️ Invitation à la bêta reçue (code " + pendingInvite() + ") : crée ton compte ou connecte-toi, tu seras admis automatiquement."); body.prepend(p); }, 0);
     var isSignup = authMode === "signup";
     body.innerHTML =
       "<div class=\"tabs\" role=\"group\" aria-label=\"Mode\" style=\"margin-bottom:14px\">" +
@@ -2849,6 +2920,21 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     $("acc-pseudo").textContent = profile.pseudo;
     $("acc-mail").textContent = session.user.email || "";
     $("acc-country").textContent = profile.country === "FR" ? "PAYS : FRANCE" : "PAYS : AUTRE";
+    if (access && access.beta_on && !access.allowed) {
+      var ib = el("div", "panel");
+      ib.append(el("p", "", "La bêta est privée. Tu as reçu un code d'invitation ?"));
+      var il = el("label", "", "CODE D'INVITATION"); il.setAttribute("for", "in-invite");
+      var ii = document.createElement("input"); ii.id = "in-invite"; ii.maxLength = 12; ii.autocomplete = "off"; ii.setAttribute("autocapitalize", "characters"); ii.spellcheck = false;
+      var iv = el("button", "btn", "VALIDER"); iv.type = "button";
+      iv.addEventListener("click", async function () {
+        if (!ii.value.trim()) return;
+        iv.disabled = true; var res = await redeemInvite(ii.value.trim()); iv.disabled = false;
+        setMsg(msg, res.text || (res.ok ? "C'est fait." : "Code refusé."), !res.ok);
+        if (res.status === "joined") { await loadMe(); renderAccount(); setMsg($("acc-msg"), res.text); }
+      });
+      ib.append(il, ii, iv);
+      $("acc-level").after(ib);
+    }
     var sl = el("p", "", "");
     var sb2 = el("a", "btn", "ESPACE BÊTA-TESTEUR");
     sb2.href = "#beta";

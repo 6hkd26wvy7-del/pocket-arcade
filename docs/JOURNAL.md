@@ -6,6 +6,17 @@ Le plus récent en haut. Chaque entrée : ce qui a été fait, où, et ce qui re
 
 ---
 
+## 16/10/2026 (nuit, suite) — invitations bêta par lien ou code (TEST)
+
+- Administration → BÊTA PRIVÉE → INVITATIONS : créer un code (1 à 50 utilisations, 1 à 90 jours, note), lien
+  `…/test/?invite=CODE`, COPIER / PARTAGER (iPhone), liste (usages, admis, expiration), ANNULER.
+- Testeur : ouvre le lien -> le code est gardé sur l'appareil, retiré de l'adresse, et utilisé dès la connexion ou
+  l'inscription (admis automatiquement) ; ou tape le code dans Profil si la bêta est privée et qu'il n'est pas admis.
+- Base v18 (sauvegarde id 9) : `beta_invites`, `beta_invite_uses`, `beta_invite_fails` (10 essais ratés / heure),
+  `beta_redeem`, `staff_beta_invite_create / invites / revoke`. Les règles existantes s'appliquent (badge
+  ÉDITION FONDATRICE pour les 10 premiers membres, déclencheur inchangé).
+- Tests : SQL 163 (+16), navigateur 21 (`invitations.mjs`, iPhone), essai réel sur TEST (annulé).
+
 ## 16/10/2026 (nuit) — audit global, corrections P1 (TEST)
 
 - Audit complet code + base TEST + tests : `docs/AUDIT-2026-10-16.md` (25 domaines, états, feuille de route P1/P2/P3).
