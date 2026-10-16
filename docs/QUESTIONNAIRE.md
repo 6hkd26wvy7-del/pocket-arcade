@@ -1,5 +1,7 @@
 # Questionnaire des bêta-testeurs (v1)
 
+Validé par Quentin le 16/10/2026.
+
 Source unique : la liste `SURVEY` dans `src/app-fragment.html` (bloc « Questionnaire des bêta-testeurs »). Pour changer une question,
 modifier cette liste (identifiant court, texte, options) ; la base ne garde que les identifiants (`beta_survey`, migration v15).
 Une option avec un 3e élément compte comme « problème » dans le classement de la page Administration → Retours bêta.

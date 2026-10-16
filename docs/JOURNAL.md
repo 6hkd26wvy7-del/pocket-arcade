@@ -17,8 +17,8 @@ Le plus récent en haut. Chaque entrée : ce qui a été fait, où, et ce qui re
   barres par question, commentaires, réponses par testeur ; filtre « envoyés seulement ».
 - Base : migration v15 (`beta_survey`, `beta_survey_get/save`, `staff_beta_survey`) appliquée sur TEST après
   sauvegarde vérifiée (id 6) ; données intactes (4 profils, 70 scores, 457 BC). Moteurs, BOYBOT et serveur non touchés.
-- La liste d'origine de 19 questions n'a pas été retrouvée : questions reconstituées (voir `docs/QUESTIONNAIRE.md`),
-  à remplacer facilement si besoin.
+- La liste d'origine de 19 questions n'a pas été retrouvée : 23 questions reconstituées (voir `docs/QUESTIONNAIRE.md`),
+  **validées par Quentin le 16/10/2026** (version 1 du questionnaire).
 
 ## 16/10/2026 — BOYBOT 🤖, joueur virtuel (TEST)
 
