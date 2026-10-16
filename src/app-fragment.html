@@ -472,6 +472,8 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
 .bt-m textarea { width: 100%; min-height: 70px; margin-top: 8px; border-radius: 12px; border: 2px solid var(--line); background: var(--card-hi); color: var(--text); font: 16px var(--body); padding: 8px; box-sizing: border-box; }
 .su-t { border-top: 1px solid var(--line); padding: 8px 0; }
 .su-t summary { font-weight: 700; cursor: pointer; }
+.jo-row { cursor: pointer; border-radius: 10px; padding: 8px; -webkit-tap-highlight-color: rgba(124, 58, 237, .25); }
+.jo-row:active { background: var(--card-hi); }
 .rt-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .rt-kpi { background: var(--card-hi); border-radius: 12px; padding: 10px; text-align: center; }
 .rt-kpi b { display: block; font-family: var(--display); font-size: 26px; }
@@ -2332,9 +2334,10 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
   }
 
   /* ---------- Administration : tous les joueurs (recherche, filtres, pages) ---------- */
-  var jo = { rows: null, q: "", f: "tous", page: 0, per: 20 };
+  var jo = { rows: null, q: "", f: "tous", page: 0, per: 20, sel: null, stale: false };
   async function renderJoueurs(reload) {
     var body = $("jo-body"), msg = $("jo-msg");
+    if (jo.sel) return renderFiche(jo.sel);
     if (!sb || !session || !role) { body.textContent = ""; body.append(el("div", "panel", "Accès réservé à l'équipe.")); return; }
     if (!jo.rows || reload) {
       setMsg(msg, "Chargement…");
@@ -2370,9 +2373,12 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       list.textContent = "";
       list.append(el("p", "small", rows.length + " compte(s) sur " + jo.rows.length + " inscrit(s)."));
       rows.slice(jo.page * jo.per, (jo.page + 1) * jo.per).forEach(function (x) {
-        var d = el("div", "su-t");
+        var d = el("div", "su-t jo-row");
+        d.tabIndex = 0; d.setAttribute("role", "button"); d.setAttribute("aria-label", "Fiche de " + x.pseudo);
+        var openF = function (e) { if (e.target.closest && e.target.closest("button")) return; jo.sel = x.pseudo; renderFiche(x.pseudo); };
+        d.addEventListener("click", openF); d.addEventListener("keydown", function (e) { if (e.key === "Enter") openF(e); });
         var tags = [x.role ? x.role.toUpperCase() : "", x.beta ? "BÊTA" : "", x.banned ? "SUSPENDU" : "", x.badges.indexOf("beta_founder") >= 0 ? "ÉDITION FONDATRICE" : "", x.badges.indexOf("beta_tester") >= 0 ? "BÊTA-TESTEUR" : ""].filter(Boolean);
-        d.append(el("p", "", x.pseudo + (tags.length ? " · " + tags.join(" · ") : "")));
+        d.append(el("p", "", x.pseudo + (tags.length ? " · " + tags.join(" · ") : "") + "  ›"));
         d.append(el("p", "small", "Inscrit le " + new Date(x.created_at).toLocaleDateString("fr-FR") + " · niveau " + x.level + " · " + x.games + " partie(s)" +
           (x.last_game ? " (dernière le " + new Date(x.last_game).toLocaleDateString("fr-FR") + ")" : "") + " · dernière connexion : " + (x.last_sign_in ? new Date(x.last_sign_in).toLocaleDateString("fr-FR") : "—") + (x.confirmed ? "" : " · e-mail non confirmé")));
         if (isAdmin && !x.beta && !x.role) {
@@ -2394,6 +2400,96 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       }
     }
     draw();
+  }
+
+  // Fiche administrative d'un joueur (lecture : staff_player_detail ; actions = fonctions d'équipe existantes, vérifiées côté serveur)
+  var ACTION_FR = { suspension: "Suspension", reactivation: "Réactivation", beta_ajout: "Ajout à la bêta", beta_retrait: "Retrait de la bêta", role: "Changement de rôle",
+    badge_beta_tester_valide: "Badge BÊTA-TESTEUR validé", badge_beta_tester_a_revoir: "Badge BÊTA-TESTEUR : à revoir", signalement_done: "Signalement traité", badge_exclusif: "Badge exclusif reçu" };
+  async function renderFiche(pseudo) {
+    var body = $("jo-body"), msg = $("jo-msg");
+    body.textContent = ""; setMsg(msg, "Chargement de la fiche…"); window.scrollTo(0, 0);
+    var back = el("button", "btn alt", "← RETOUR À LA LISTE"); back.type = "button";
+    back.addEventListener("click", function () { jo.sel = null; setMsg(msg, ""); renderJoueurs(!!jo.stale); jo.stale = false; });
+    body.append(back);
+    var r = await sb.rpc("staff_player_detail", { p_pseudo: pseudo });
+    if (r.error) { setMsg(msg, r.error.message === "forbidden" ? "Accès refusé." : "Fiche indisponible (migration v20 non appliquée ?).", true); return; }
+    setMsg(msg, "");
+    var F = r.data, P = F.profile || {}, S = F.stats || { level: 1, xp: 0, bc: 0 }, B = F.beta || {};
+    var isAdmin = role === "founder" || role === "admin", isFounder = role === "founder";
+    function panel(title) { var p = el("div", "panel"); if (title) p.append(el("h3", "", title)); body.append(p); return p; }
+    function line(p, t) { p.append(el("p", "small", t)); }
+    function d(x) { return x ? new Date(x).toLocaleDateString("fr-FR") : "—"; }
+    async function doAct(call, okText) {
+      var res = await call;
+      if (res.error) { setMsg(msg, rewardError(res.error), true); return; }
+      jo.stale = true; await renderFiche(pseudo); setMsg($("jo-msg"), okText);
+    }
+    // en-tête
+    var head = panel(""), hd = el("div", "pf-head"), info = el("div", "");
+    info.append(el("b", "", P.pseudo), el("div", "small", "Niveau " + S.level + " · " + S.xp + " XP · " + S.bc + " BOYCOINS"),
+      el("div", "small", (F.role ? "Rôle : " + F.role + " · " : "") + (B.member ? "Membre de la bêta" : "Hors bêta") + (F.ban ? " · SUSPENDU" : "")));
+    hd.append(avatarEl(P.avatar, 64), info); head.append(hd);
+    line(head, "Inscrit le " + d(P.created_at) + " · dernière connexion : " + d(F.account && F.account.last_sign_in) + (F.account && !F.account.confirmed ? " · e-mail non confirmé" : "") + " · pays : " + (P.country === "FR" ? "France" : "autre"));
+    line(head, F.friends + " ami(s) · " + F.continued + " partie(s) continuée(s) · " + F.reports_sent + " signalement(s) envoyé(s)");
+    if (F.ban) line(head, "Suspendu depuis le " + d(F.ban.since) + (F.ban.until ? " jusqu'au " + d(F.ban.until) : " (définitivement)") + (F.ban.reason ? " — " + F.ban.reason : ""));
+    // records et badges
+    var pr = panel("RECORDS");
+    if (!F.records.length) line(pr, "Aucune partie enregistrée.");
+    F.records.forEach(function (x) { line(pr, (GAME_LABEL[x.game] || x.game) + " : " + x.best + " (" + x.plays + " partie(s), dernière le " + d(x.last) + ")"); });
+    var pb = panel("BADGES");
+    if (!F.badges.length) line(pb, "Aucun badge.");
+    F.badges.forEach(function (x) { line(pb, (x.exclusive ? "🏅 " : "• ") + x.name + " — " + d(x.at) + (x.exclusive ? " (exclusif, permanent)" : "")); });
+    // bêta
+    var pt = panel("BÊTA");
+    line(pt, B.member ? "Membre depuis le " + d(B.since) + (B.invite ? " (invitation " + B.invite + ")" : "") : "Pas membre de la bêta.");
+    var codes = B.codes || [], done = codes.filter(function (c) { return B.missions[c] && B.missions[c].status !== "non_teste"; }).length;
+    line(pt, "Missions (manche " + B.version + ") : " + done + " / " + codes.length + " · questionnaire : " + (B.survey ? "envoyé le " + d(B.survey) : B.survey_draft ? "en cours" : "non commencé") + (B.eligible ? " · éligible au badge BÊTA-TESTEUR" : ""));
+    codes.forEach(function (c) { var m = B.missions[c]; if (m && m.status !== "non_teste") line(pt, "• " + ((BETA_MISSIONS[c] || { t: c }).t) + " : " + (BETA_STATUS.filter(function (s) { return s[0] === m.status; })[0] || [0, m.status])[1] + (m.note ? " — « " + m.note + " »" : "")); });
+    // signalements et bugs
+    var ps = panel("SIGNALEMENTS REÇUS");
+    if (!F.reports_received.length) line(ps, "Aucun signalement.");
+    F.reports_received.forEach(function (x) {
+      var row = el("div", "su-t"); row.append(el("p", "small", d(x.at) + " · par " + (x.by || "?") + " · " + (x.status === "open" ? "À TRAITER" : "traité") + " — " + x.reason));
+      if (x.status === "open") { var b = el("button", "btn mini alt", "MARQUER TRAITÉ"); b.type = "button"; b.addEventListener("click", function () { if (window.confirm("Marquer ce signalement comme traité ?")) doAct(sb.rpc("staff_resolve_report", { p_id: x.id }), "Signalement traité."); }); row.append(b); }
+      ps.append(row);
+    });
+    var pg = panel("BUGS SIGNALÉS PAR CE JOUEUR");
+    if (!F.bugs.length) line(pg, "Aucun bug signalé.");
+    F.bugs.forEach(function (x) { line(pg, "n°" + x.id + " · " + d(x.at) + " · " + x.status + " — " + x.text); });
+    // actions (chacune confirmée ; le serveur vérifie le rôle)
+    var pa = panel("ACTIONS");
+    var ra = el("div", "row"); pa.append(ra);
+    function act(label, alt, question, call, okText) { var b = el("button", "btn mini" + (alt ? " alt" : ""), label); b.type = "button"; b.addEventListener("click", function () { if (window.confirm(question)) doAct(call(), okText); }); ra.append(b); }
+    if (!F.role) {
+      if (isAdmin && !B.member) act("AJOUTER À LA BÊTA", false, "Ajouter " + P.pseudo + " à la bêta ? (règle existante : badge ÉDITION FONDATRICE pour les 10 premiers membres)", function () { return sb.rpc("staff_beta_add", { p_pseudo: P.pseudo }); }, "Ajouté à la bêta.");
+      if (isAdmin && B.member) act("RETIRER DE LA BÊTA", true, "Retirer " + P.pseudo + " de la bêta ? Ses données et badges sont conservés.", function () { return sb.rpc("staff_beta_remove", { p_pseudo: P.pseudo }); }, "Retiré de la bêta.");
+      if (!F.ban) {
+        var sus = el("button", "btn mini alt", "SUSPENDRE…"); sus.type = "button";
+        sus.addEventListener("click", function () {
+          var days = window.prompt("Suspendre " + P.pseudo + " combien de jours ? (laisser vide = définitivement)", "7"); if (days === null) return;
+          var reason = window.prompt("Motif (visible par l'équipe) :", ""); if (reason === null) return;
+          var n = days.trim() === "" ? null : Math.max(1, Math.min(365, parseInt(days, 10) || 7));
+          if (window.confirm("Confirmer la suspension de " + P.pseudo + (n ? " pour " + n + " jour(s)" : " définitivement") + " ?")) doAct(sb.rpc("staff_ban", { p_pseudo: P.pseudo, p_reason: reason, p_days: n }), "Joueur suspendu.");
+        });
+        ra.append(sus);
+      } else act("RÉACTIVER", false, "Lever la suspension de " + P.pseudo + " ?", function () { return sb.rpc("staff_unban", { p_pseudo: P.pseudo }); }, "Suspension levée.");
+      if (isAdmin && B.eligible && !F.badges.some(function (x) { return x.code === "beta_tester"; }))
+        act("VALIDER LE BADGE BÊTA-TESTEUR", false, "Attribuer le badge permanent BÊTA-TESTEUR BOYGAMES à " + P.pseudo + " ?", function () { return sb.rpc("staff_beta_validate", { p_pseudo: P.pseudo, p_decision: "valide", p_note: "" }); }, "Badge attribué.");
+    }
+    if (isFounder && F.role !== "founder") {
+      var rr = el("div", "row"); pa.append(el("p", "small", "Rôle dans l'équipe :"), rr);
+      [["admin", "ADMIN"], ["moderator", "MODÉRATEUR"], ["none", "AUCUN"]].forEach(function (o) {
+        if ((F.role || "none") === o[0]) return;
+        var b = el("button", "btn mini alt", o[1]); b.type = "button";
+        b.addEventListener("click", function () { if (window.confirm("Donner le rôle « " + o[1] + " » à " + P.pseudo + " ?")) doAct(sb.rpc("staff_set_role", { p_pseudo: P.pseudo, p_role: o[0] }), "Rôle mis à jour."); });
+        rr.append(b);
+      });
+    }
+    line(pa, "XP, BOYCOINS, scores et badges permanents ne sont pas modifiables ici. Aucune suppression de compte depuis cette fiche.");
+    // historique
+    var ph = panel("HISTORIQUE DES INTERVENTIONS");
+    if (!F.history.length) line(ph, "Aucune intervention enregistrée (journal actif depuis le 16/10/2026).");
+    F.history.forEach(function (x) { line(ph, new Date(x.at).toLocaleString("fr-FR") + " · " + (ACTION_FR[x.action] || x.action) + " · par " + (x.self ? "le joueur (invitation)" : x.by) + (x.detail && x.detail.motif ? " — " + x.detail.motif : "") + (x.detail && x.detail.apres !== undefined ? " — " + (x.detail.avant || "aucun") + " → " + (x.detail.apres || "aucun") : "") + (x.detail && x.detail.badge ? " — " + x.detail.badge : "")); });
   }
 
   async function renderMarketing() {
@@ -5088,7 +5184,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     if (h === "retours") renderRetours();
     if (h === "beta") renderBeta();
     if (h === "suivi") renderSuivi();
-    if (h === "joueurs") renderJoueurs(true);
+    if (h === "joueurs") { jo.sel = null; renderJoueurs(true); }
     $("pf-modal").hidden = true;
     if (h !== "snake") loadMaint();
     if (h === "compte") renderAccount();

@@ -42,6 +42,11 @@ window.supabase = { createClient: function(){
      case 'staff_beta_invite_revoke': return ok(null);
      case 'staff_beta_list': return ok(window.__betaList||[{pseudo:'Joh'}]);
      case 'staff_players': window.__playersCalls=(window.__playersCalls||0)+1; return ok(window.__players||[]);
+     case 'staff_player_detail': window.__detailCalls=(window.__detailCalls||0)+1; return ok({profile:{pseudo:a.p_pseudo,avatar:'av_03',country:'FR',created_at:'2026-10-16T10:21:26Z'},account:{last_sign_in:'2026-10-16T10:21:12Z',confirmed:true},stats:{level:1,xp:0,bc:0},role:null,ban:window.__banned?{reason:'essai',since:'2026-10-16T12:00:00Z',until:null}:null,
+       badges:[{code:'beta_founder',name:'BÊTA TESTEUR — ÉDITION FONDATRICE',exclusive:true,at:'2026-10-16T10:30:00Z'}],records:[],continued:0,friends:0,
+       beta:{member:true,since:'2026-10-16T10:30:00Z',invite:null,version:1,codes:['compte','snake'],missions:{compte:{status:'reussi',note:''}},survey:null,survey_draft:false,eligible:false},
+       reports_received:[{id:5,at:'2026-10-16T11:00:00Z',by:'Joh17',reason:'pseudo bizarre',status:'open'}],reports_sent:0,bugs:[],history:[{at:'2026-10-16T10:30:00Z',action:'beta_ajout',by:'tintintest',self:false,detail:{}}]});
+     case 'staff_ban': window.__banned=a; return ok(null);
      case 'my_notifications': return ok([]);
      case 'get_maintenance': return ok({on:false,message:''});
      case 'my_friends': return ok(friends);

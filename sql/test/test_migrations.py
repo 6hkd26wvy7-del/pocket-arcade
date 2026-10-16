@@ -38,6 +38,7 @@ try:
     run_file(c, f"{REPO}/schema_v17_plafond_space.sql"); run_file(c, f"{REPO}/schema_v17_plafond_space.sql")
     run_file(c, f"{REPO}/schema_v18_invitations.sql"); run_file(c, f"{REPO}/schema_v18_invitations.sql")
     run_file(c, f"{REPO}/schema_v19_liste_joueurs.sql"); run_file(c, f"{REPO}/schema_v19_liste_joueurs.sql")
+    run_file(c, f"{REPO}/schema_v20_fiche_joueur.sql"); run_file(c, f"{REPO}/schema_v20_fiche_joueur.sql")
     run_file(c, f"{REPO}/schema_v6_v7.sql")   # la liste blanche relancée garde les fonctions du questionnaire
     sql("update public.app_settings set value = 'false' where key = 'maintenance'") if sql("select to_regclass('public.app_settings')")[0][0] else None
     print("app_settings:", sql("select * from public.app_settings"))
@@ -269,6 +270,19 @@ console.log(JSON.stringify({moves:g.log,score:g.score}));""" % os.path.join(os.p
     t("réponses d'équipe refusées à un joueur", lambda: must_fail(lambda: as_user(c, U2, "select staff_beta_survey()"), "forbidden"))
     t("table illisible en direct", lambda: must_fail(lambda: as_user(c, U2, "select * from beta_survey"), "permission denied"))
     t("équipe : réponses avec pseudo", lambda: [(r["pseudo"], r["answers"], r["comment"]) for r in as_user(c, U1, "select staff_beta_survey()")[0][0]])
+
+    print("== v20 : fiche joueur + journal des interventions")
+    fiche = as_user(c, U1, "select staff_player_detail('joh')")[0][0]
+    t("fiche : profil, stats, badges, records, bêta, signalements, bugs, historique", lambda: sorted(fiche.keys()))
+    t("fiche : ni e-mail, ni mot de passe, ni message privé", lambda: (not any(k in json.dumps(fiche).lower() for k in ["@", "password", "encrypted", "messages"])) or (_ for _ in ()).throw(Exception("fuite")))
+    t("fiche refusée à un joueur", lambda: must_fail(lambda: as_user(c, U2, "select staff_player_detail('tintintest')"), "forbidden"))
+    t("fiche : joueur inconnu", lambda: must_fail(lambda: as_user(c, U1, "select staff_player_detail('personne')"), "unknown player"))
+    as_user(c, U1, "select staff_ban('joh', 'essai journal', 1)"); as_user(c, U1, "select staff_unban('joh')")
+    as_user(c, U1, "select staff_beta_remove('joh')"); as_user(c, U1, "select staff_beta_add('joh')")
+    hist = as_user(c, U1, "select staff_player_detail('joh')->'history'")[0][0]
+    t("journal : suspension, réactivation, retrait et ajout bêta, avec l'auteur", lambda: [(h["action"], h["by"]) for h in hist[:4]])
+    t("journal illisible et non modifiable par un joueur", lambda: must_fail(lambda: as_user(c, U2, "delete from admin_actions"), "permission denied"))
+    t("aucune donnée modifiée par la fiche (BC, XP inchangés)", lambda: sql("select bc, xp from player_stats where user_id = %s", (U2,))[0])
 
     print("== v19 : liste des joueurs (équipe)")
     nb_profils = sql("select count(*) from profiles")[0][0]

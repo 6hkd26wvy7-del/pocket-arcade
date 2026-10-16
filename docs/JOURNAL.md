@@ -6,6 +6,19 @@ Le plus récent en haut. Chaque entrée : ce qui a été fait, où, et ce qui re
 
 ---
 
+## 16/10/2026 — fiche administrative des joueurs (TEST)
+
+- Administration → Joueurs : chaque ligne s'ouvre en fiche (profil, niveau/XP/BC, records, badges, bêta et missions,
+  questionnaire, signalements reçus, bugs envoyés, historique). Actions regroupées, toutes confirmées et vérifiées
+  côté serveur : bêta (ajouter/retirer), suspendre (durée + motif) / réactiver, rôle (Fondateur seulement), valider le
+  badge BÊTA-TESTEUR si éligible, signalement traité. Rien pour modifier XP/BC/scores/badges ni supprimer un compte.
+  RETOUR À LA LISTE garde recherche, filtre et page.
+- Migration v20 (sauvegarde id 11) : `staff_player_detail` (lecture, sans e-mail ni messages) + journal `admin_actions`
+  rempli par déclencheurs sur bans, beta_members, user_roles, beta_validations, reports, badges exclusifs (aucune
+  fonction existante réécrite ; journal non modifiable par le site).
+- Profils depuis les classements : revérifiés (test `beta-profils.mjs`).
+- Tests : SQL 175 (+7), morcelé 10, navigateur 22 (`joueurs.mjs` étendu à la fiche).
+
 ## 16/10/2026 — « EL-MATHISSO introuvable » depuis le compte Fondateur (TEST)
 
 - Vérifié en base TEST : compte présent, e-mail confirmé, membre de la bêta, un seul badge (ÉDITION FONDATRICE),
