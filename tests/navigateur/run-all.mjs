@@ -25,6 +25,7 @@ const TESTS = {
   "boybot-pause.mjs": ["boybot-pause OK"],
   "beta-profils.mjs": ["beta-profils OK"],
   "invitations.mjs": ["invitations OK"],
+  "joueurs.mjs": ["joueurs OK"],
   "iphone.mjs": ["envoyés identiques: true", "Score vérifié et enregistré", "protection ok", "accueil ok"],
 };
 let bad = 0;

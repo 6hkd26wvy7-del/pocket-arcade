@@ -37,6 +37,7 @@ try:
     badges_apres = sql("select count(*) from user_badges")[0][0]
     run_file(c, f"{REPO}/schema_v17_plafond_space.sql"); run_file(c, f"{REPO}/schema_v17_plafond_space.sql")
     run_file(c, f"{REPO}/schema_v18_invitations.sql"); run_file(c, f"{REPO}/schema_v18_invitations.sql")
+    run_file(c, f"{REPO}/schema_v19_liste_joueurs.sql"); run_file(c, f"{REPO}/schema_v19_liste_joueurs.sql")
     run_file(c, f"{REPO}/schema_v6_v7.sql")   # la liste blanche relancée garde les fonctions du questionnaire
     sql("update public.app_settings set value = 'false' where key = 'maintenance'") if sql("select to_regclass('public.app_settings')")[0][0] else None
     print("app_settings:", sql("select * from public.app_settings"))
@@ -268,6 +269,14 @@ console.log(JSON.stringify({moves:g.log,score:g.score}));""" % os.path.join(os.p
     t("réponses d'équipe refusées à un joueur", lambda: must_fail(lambda: as_user(c, U2, "select staff_beta_survey()"), "forbidden"))
     t("table illisible en direct", lambda: must_fail(lambda: as_user(c, U2, "select * from beta_survey"), "permission denied"))
     t("équipe : réponses avec pseudo", lambda: [(r["pseudo"], r["answers"], r["comment"]) for r in as_user(c, U1, "select staff_beta_survey()")[0][0]])
+
+    print("== v19 : liste des joueurs (équipe)")
+    nb_profils = sql("select count(*) from profiles")[0][0]
+    pl = as_user(c, U1, "select staff_players()")[0][0]
+    t("tous les comptes listés, même sans partie", lambda: (len(pl), nb_profils, sorted(x["pseudo"] for x in pl if x["games"] == 0)) if len(pl) == nb_profils else (_ for _ in ()).throw(Exception("manquants")))
+    t("aucune adresse e-mail renvoyée", lambda: not any("@" in json.dumps(x) for x in pl) or (_ for _ in ()).throw(Exception("e-mail")))
+    t("refusé à un joueur", lambda: must_fail(lambda: as_user(c, U2, "select staff_players()"), "forbidden"))
+    t("refusé à un visiteur", lambda: must_fail(lambda: as_user(c, None, "select staff_players()"), "permission denied"))
 
     print("== v18 : invitations bêta")
     sql("update app_settings set value = '{\"on\": true}' where key = 'beta'")

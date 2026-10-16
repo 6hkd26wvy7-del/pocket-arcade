@@ -6,6 +6,19 @@ Le plus récent en haut. Chaque entrée : ce qui a été fait, où, et ce qui re
 
 ---
 
+## 16/10/2026 — « EL-MATHISSO introuvable » depuis le compte Fondateur (TEST)
+
+- Vérifié en base TEST : compte présent, e-mail confirmé, membre de la bêta, un seul badge (ÉDITION FONDATRICE),
+  0 partie. Le compte Fondateur utilise bien TEST (journaux : administration ouverte depuis l'iPhone à 13 h 22).
+  `staff_beta_list` le renvoyait déjà.
+- Causes : (1) l'administration n'avait AUCUNE liste des joueurs (seulement un compteur) ; (2) la liste bêta était
+  une seule ligne de petit texte ; (3) les classements ne listent que les joueurs ayant un score (normal, il n'a pas joué).
+- Correction : migration v19 `staff_players` (équipe, lecture seule, sans e-mail, sauvegarde id 10) + page
+  Administration → VOIR TOUS LES JOUEURS (`#joueurs`) : tous les comptes même sans partie, recherche, filtres
+  (bêta, hors bêta, sans partie, équipe, suspendus), pages de 20, ACTUALISER, AJOUTER À LA BÊTA ; liste bêta une
+  ligne par membre avec la date d'ajout. Aucune donnée modifiée, aucun compte recréé, aucun badge ajouté.
+- Tests : SQL 168, navigateur 22 (`joueurs.mjs`, iPhone).
+
 ## 16/10/2026 (nuit, suite) — invitations bêta par lien ou code (TEST)
 
 - Administration → BÊTA PRIVÉE → INVITATIONS : créer un code (1 à 50 utilisations, 1 à 90 jours, note), lien

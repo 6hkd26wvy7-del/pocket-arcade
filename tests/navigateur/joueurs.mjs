@@ -1,0 +1,42 @@
+// Administration → Joueurs (iPhone) : tous les comptes même sans partie, recherche, filtres, pages, actualisation ; liste bêta lisible.
+import { createRequire } from 'module'; const require=createRequire(import.meta.url); const { webkit, devices } = require('playwright');
+import fs from 'fs';
+const ROOT=new URL('../../', import.meta.url).pathname, FT=new URL('./', import.meta.url).pathname; fs.mkdirSync(FT+'captures',{recursive:true});
+const html = fs.readFileSync(ROOT+'site/index.html','utf8');
+const fail = (m) => { throw new Error(m); };
+const b=await webkit.launch(); const ctx=await b.newContext(devices['iPhone 13']); const page=await ctx.newPage();
+await page.addInitScript(()=>{ window.__synced=1; window.__role='founder'; window.__access={beta_on:true,allowed:true};
+  const d='2026-10-15T12:00:00Z'; const P=[{pseudo:'EL-MATHISSO',country:'FR',created_at:'2026-10-16T10:21:26Z',last_sign_in:'2026-10-16T10:21:12Z',confirmed:true,level:1,xp:0,bc:0,games:0,last_game:null,beta:true,role:null,banned:false,badges:['beta_founder']},
+    {pseudo:'tintintest',country:'FR',created_at:'2026-10-14T18:11:40Z',last_sign_in:d,confirmed:true,level:5,xp:900,bc:300,games:43,last_game:d,beta:false,role:'founder',banned:false,badges:['founder']}];
+  for (let i=1;i<=23;i++) P.push({pseudo:'joueur'+i,country:'FR',created_at:d,last_sign_in:null,confirmed:i%5!==0,level:1,xp:0,bc:0,games:i%3,last_game:i%3?d:null,beta:i%2===0,role:null,banned:i===7,badges:[]});
+  window.__players=P; window.__betaList=[{pseudo:'EL-MATHISSO',added_at:'2026-10-16T10:30:00Z'},{pseudo:'Joh17',added_at:d}]; });
+const errs=[]; page.on('pageerror',e=>errs.push(String(e.stack).slice(0,300)));
+await page.route('**/*', r=>{ const u=r.request().url();
+  if(u.startsWith('http://x.test/')) { if(u==='http://x.test/'||u.startsWith('http://x.test/?')) return r.fulfill({contentType:'text/html',body:html});
+    if(u.endsWith('config.js')) return r.fulfill({contentType:'text/javascript',body:'window.ARCADE_CONFIG={SUPABASE_URL:"https://x.supabase.co",SUPABASE_ANON_KEY:"k"};'});
+    return r.fulfill({status:404,body:''}); }
+  if(u.includes('supabase.js')) return r.fulfill({contentType:'text/javascript',body:fs.readFileSync(FT+'fake5.js','utf8')}); return r.fulfill({status:200,body:'',contentType:'text/css'}); });
+await page.goto('http://x.test/#admin'); await page.waitForTimeout(1200);
+const betaTxt = await page.textContent('#adm-body');
+const betaOk = /Membres de la bêta : 2/.test(betaTxt) && /• EL-MATHISSO — depuis le 16\/10\/2026/.test(betaTxt);
+await page.tap('text=VOIR TOUS LES JOUEURS'); await page.waitForTimeout(500);
+const count = await page.textContent('#jo-body .panel >> nth=1 >> p.small');
+const first = await page.textContent('#jo-body .su-t >> nth=0');
+const pageInfo = await page.textContent('#jo-body .row >> nth=1');
+await page.screenshot({path:FT+'captures/joueurs-iphone.png'});
+await page.fill('#jo-body input[type=search]', 'math'); await page.waitForTimeout(400);
+const found = await page.$$eval('#jo-body .su-t', e=>e.map(x=>x.textContent));
+await page.fill('#jo-body input[type=search]', ''); await page.waitForTimeout(300);
+await page.selectOption('#jo-body select', 'inactifs'); await page.waitForTimeout(200);
+const inact = await page.textContent('#jo-body .panel >> nth=1 >> p.small');
+await page.selectOption('#jo-body select', 'tous'); await page.waitForTimeout(200);
+await page.tap('text=SUIVANT →'); await page.waitForTimeout(200);
+const p2 = await page.textContent('#jo-body .row >> nth=1');
+const calls0 = await page.evaluate(()=>window.__playersCalls);
+await page.tap('text=ACTUALISER'); await page.waitForTimeout(300);
+const calls1 = await page.evaluate(()=>window.__playersCalls);
+console.log('bêta lisible :', betaOk, '| compte :', count, '| 1er :', first.slice(0, 60), '|', pageInfo.trim(), '| recherche « math » :', found.length, '| sans partie :', inact, '| page 2 :', /Page 2 \/ 2/.test(p2), '| actualiser :', calls0, '→', calls1);
+if (!betaOk || !/25 compte\(s\) sur 25/.test(count) || !/^EL-MATHISSO · BÊTA · ÉDITION FONDATRICE/.test(first) || found.length !== 1 || !/8 compte\(s\)/.test(inact) || !/Page 2 \/ 2/.test(p2) || calls1 !== calls0 + 1) fail('page Joueurs');
+if (/@/.test(await page.textContent('#jo-body'))) fail('e-mail affiché');
+if (errs.length) fail(errs.join('\n'));
+await b.close(); console.log('joueurs OK');

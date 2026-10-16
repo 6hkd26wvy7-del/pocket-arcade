@@ -40,7 +40,8 @@ window.supabase = { createClient: function(){
      case 'staff_beta_invite_create': window.__invites=(window.__invites||[]).concat([{code:'K7P2Q9XZ',note:a.p_note,created_at:new Date().toISOString(),expires_at:new Date(Date.now()+a.p_days*864e5).toISOString(),max_uses:a.p_max_uses,uses:0,revoked:false,by:'Quentin',players:[]}]); return ok({code:'K7P2Q9XZ',expires_at:'',max_uses:a.p_max_uses});
      case 'staff_beta_invites': return ok(window.__invites||[]);
      case 'staff_beta_invite_revoke': return ok(null);
-     case 'staff_beta_list': return ok([{pseudo:'Joh'}]);
+     case 'staff_beta_list': return ok(window.__betaList||[{pseudo:'Joh'}]);
+     case 'staff_players': window.__playersCalls=(window.__playersCalls||0)+1; return ok(window.__players||[]);
      case 'my_notifications': return ok([]);
      case 'get_maintenance': return ok({on:false,message:''});
      case 'my_friends': return ok(friends);

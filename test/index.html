@@ -572,6 +572,13 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       <p id="bt-msg" class="msg" role="status"></p>
     </section>
 
+    <section id="view-joueurs" hidden>
+      <h2>Joueurs</h2>
+      <p class="small"><a href="#admin">&larr; Administration</a></p>
+      <div id="jo-body"></div>
+      <p id="jo-msg" class="msg" role="status"></p>
+    </section>
+
     <section id="view-suivi" hidden>
       <h2>Suivi bêta</h2>
       <p class="small"><a href="#admin">&larr; Administration</a></p>
@@ -1385,6 +1392,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     if (current === "questionnaire") renderSurvey();
     if (current === "beta") renderBeta();
     if (current === "suivi") renderSuivi();
+    if (current === "joueurs") renderJoueurs(true);
     if (current === "retours") renderRetours();
     loadMaint();
   }
@@ -2381,6 +2389,71 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     });
   }
 
+  /* ---------- Administration : tous les joueurs (recherche, filtres, pages) ---------- */
+  var jo = { rows: null, q: "", f: "tous", page: 0, per: 20 };
+  async function renderJoueurs(reload) {
+    var body = $("jo-body"), msg = $("jo-msg");
+    if (!sb || !session || !role) { body.textContent = ""; body.append(el("div", "panel", "Accès réservé à l'équipe.")); return; }
+    if (!jo.rows || reload) {
+      setMsg(msg, "Chargement…");
+      var r = await sb.rpc("staff_players");
+      if (r.error) { setMsg(msg, "Liste indisponible (migration v19 non appliquée ?).", true); return; }
+      jo.rows = r.data || []; setMsg(msg, "Liste à jour (" + new Date().toLocaleTimeString("fr-FR") + ").");
+    }
+    body.textContent = "";
+    var top = el("div", "panel");
+    var q = document.createElement("input"); q.type = "search"; q.placeholder = "Rechercher un pseudo"; q.value = jo.q; q.setAttribute("aria-label", "Rechercher un pseudo");
+    var f = document.createElement("select"); f.setAttribute("aria-label", "Filtre");
+    [["tous", "Tous les comptes"], ["beta", "Membres de la bêta"], ["hors", "Hors bêta"], ["inactifs", "Sans aucune partie"], ["equipe", "Équipe"], ["bannis", "Suspendus"]].forEach(function (o) {
+      var op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; if (o[0] === jo.f) op.selected = true; f.append(op);
+    });
+    var rf = el("button", "btn mini alt", "ACTUALISER"); rf.type = "button"; rf.addEventListener("click", function () { renderJoueurs(true); });
+    var row = el("div", "row"); row.append(f, rf);
+    top.append(q, row);
+    body.append(top);
+    var qt = null; q.addEventListener("input", function () { clearTimeout(qt); qt = setTimeout(function () { jo.q = q.value; jo.page = 0; draw(); }, 200); });
+    f.addEventListener("change", function () { jo.f = f.value; jo.page = 0; draw(); });
+    var list = el("div", "panel"), nav = el("div", "row");
+    body.append(list, nav);
+    var isAdmin = role === "founder" || role === "admin";
+    function draw() {
+      var s = jo.q.trim().toLowerCase();
+      var rows = jo.rows.filter(function (x) {
+        if (s && x.pseudo.toLowerCase().indexOf(s) < 0) return false;
+        if (jo.f === "beta") return x.beta; if (jo.f === "hors") return !x.beta && !x.role;
+        if (jo.f === "inactifs") return !x.games; if (jo.f === "equipe") return !!x.role; if (jo.f === "bannis") return x.banned;
+        return true;
+      });
+      var pages = Math.max(1, Math.ceil(rows.length / jo.per)); if (jo.page >= pages) jo.page = pages - 1;
+      list.textContent = "";
+      list.append(el("p", "small", rows.length + " compte(s) sur " + jo.rows.length + " inscrit(s)."));
+      rows.slice(jo.page * jo.per, (jo.page + 1) * jo.per).forEach(function (x) {
+        var d = el("div", "su-t");
+        var tags = [x.role ? x.role.toUpperCase() : "", x.beta ? "BÊTA" : "", x.banned ? "SUSPENDU" : "", x.badges.indexOf("beta_founder") >= 0 ? "ÉDITION FONDATRICE" : "", x.badges.indexOf("beta_tester") >= 0 ? "BÊTA-TESTEUR" : ""].filter(Boolean);
+        d.append(el("p", "", x.pseudo + (tags.length ? " · " + tags.join(" · ") : "")));
+        d.append(el("p", "small", "Inscrit le " + new Date(x.created_at).toLocaleDateString("fr-FR") + " · niveau " + x.level + " · " + x.games + " partie(s)" +
+          (x.last_game ? " (dernière le " + new Date(x.last_game).toLocaleDateString("fr-FR") + ")" : "") + " · dernière connexion : " + (x.last_sign_in ? new Date(x.last_sign_in).toLocaleDateString("fr-FR") : "—") + (x.confirmed ? "" : " · e-mail non confirmé")));
+        if (isAdmin && !x.beta && !x.role) {
+          var b = el("button", "btn mini", "AJOUTER À LA BÊTA"); b.type = "button";
+          b.addEventListener("click", async function () {
+            if (!window.confirm("Ajouter " + x.pseudo + " à la bêta ? (règles existantes : badge ÉDITION FONDATRICE pour les 10 premiers membres)")) return;
+            var r2 = await sb.rpc("staff_beta_add", { p_pseudo: x.pseudo });
+            if (r2.error) { setMsg(msg, rewardError(r2.error), true); return; } renderJoueurs(true);
+          });
+          d.append(b);
+        }
+        list.append(d);
+      });
+      nav.textContent = "";
+      if (pages > 1) {
+        var pv = el("button", "btn mini alt", "← PRÉCÉDENT"); pv.type = "button"; pv.disabled = jo.page === 0; pv.addEventListener("click", function () { jo.page--; draw(); });
+        var nx = el("button", "btn mini alt", "SUIVANT →"); nx.type = "button"; nx.disabled = jo.page >= pages - 1; nx.addEventListener("click", function () { jo.page++; draw(); });
+        nav.append(pv, el("span", "small", "Page " + (jo.page + 1) + " / " + pages), nx);
+      }
+    }
+    draw();
+  }
+
   async function renderMarketing() {
     var body = $("mk-body"), msg = $("mk-msg");
     setMsg(msg, ""); body.textContent = "";
@@ -2511,6 +2584,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
 
     var st = await sb.rpc("staff_stats");
     var ps = panel("CHIFFRES (RÔLE : " + role.toUpperCase() + ")");
+    var ajo = el("a", "btn mini", "VOIR TOUS LES JOUEURS"); ajo.href = "#joueurs"; ps.append(ajo);
     if (!st.error && st.data) {
       var d = st.data;
       [["Joueurs", d.players], ["Nouveaux aujourd'hui", d.new_today], ["Parties aujourd'hui", d.games_today],
@@ -2549,7 +2623,10 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       button(rowbeta, betaOn ? "DÉSACTIVER" : "ACTIVER", betaOn, async function () { if (await act(sb.rpc("staff_set_beta", { p_on: !betaOn }), betaOn ? "Bêta privée désactivée." : "Bêta privée activée.")) renderAdmin(); });
       pbeta.append(rowbeta);
       var bl = await sb.rpc("staff_beta_list");
-      pbeta.append(el("p", "small", "Testeurs : " + ((bl.data && bl.data.length) ? bl.data.map(function (x) { return x.pseudo; }).join(", ") : "aucun")));
+      var bmem = bl.data || [];
+      pbeta.append(el("p", "", "Membres de la bêta : " + bmem.length));
+      bmem.forEach(function (x) { pbeta.append(el("p", "small", "• " + x.pseudo + (x.added_at ? " — depuis le " + new Date(x.added_at).toLocaleDateString("fr-FR") : ""))); });
+      if (!bmem.length) pbeta.append(el("p", "small", "Aucun membre."));
       var bpseudo = field(pbeta, "PSEUDO DU TESTEUR"); bpseudo.maxLength = 16;
       var rowb2 = el("div", "row");
       button(rowb2, "AJOUTER", false, async function () { if (await act(sb.rpc("staff_beta_add", { p_pseudo: bpseudo.value }), "Testeur ajouté.")) renderAdmin(); });
@@ -5118,7 +5195,7 @@ return {SIZE: SIZE, SIZES: SIZES, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid
 
 
   /* ---------- Signaler un bug (toutes les pages, y compris en jeu) ---------- */
-  var APP_BUILD = "2026.10.16-278ab1";
+  var APP_BUILD = "2026.10.16-e5009a";
   var recentErrors = [];
   function pushErr(t) { recentErrors.push(String(t).slice(0, 160)); if (recentErrors.length > 5) recentErrors.shift(); }
   window.addEventListener("error", function (e) { pushErr((e.message || "error") + " @" + String(e.filename || "").split("/").pop() + ":" + (e.lineno || "")); });
@@ -5270,7 +5347,7 @@ return {SIZE: SIZE, SIZES: SIZES, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid
   });
 
   /* ---------- Router ---------- */
-  var VIEWS = ["menu", "scores", "amis", "boutique", "compte", "admin", "marketing", "questionnaire", "retours", "beta", "suivi", "snake", "arena", "blocks", "boyblocks", "space"];
+  var VIEWS = ["menu", "scores", "amis", "boutique", "compte", "admin", "marketing", "questionnaire", "retours", "beta", "suivi", "joueurs", "snake", "arena", "blocks", "boyblocks", "space"];
 
   function route() {
     var h = (location.hash || "#menu").slice(1);
@@ -5283,7 +5360,7 @@ return {SIZE: SIZE, SIZES: SIZES, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid
     if (h !== "amis") stopChatTimer();
     current = h;
     VIEWS.forEach(function (v) { $("view-" + v).hidden = v !== h; });
-    var tabOf = { boutique: "compte", admin: "compte", marketing: "compte", questionnaire: "compte", retours: "compte", beta: "compte", suivi: "compte", arena: "menu", snake: "menu", blocks: "menu", boyblocks: "menu", space: "menu" };
+    var tabOf = { boutique: "compte", admin: "compte", marketing: "compte", questionnaire: "compte", retours: "compte", beta: "compte", suivi: "compte", joueurs: "compte", arena: "menu", snake: "menu", blocks: "menu", boyblocks: "menu", space: "menu" };
     document.querySelectorAll("[data-nav]").forEach(function (a) {
       var on = a.getAttribute("data-nav") === (tabOf[h] || h);
       a.classList.toggle("on", on);
@@ -5300,6 +5377,7 @@ return {SIZE: SIZE, SIZES: SIZES, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid
     if (h === "retours") renderRetours();
     if (h === "beta") renderBeta();
     if (h === "suivi") renderSuivi();
+    if (h === "joueurs") renderJoueurs(true);
     $("pf-modal").hidden = true;
     if (h !== "snake") loadMaint();
     if (h === "compte") renderAccount();
