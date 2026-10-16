@@ -35,6 +35,7 @@ try:
     badges_avant = sql("select count(*) from user_badges")[0][0]
     run_file(c, f"{REPO}/schema_v16_espace_beta.sql"); run_file(c, f"{REPO}/schema_v16_espace_beta.sql")
     badges_apres = sql("select count(*) from user_badges")[0][0]
+    run_file(c, f"{REPO}/schema_v17_plafond_space.sql"); run_file(c, f"{REPO}/schema_v17_plafond_space.sql")
     run_file(c, f"{REPO}/schema_v6_v7.sql")   # la liste blanche relancée garde les fonctions du questionnaire
     sql("update public.app_settings set value = 'false' where key = 'maintenance'") if sql("select to_regclass('public.app_settings')")[0][0] else None
     print("app_settings:", sql("select * from public.app_settings"))
@@ -266,6 +267,11 @@ console.log(JSON.stringify({moves:g.log,score:g.score}));""" % os.path.join(os.p
     t("réponses d'équipe refusées à un joueur", lambda: must_fail(lambda: as_user(c, U2, "select staff_beta_survey()"), "forbidden"))
     t("table illisible en direct", lambda: must_fail(lambda: as_user(c, U2, "select * from beta_survey"), "permission denied"))
     t("équipe : réponses avec pseudo", lambda: [(r["pseudo"], r["answers"], r["comment"]) for r in as_user(c, U1, "select staff_beta_survey()")[0][0]])
+
+    print("== v17 : plafond Space Attack")
+    t("score Space 45 000 accepté (bloqué à 20 000 avant)", lambda: (sql("update scores set created_at = now() - interval '1 minute' where user_id = %s", (U2,)), as_user(c, U2, "select submit_score('space', 45000)->>'xp'")[0][0])[1])
+    t("score Space au-delà de 100 000 refusé", lambda: (sql("update scores set created_at = now() - interval '1 minute' where user_id = %s", (U2,)), must_fail(lambda: as_user(c, U2, "select submit_score('space', 100001)"), "invalid score"))[1])
+    t("plafond Snake inchangé", lambda: (sql("update scores set created_at = now() - interval '1 minute' where user_id = %s", (U2,)), must_fail(lambda: as_user(c, U2, "select submit_score('snake', 430)"), "invalid score"))[1])
 
     print("== v16 : espace bêta, missions, badge sur validation")
     t("migration : aucun badge attribué automatiquement", lambda: (badges_avant, badges_apres) if badges_avant == badges_apres else (_ for _ in ()).throw(Exception("badges modifiés")))

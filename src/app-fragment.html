@@ -1279,7 +1279,8 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     if (!sb || !session || !profile) return;
     var r = await sb.rpc("submit_continued_score", { p_game: game, p_score: value, p_continues: used });
     if (r.error) { setMsg(msgEl, "Partie continuée : score non enregistré.", true); return; }
-    setMsg(msgEl, "Partie continuée : score hors classement. +" + r.data.xp + " XP" + (r.data.bc ? ", +" + r.data.bc + " BOYCOINS." : "."));
+    // signalements du 15/10 : le score « disparaissait » aux yeux du joueur. Le score d'avant la vidéo est bien classé.
+    setMsg(msgEl, "Partie continuée : ton score d'avant la vidéo est bien enregistré au classement. Le score final (" + value + ") est hors classement. +" + r.data.xp + " XP" + (r.data.bc ? ", +" + r.data.bc + " BOYCOINS." : "."));
     loadMe();
   }
 
@@ -4139,7 +4140,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     function reset() { g = SP.create(); state = "ready"; targetX = null; continues = 0; setMsg($("sp-msg"), ""); clearContinue($("sp-msg").nextElementSibling); }
     function finish() {
       state = "over";
-      if (continues > 0) submitContinued("space", Math.min(g.score, 20000), continues, $("sp-msg"));   // hors classement
+      if (continues > 0) submitContinued("space", Math.min(g.score, 100000), continues, $("sp-msg"));   // hors classement
       else {
         if (g.score > best) { best = g.score; saveLocalBest("space", best); }
         if (g.score > 0) submit(g.score);
@@ -4169,7 +4170,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
         return;
       }
       setMsg(m, "Envoi du score…");
-      var r = await sb.rpc("submit_score", { p_game: "space", p_score: Math.min(value, 20000) });
+      var r = await sb.rpc("submit_score", { p_game: "space", p_score: Math.min(value, 100000) });   // plafond de la base (v17)
       if (r.error) {
         var em = String(r.error.message || "");
         if (em.indexOf("maintenance") >= 0) setMsg(m, "Maintenance en cours : score non enregistré.", true);

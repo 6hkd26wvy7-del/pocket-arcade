@@ -6,6 +6,19 @@ Le plus récent en haut. Chaque entrée : ce qui a été fait, où, et ce qui re
 
 ---
 
+## 16/10/2026 (nuit) — audit global, corrections P1 (TEST)
+
+- Audit complet code + base TEST + tests : `docs/AUDIT-2026-10-16.md` (25 domaines, états, feuille de route P1/P2/P3).
+  Pas de cahier des charges consolidé du 15/10 dans le projet : références = demandes, PLAN-PHASES, HANDOFF, journal.
+- Sécurité vérifiée en direct : RLS partout, fonctions joueur = liste blanche + staff_*, visiteurs = 5 lectures,
+  aucune fuite (lignes personnelles seulement), 8 sauvegardes vérifiées.
+- Bugs corrigés (signalements réels du 15/10) : plafond Space Attack 20 000 -> 100 000 (migration v17, sauvegarde id 8) ;
+  message clair après une partie continuée (le score d'avant la vidéo est bien classé) ; numéro de version des
+  signalements automatique (make_test_release).
+- Tests : SQL 148 + moteur 300 parties + morcelé 8, serveur 91, logique 8, navigateur 20, site en ligne OK.
+- Décisions : aucun gros chantier P2 commencé (validation requise) ; signalements n°1 et n°2 laissés « nouveau »
+  pour vérification par Quentin sur iPhone.
+
 ## 16/10/2026 (soir) — défilement iPhone, profils depuis les classements, espace bêta, badge, suivi (TEST)
 
 - Défilement iPhone : la page « Jouer en ligne » (section BOYBOT) avait `touch-action: none` en permanence ; la règle

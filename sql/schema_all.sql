@@ -1303,7 +1303,7 @@ returns int language sql immutable as $$
   select case p_game
     when 'snake' then 429
     when 'blocks' then 50000
-    when 'space' then 20000
+    when 'space' then 100000   -- v17 : 20 000 avant (bloquait les bonnes parties depuis les bonus)
     else 0
   end;
 $$;

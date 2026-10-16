@@ -10,6 +10,11 @@ html = open(ROOT + "/site/index.html", encoding="utf-8").read()
 a = "if (/[?&]env=test/.test(location.search)) {"; b = "var isTest = /[?&]env=test/.test(location.search);"
 assert html.count(a) == 1 and html.count(b) == 1
 html = html.replace(a, "if (true) {").replace(b, "var isTest = true;")
+# numéro de version affiché dans les signalements de bug : date + empreinte du contenu (change à chaque modification)
+import hashlib, datetime
+stamp = datetime.date.today().strftime("%Y.%m.%d") + "-" + hashlib.md5(html.encode("utf-8")).hexdigest()[:6]
+html, n = re.subn(r'var APP_BUILD = "[^"]*";', 'var APP_BUILD = "%s";' % stamp, html, count=1)
+assert n == 1
 open(OUT + "/index.html", "w", encoding="utf-8").write(html)
 for n in ("config.test.js", "cgu.html", "privacy.html", "icon-180.png", "icon-192.png", "icon-512.png"):
     shutil.copyfile(ROOT + "/site/" + n, OUT + "/" + n)

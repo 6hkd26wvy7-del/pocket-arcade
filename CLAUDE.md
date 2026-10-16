@@ -1,6 +1,6 @@
 # BOYGAMES — mémo pour les sessions de travail
 
-Lire d'abord `docs/JOURNAL.md` (état et prochaines étapes), puis `docs/PLAN-PHASES.md`.
+Lire d'abord `docs/JOURNAL.md` (état et prochaines étapes), puis `docs/AUDIT-2026-10-16.md` (état réel + feuille de route).
 
 ## Règles
 - **Production intouchable sans accord explicite** : racine du site (`index.html`, `config.js`, `sw.js`, `privacy.html`,
@@ -19,7 +19,7 @@ Lire d'abord `docs/JOURNAL.md` (état et prochaines étapes), puis `docs/PLAN-PH
 | Space Attack (logique solo) | entre `/*SPACE-LOGIC-START*/` et `/*SPACE-LOGIC-END*/` dans `src/app-fragment.html` |
 | BOYBOT (joueur virtuel) | `server/boybot.js` : cerveaux Snake / BoyBlocks / Space, niveaux easy/normal/hard ; branché dans `ArenaRoom` (`hello.bot`), place 2 |
 | Serveur de duels | `server/` (`npx wrangler deploy` depuis `server/`, PATH `~/.local/node/bin`) |
-| Base | `sql/` : migrations `schema_v6_v7` → `v8_v9` → `v10` → `v11` → `v12` → `v13` → `v14` (BoyBlocks 9×9) → `v15` (questionnaire bêta) → `v16` (espace bêta, missions, badge) ; installation neuve `schema_all.sql` |
+| Base | `sql/` : migrations `schema_v6_v7` → `v8_v9` → `v10` → `v11` → `v12` → `v13` → `v14` (BoyBlocks 9×9) → `v15` (questionnaire bêta) → `v16` (espace bêta, missions, badge) → `v17` (plafond Space 100 000) ; installation neuve `schema_all.sql` |
 | Fonctions autorisées au site | listes `api` / `anon_ok` de `sql/schema_v6_v7.sql` et `schema_all.sql` : y ajouter toute nouvelle fonction |
 | Questionnaire bêta | liste `SURVEY` dans `src/app-fragment.html` (questions, options, « problèmes ») ; table `beta_survey` ; vues `#questionnaire` et `#retours` ; doc `docs/QUESTIONNAIRE.md` |
 | Espace bêta / suivi | missions `BETA_MISSIONS` (textes) + `app_settings.beta_missions` (codes, obligatoires, manche) ; vues `#beta` (testeur) et `#suivi` (équipe : validation du badge `beta_tester`, CSV) ; badge attribué UNIQUEMENT par `staff_beta_validate` |
@@ -31,7 +31,7 @@ Lire d'abord `docs/JOURNAL.md` (état et prochaines étapes), puis `docs/PLAN-PH
 ```
 cd server && for f in test/*.test.mjs; do node $f; done          # 91
 node tests/logique/space.test.mjs                                 # 8
-python3 sql/test/test_migrations.py                               # 145 (pip install pgserver psycopg2-binary)
+python3 sql/test/test_migrations.py                               # 148 (pip install pgserver psycopg2-binary)
 python3 sql/test/test_installation_et_moteur.py                   # moteur JS = SQL sur 300 parties
 python3 sql/test/test_execution_morcelee.py                       # pip install sqlparse
 cd tests/navigateur && npm test                                   # 20 (Chromium + WebKit iPhone)
@@ -45,7 +45,7 @@ Exécuter le fichier entier d'un seul bloc (connecteur Supabase `execute_sql`), 
 plusieurs morceaux ou si une donnée existante change.
 
 ## État au 16/10/2026 — à reprendre
-- Base TEST v16 (espace bêta ; sauvegarde « avant v16 » id 7 vérifiée ; empreintes des fonctions v16 identiques au local). v15 = questionnaire. v14 = 9×9 en essai. Site TEST publié = `main` à jour. Serveur de duels v6 (BOYBOT).
+- Base TEST v17 (plafond Space ; sauvegarde « avant v17 » id 8). v16 = espace bêta ( sauvegarde « avant v16 » id 7 vérifiée ; empreintes des fonctions v16 identiques au local). v15 = questionnaire. v14 = 9×9 en essai. Site TEST publié = `main` à jour. Serveur de duels v6 (BOYBOT).
   La production n'utilise pas le serveur de duels (pas d'`ARENA_URL` dans `config.js`).
 - **BOYBOT** (bêta) : joueur virtuel côté serveur ; il envoie les mêmes ordres qu'un téléphone (mêmes validations).
   Signalé `bots:[false,true]` dans `lobby`/`countdown`. Pause (`pause`/`resume`, 3 s) uniquement dans les salles BOYBOT. Les duels ne donnent ni XP, ni BC, ni classement : si un jour
