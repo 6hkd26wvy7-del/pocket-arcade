@@ -27,6 +27,8 @@ Le plus récent en haut. Chaque entrée : ce qui a été fait, où, et ce qui re
 - Tests : SQL 145, serveur 91, navigateur 20 (nouveau `beta-profils.mjs` sur iPhone). Serveur non redéployé (inchangé).
 - À noter : la bêta privée est ACTIVÉE sur TEST ; un compte hors liste bêta ne peut ni jouer en ligne ni ouvrir
   l'espace bêta (Administration → bêta privée pour l'ajouter).
+- EL-MATHISSO (compte créé le 16/10) ajouté à la liste bêta à la demande de Quentin (4 membres) ; il a reçu
+  automatiquement le badge exclusif « BÊTA TESTEUR — ÉDITION FONDATRICE » (règle existante : 10 premiers, 4/10 attribués).
 
 ## 16/10/2026 (suite) — BOYBOT Snake corrigé + pause (retours de Joh)
 
