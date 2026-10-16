@@ -6,6 +6,22 @@ Le plus récent en haut. Chaque entrée : ce qui a été fait, où, et ce qui re
 
 ---
 
+## 16/10/2026 (suite) — BOYBOT Snake corrigé + pause (retours de Joh)
+
+- Constat mesuré : en Facile, BOYBOT réfléchissait un tour sur deux et un « bruit » aléatoire plus fort que l'attrait
+  de la pomme le faisait tourner autour (1,4 pomme / 100 pas, 3 371 retours sur ses pas en 40 parties).
+- État initial vérifié : positions en miroir, longueur 3, score 0, une case par tour comme l'humain ; aucun avantage.
+- Nouveau déplacement : chemin le plus court (parcours en largeur) vers une pomme choisie et gardée, tout droit en
+  priorité (pas de zigzag), mode survie quand aucune pomme n'est accessible (case qui laisse le plus de place).
+  Niveaux = défauts humains : réflexes en retard, pomme moins bien choisie, pas d'anticipation des pièges (Facile) ;
+  Difficile anticipe la tête adverse. Mesures : Facile 27 pommes / 2 min, Normal 67, Difficile 75 ;
+  en duel, Facile gagne 25 % contre Normal, Normal 33 % contre Difficile.
+- Pause contre BOYBOT (Snake, et aussi BoyBlocks / Space contre BOYBOT) : bouton PAUSE / REPRENDRE, compte à rebours
+  3 s, plus aucun tour côté serveur pendant la pause (serpents, robot, temps de jeu figés), reprise au tour suivant,
+  direction choisissable pendant le décompte, pause auto quand l'appli passe en arrière-plan.
+  Refusée entre deux humains (règles des duels inchangées).
+- Tests : 8 nouveaux tests serveur (91), test iPhone `boybot-pause.mjs` (19 navigateur). Serveur et site TEST déployés.
+
 ## 16/10/2026 — questionnaire des bêta-testeurs (TEST)
 
 - Questionnaire intégré (`#questionnaire`) : une question par écran, gros boutons au doigt, barre de progression,

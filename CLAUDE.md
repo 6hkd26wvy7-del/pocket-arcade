@@ -27,12 +27,12 @@ Lire d'abord `docs/JOURNAL.md` (état et prochaines étapes), puis `docs/PLAN-PH
 
 ## Tests (tous doivent passer avant une publication)
 ```
-cd server && for f in test/*.test.mjs; do node $f; done          # 83
+cd server && for f in test/*.test.mjs; do node $f; done          # 91
 node tests/logique/space.test.mjs                                 # 8
 python3 sql/test/test_migrations.py                               # 123 (pip install pgserver psycopg2-binary)
 python3 sql/test/test_installation_et_moteur.py                   # moteur JS = SQL sur 300 parties
 python3 sql/test/test_execution_morcelee.py                       # pip install sqlparse
-cd tests/navigateur && npm test                                   # 18 (Chromium + WebKit iPhone)
+cd tests/navigateur && npm test                                   # 19 (Chromium + WebKit iPhone)
 node tests/navigateur/en-ligne.mjs                                # site TEST publié
 ```
 Node : `export PATH=~/.local/node/bin:$PATH`. Python des tests SQL : un venv avec `pgserver psycopg2-binary sqlparse`.
@@ -46,6 +46,6 @@ plusieurs morceaux ou si une donnée existante change.
 - Base TEST v15 (questionnaire bêta ; sauvegarde « avant v15 » id 6 vérifiée). v14 = 9×9 en essai. Site TEST publié = `main` à jour. Serveur de duels v6 (BOYBOT).
   La production n'utilise pas le serveur de duels (pas d'`ARENA_URL` dans `config.js`).
 - **BOYBOT** (bêta) : joueur virtuel côté serveur ; il envoie les mêmes ordres qu'un téléphone (mêmes validations).
-  Signalé `bots:[false,true]` dans `lobby`/`countdown`. Les duels ne donnent ni XP, ni BC, ni classement : si un jour
+  Signalé `bots:[false,true]` dans `lobby`/`countdown`. Pause (`pause`/`resume`, 3 s) uniquement dans les salles BOYBOT. Les duels ne donnent ni XP, ni BC, ni classement : si un jour
   ils en donnent, **exclure les salles où `bots` contient true**.
 - Empreinte distante v14 : `81c4fbed…` (formule `md5(string_agg(proname||':'||md5(prosrc)))`) ; rejeu 9×9 distant = attendu.

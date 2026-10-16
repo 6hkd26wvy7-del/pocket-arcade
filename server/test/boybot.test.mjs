@@ -24,10 +24,75 @@ await t("snake: Difficile bat Facile la plupart du temps, sans etre invincible",
   let hard = 0, easy = 0;
   for (let s = 1; s <= 80; s++) { const g = snakeMatch(s, s % 2 ? "hard" : "easy", s % 2 ? "easy" : "hard"); const hi = s % 2 ? 0 : 1; if (g.winner === hi) hard++; else if (g.winner === 1 - hi) easy++; }
   assert.ok(hard > easy * 1.5, "difficile " + hard + " / facile " + easy);
+  let n2 = 0, h2 = 0;
+  for (let s = 1; s <= 120; s++) { const g = snakeMatch(s * 7 + 3, "normal", "hard"); if (g.winner === 1) h2++; else if (g.winner === 0) n2++; }
+  assert.ok(h2 > n2, "difficile " + h2 + " / normal " + n2);
 });
 await t("snake: un seul ordre a la fois, jamais de demi-tour", () => {
   const g = SN.newGame(3), b = BOT.makeBot("snake", "hard", 3);
   for (let k = 0; k < 300 && !g.over; k++) { const ms = b.act(g, 0); assert.ok(ms.length <= 1); ms.forEach((m) => assert.notEqual(m.d, { U: "D", D: "U", L: "R", R: "L" }[g.players[0].dir])); ms.forEach((m) => SN.setDirection(g, 0, m.d)); SN.step(g); }
+});
+
+await t("snake: BOYBOT part dans les memes conditions qu'un humain (miroir, longueur, score, vitesse)", () => {
+  for (let s = 1; s <= 20; s++) {
+    const g = SN.newGame(s), [h, b] = g.players;
+    assert.equal(h.body.length, b.body.length); assert.equal(h.score, 0); assert.equal(b.score, 0);
+    assert.equal(h.body[0].y, b.body[0].y); assert.equal(h.body[0].x, SN.COLS - 1 - b.body[0].x);   // positions en miroir
+    assert.equal(h.dir, "R"); assert.equal(b.dir, "L");
+    const before = b.body.map((c) => ({ ...c })); SN.step(g);                                          // une case par tour, comme l'humain
+    assert.equal(Math.abs(b.body[0].x - before[0].x) + Math.abs(b.body[0].y - before[0].y), 1);
+  }
+});
+// Pommes placées dans des situations précises : le bot (place 1) doit la manger, sans tourner autour.
+function scenario(level, food, body, dir, limit) {
+  const g = SN.newGame(1); g.players[0].alive = false; g.players[0].body = [{ x: -9, y: -9 }];
+  const me = g.players[1]; me.body = body.map(([x, y]) => ({ x, y })); me.dir = dir; g.food = [food];
+  const bot = BOT.makeBot("snake", level, 5); let k = 0;
+  while (k++ < limit) {
+    bot.act(g, 1).forEach((m) => SN.setDirection(g, 1, m.d)); SN.step(g); g.over = false;
+    if (!me.alive) return { dead: true, k };
+    if (me.score > 0) return { ate: true, k };
+  }
+  return { k };
+}
+const SITUATIONS = {
+  "pomme dans un coin": [{ x: 0, y: 0 }, [[12, 12], [13, 12], [14, 12]], "L"],
+  "pomme contre un mur": [{ x: 23, y: 7 }, [[5, 20], [4, 20], [3, 20]], "R"],
+  "pomme juste derrière lui (demi-tour impossible)": [{ x: 15, y: 10 }, [[12, 10], [13, 10], [14, 10]], "L"],
+  "pomme derrière son long corps": [{ x: 10, y: 9 }, [[10, 11], [11, 11], [12, 11], [13, 11], [13, 10], [12, 10], [11, 10], [10, 10], [9, 10], [8, 10], [7, 10], [6, 10]], "D"],
+  "pomme dans un cul-de-sac en U": [{ x: 1, y: 1 }, [[6, 6], [6, 7], [6, 8]], "U"],
+};
+for (const level of BOT.LEVELS) {
+  await t("snake " + level + ": mange la pomme dans 5 situations, sans boucle ni accident", () => {
+    for (const [name, [food, body, dir]] of Object.entries(SITUATIONS)) {
+      const r = scenario(level, food, body, dir, 160);
+      assert.ok(r.ate, name + " : " + JSON.stringify(r));
+    }
+  });
+}
+await t("snake: pomme inaccessible = mode survie (il ne se jette pas contre un mur)", () => {
+  for (const level of BOT.LEVELS) {
+    const g = SN.newGame(1); g.players[0].alive = false; g.players[0].body = [{ x: -9, y: -9 }];
+    const wall = []; for (let y = 0; y < SN.ROWS; y++) wall.push({ x: 18, y });   // un mur infranchissable (le serpent adverse « mort » n'en est pas un : on le simule)
+    g.players[0].alive = true; g.players[0].body = wall; g.players[0].dir = "D"; g.players[0].queue = [];
+    const me = g.players[1]; me.body = [{ x: 8, y: 12 }, { x: 9, y: 12 }, { x: 10, y: 12 }]; me.dir = "L"; g.food = [{ x: 21, y: 3 }];
+    const bot = BOT.makeBot("snake", level, 3); let k = 0;
+    for (; k < 150; k++) { bot.act(g, 1).forEach((m) => SN.setDirection(g, 1, m.d)); g.players[0].body = wall; g.players[0].alive = true; SN.step(g); g.players[0].body = wall; g.players[0].alive = true; g.over = false; if (!me.alive) break; }
+    assert.ok(k >= 150 || level === "easy" && k > 60, level + " a survécu " + k + " tours");
+  }
+});
+await t("snake: plus de tours en rond (Facile mange regulierement)", () => {
+  const rate = {};
+  for (const level of BOT.LEVELS) {
+    let eat = 0, ticks = 0, starve = 0;
+    for (let s = 1; s <= 30; s++) {
+      const g = SN.newGame(s), b = BOT.makeBot("snake", level, s); g.players[0].alive = false; g.players[0].body = [{ x: -9, y: -9 }];
+      let since = 0;
+      for (let k = 0; k < 500; k++) { b.act(g, 1).forEach((m) => SN.setDirection(g, 1, m.d)); const sc = g.players[1].score; SN.step(g); g.over = false; if (!g.players[1].alive) break; ticks++; if (g.players[1].score > sc) { eat++; since = 0; } else if (++since > 80) { starve++; since = 0; } }
+    }
+    rate[level] = 100 * eat / ticks; assert.ok(starve <= 3, level + " : " + starve + " longues périodes sans manger");
+  }
+  assert.ok(rate.easy > 4 && rate.easy < rate.normal && rate.normal <= rate.hard + 0.5, JSON.stringify(rate));
 });
 
 // ---------- BoyBlocks ----------
@@ -121,5 +186,33 @@ await t("salle: revanche avec BOYBOT, salle pleine pour un autre, difficulte inc
   a.say({ t: "again" }); await wait(80);
   assert.ok(a.inbox.filter((m) => m.t === "countdown").length >= 2, "nouvelle partie lancée");
   const r2 = new ArenaRoom({}, env); const z = await phone(r2, "SBOT3", U1, "expert"); assert.equal(z.last("error").code, "bot");
+});
+await t("pause contre BOYBOT : tout s'arrete, reprise apres le compte a rebours, au meme tour", async () => {
+  const room = new ArenaRoom({}, { ...env, TICK_MS: 10, DT_MS: 140, RESUME_MS: 60 });
+  const a = await phone(room, "SBOTP", U1, "normal");
+  await wait(120);
+  a.say({ t: "pause" }); await wait(30);
+  assert.ok(a.last("paused"), "pause confirmée");
+  const tick0 = a.last("state").tick, n0 = a.inbox.length;
+  await wait(200);
+  assert.equal(a.inbox.filter((m, i) => i >= n0 && m.t === "state").length, 0, "aucun tour pendant la pause");
+  const g = room.game; assert.equal(g.tick, tick0, "le serveur n'avance plus");
+  const bot = g.players[1].body.map((c) => c.x + "," + c.y).join(" ");
+  a.say({ t: "dir", d: "U" }); await wait(20); assert.equal(g.players[0].queue.length, 0, "pas d'ordre pendant la pause");
+  a.say({ t: "resume" }); await wait(20);
+  assert.equal(a.last("resume").ms, 60);
+  a.say({ t: "dir", d: "U" }); await wait(10); assert.deepEqual(g.players[0].queue, ["U"], "direction choisie pendant le compte à rebours");
+  assert.equal(g.tick, tick0); assert.equal(g.players[1].body.map((c) => c.x + "," + c.y).join(" "), bot, "BOYBOT figé pendant le compte à rebours");
+  await wait(120);
+  assert.ok(g.tick > tick0, "la partie a repris"); assert.equal(room.phase === "playing" || room.phase === "over", true);
+  assert.ok(a.inbox.filter((m) => m.t === "state" && m.tick === tick0 + 1).length >= 1, "reprise au tour suivant, sans saut");
+});
+await t("pause refusee entre deux humains (regles des duels inchangees)", async () => {
+  const room = new ArenaRoom({}, { ...env, TICK_MS: 10, DT_MS: 140 });
+  const a = await phone(room, "SHUM1", U1), b = await phone(room, "SHUM1", U2);
+  await wait(40); a.say({ t: "dir", d: "U" }); b.say({ t: "dir", d: "D" });   // pas de face-à-face
+  await wait(40); const t0 = room.game.tick;
+  a.say({ t: "pause" }); await wait(60);
+  assert.equal(a.last("paused"), undefined); assert.ok(room.game.tick > t0, "la partie continue"); assert.notEqual(room.phase, "paused");
 });
 console.log(n + " tests OK"); process.exit(0);

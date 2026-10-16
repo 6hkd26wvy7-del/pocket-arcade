@@ -146,6 +146,7 @@ export class ArenaRoom {
     this.again = [false, false];
     this.endCloseMs = env.END_CLOSE_MS !== undefined ? Number(env.END_CLOSE_MS) : 90000;
     this.bot = null; // { index, level, brain } quand BOYBOT occupe la 2e place
+    this.resumeMs = env.RESUME_MS !== undefined ? Number(env.RESUME_MS) : 3000;
   }
 
   // Un joueur est « là » s'il a une connexion ouverte, ou si c'est BOYBOT.
@@ -226,8 +227,10 @@ export class ArenaRoom {
       }
 
       if (msg.t === "again") { this.onAgain(me.index); return; }
+      if (msg.t === "pause") { this.pause(); return; }
+      if (msg.t === "resume") { this.resume(); return; }
       if (msg.t === "sync" && this.game && this.kind.syncLog && (this.phase === "playing" || this.phase === "over")) { this.send(ws, this.kind.syncLog(this.game, me.index)); return; }
-      if (this.phase === "playing" && this.game) {
+      if ((this.phase === "playing" || (this.phase === "resuming" && !this.kind.instant)) && this.game) {
         const changed = this.kind.input(this.game, me.index, msg);
         if (changed && this.kind.instant) {
           this.broadcast(snapshot(this.game, this.kind));
@@ -265,8 +268,9 @@ export class ArenaRoom {
   afterJoin() {
     const names = this.names(), bots = this.bots();
     this.slots.forEach((p, i) => { if (p && p.ws) this.send(p.ws, { t: "lobby", code: this.code, kind: this.kind.name, you: i, players: names, bots, phase: this.phase }); });
-    if (this.phase === "playing" || this.phase === "over") {
+    if (this.phase === "playing" || this.phase === "over" || this.phase === "paused" || this.phase === "resuming") {
       this.slots.forEach((p, i) => { if (p && p.ws && this.game) this.send(p.ws, snapshot(this.game, this.kind)); });
+      if (this.phase === "paused") this.broadcast({ t: "paused" });
     }
     if (this.phase === "lobby" && this.present(this.slots[0]) && this.present(this.slots[1]) && this.slots.some((p) => p && p.ws)) {
       this.phase = "countdown";
@@ -282,7 +286,33 @@ export class ArenaRoom {
     this.phase = "playing";
     this.broadcast(snapshot(this.game, this.kind));
     this.timer = setInterval(() => this.tick(), this.tickMs);
-    this.hardStop = setTimeout(() => this.finish("timeout"), 5 * 60 * 1000);
+    this.stopLeft = 5 * 60 * 1000;
+    this.armStop();
+  }
+  armStop() { this.stopAt = Date.now(); clearTimeout(this.hardStop); this.hardStop = setTimeout(() => this.finish("timeout"), this.stopLeft); }
+
+  // Pause : seulement dans une salle avec BOYBOT (entre deux humains, rien ne change).
+  // Tout s'arrête d'un coup (les deux serpents, BOYBOT, le temps de jeu) : aucun tour ne passe pendant la pause.
+  pause() {
+    if (!this.bot || this.phase !== "playing" || !this.game || this.game.over) return;
+    this.phase = "paused";
+    clearInterval(this.timer); this.timer = null;
+    clearTimeout(this.hardStop); this.stopLeft = Math.max(1000, this.stopLeft - (Date.now() - this.stopAt));
+    this.broadcast({ t: "paused" });
+  }
+  // Reprise après 3 secondes de compte à rebours (le jeu reprend exactement où il s'était arrêté).
+  resume() {
+    if (!this.bot || this.phase !== "paused") return;
+    this.phase = "resuming";
+    this.broadcast({ t: "resume", ms: this.resumeMs });
+    clearTimeout(this.resumeTimer);
+    this.resumeTimer = setTimeout(() => {
+      if (this.phase !== "resuming") return;
+      this.phase = "playing";
+      this.broadcast(snapshot(this.game, this.kind));
+      this.timer = setInterval(() => this.tick(), this.tickMs);
+      this.armStop();
+    }, this.resumeMs);
   }
 
   tick() {
@@ -306,7 +336,7 @@ export class ArenaRoom {
       if (!this.slots.some((q) => q && q.ws)) { clearTimeout(this.closeTimer); this.slots = [null, null]; this.bot = null; }
       return;
     }
-    if (this.phase === "playing" || this.phase === "countdown") {
+    if (this.phase === "playing" || this.phase === "countdown" || this.phase === "paused" || this.phase === "resuming") {
       // 10 secondes pour revenir, sinon l'autre gagne
       this.graceTimers[index] = setTimeout(() => {
         if (this.phase === "over" || (this.slots[index] && this.slots[index].ws)) return;
@@ -330,6 +360,7 @@ export class ArenaRoom {
   finish(reason) {
     if (this.phase === "over") return;
     this.phase = "over";
+    clearTimeout(this.resumeTimer);
     clearInterval(this.timer);
     clearTimeout(this.hardStop);
     if (this.game && !this.game.over) { this.game.over = true; this.game.winner = "draw"; this.game.reason = reason; }

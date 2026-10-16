@@ -22,6 +22,7 @@ const TESTS = {
   "multi-visuel.mjs": ["multi-visuel OK"],
   "boybot.mjs": ["boybot OK"],
   "questionnaire.mjs": ["questionnaire OK"],
+  "boybot-pause.mjs": ["boybot-pause OK"],
   "iphone.mjs": ["envoyés identiques: true", "Score vérifié et enregistré", "protection ok", "accueil ok"],
 };
 let bad = 0;

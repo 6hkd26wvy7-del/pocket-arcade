@@ -615,7 +615,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
         <p id="ar-top" class="msg" role="status"></p>
         <canvas id="ar-screen" class="screen" width="240" height="264" style="aspect-ratio:240/264;width:min(100%,420px)" tabindex="0" aria-label="Jeu en ligne. Glisse un doigt pour jouer."></canvas>
         <p id="ar-msg" class="msg" role="status"></p>
-        <div class="row"><button class="btn" id="ar-again" type="button" hidden>REJOUER</button><button class="btn alt" id="ar-leave" type="button">QUITTER</button></div>
+        <div class="row"><button class="btn" id="ar-pause" type="button" hidden>PAUSE</button><button class="btn" id="ar-again" type="button" hidden>REJOUER</button><button class="btn alt" id="ar-leave" type="button">QUITTER</button></div>
       </div>
       <p id="ar-note" class="msg" role="status"></p>
     </section>
@@ -3763,6 +3763,11 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
         ctx.fillStyle = "rgba(11,18,32,.8)"; ctx.fillRect(0, 0, W, H);
         ctx.fillStyle = "#F8FAFC"; ctx.textAlign = "center"; ctx.font = "800 54px system-ui, sans-serif"; ctx.fillText("PRÉPARATION…", W / 2, H / 2);
       }
+      if (duel && duelPause && !duelFinal) {   // pause contre BOYBOT : calque + « PAUSE » ou compte à rebours
+        ctx.fillStyle = "rgba(11,18,32,.72)"; ctx.fillRect(0, BY - 12, W, N * CELL + 24);
+        ctx.textAlign = "center"; ctx.fillStyle = "#F8FAFC"; ctx.font = "800 96px system-ui, sans-serif";
+        ctx.fillText(duelPause.label, W / 2, BY + N * CELL / 2 + 32);
+      }
       if (duel && duelFinal) drawDuelEnd();
       else if (duel && state === "blocked") {
         ctx.fillStyle = "rgba(11,18,32,.6)"; ctx.fillRect(0, 0, W, H);
@@ -3783,12 +3788,12 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     }
 
     /* ----- duel : état venant du serveur ----- */
-    var duelSt = null, duelAt = 0, duelFinal = null, duelYou = 0, duelNames = ["", ""], duelRun = false;
+    var duelSt = null, duelAt = 0, duelFinal = null, duelYou = 0, duelNames = ["", ""], duelRun = false, duelPause = null;
     function drawDuelHud() {
       var opp = duelSt ? duelSt.players[1 - duelYou] : null, me = duelSt ? duelSt.players[duelYou] : null;
       ctx.textAlign = "left"; ctx.fillStyle = "#22D3EE"; ctx.font = "700 24px system-ui, sans-serif"; ctx.fillText(String(duelNames[duelYou] || "TOI").slice(0, 10).toUpperCase(), BX, 44);
       ctx.fillStyle = "#F8FAFC"; ctx.font = "800 62px system-ui, sans-serif"; ctx.fillText(String(Math.round(shown)), BX, 104);
-      var left = duelSt ? Math.max(0, duelSt.msLeft - (Date.now() - duelAt)) : 0, sec = Math.ceil(left / 1000);
+      var left = duelSt ? Math.max(0, duelSt.msLeft - ((duelPause ? duelPause.at : Date.now()) - duelAt)) : 0, sec = Math.ceil(left / 1000);
       ctx.textAlign = "center"; ctx.fillStyle = sec <= 15 ? "#F87171" : "#F8FAFC"; ctx.font = "800 54px system-ui, sans-serif";
       ctx.fillText(Math.floor(sec / 60) + ":" + (sec % 60 < 10 ? "0" : "") + (sec % 60), W / 2 - 10, 92);
       if (opp) {
@@ -3820,8 +3825,9 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       for (var i = 0; i < log.length; i++) BBE.place(g, log[i][0], log[i][1], log[i][2]);
       shown = g.score; state = g.over ? "blocked" : "playing";
     }
+    function duelSetPause(label) { duelPause = label ? { label: label, at: duelPause ? duelPause.at : Date.now() } : null; }
     function duelOnState(st, you, names) {
-      duelYou = you; duelNames = names; duelSt = st; duelAt = Date.now();
+      duelYou = you; duelNames = names; duelSt = st; duelAt = Date.now(); duelPause = null;
       if (!g || g.seed !== st.seed || (g.size || 8) !== (st.size || 8)) {
         setGrid(st.size || 8); g = BBE.newGame(st.seed, { ensureFit: false, size: st.size || 8 }); shown = 0; state = "playing"; duelFinal = null; fx = []; pops = []; banner = null;
         if (st.players[you].moves > 0) duel.send({ t: "sync" });
@@ -3863,7 +3869,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       });
       canvas.addEventListener("keydown", function (e) { if (e.key === "Enter" && state === "over" && Date.now() - overAt > 900) reset(); });
     }
-    return { enter: enter, leave: leave, onState: duelOnState, onSync: duelSync, stop: duelStop, _debug: function () { return { g: g, state: state, ranked: ranked }; } };
+    return { enter: enter, leave: leave, onState: duelOnState, onSync: duelSync, stop: duelStop, setPause: duelSetPause, _debug: function () { return { g: g, state: state, ranked: ranked }; } };
   }
   var boyblocks = makeBoyBlocks("bb-screen", null);
 
@@ -4065,7 +4071,17 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     var SIZES = { snake: [240, 264], space: [144, 208], blocks: [240, 236], boyblocks: [720, 1040] };
     var canvas = $("ar-screen"), ctx = canvas.getContext("2d");
     var ws = null, code = "", kind = "snake", you = -1, names = ["", ""], st = null, phase = "idle";
-    var retries = 0, wantOpen = false, touch = null, botReq = null, bots = [false, false];
+    var retries = 0, wantOpen = false, touch = null, botReq = null, bots = [false, false], resumeAt = 0, resumeTimer = null;
+    // Pause : seulement contre BOYBOT (le serveur refuse sinon). Le bouton suit la phase de la partie.
+    function botRoom() { return bots[0] || bots[1]; }
+    function updatePause() {
+      var b = $("ar-pause");
+      b.hidden = !(botRoom() && (phase === "playing" || phase === "paused" || phase === "resuming"));
+      b.textContent = phase === "playing" ? "PAUSE" : "REPRENDRE";
+      b.disabled = phase === "resuming";
+    }
+    function sendRaw(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
+    function pauseLabel() { return phase === "paused" ? "PAUSE" : phase === "resuming" ? String(Math.max(1, Math.ceil((resumeAt - Date.now()) / 1000))) : null; }
     var BOT_LEVEL_FR = { easy: "facile", normal: "normal", hard: "difficile" };
     function botLevel() { var v = null; try { v = localStorage.getItem("boygames-bot-level"); } catch (e) { /* ignore */ } return BOT_LEVEL_FR[v] ? v : "normal"; }
     function playersLine() {
@@ -4142,7 +4158,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
         say("ar-msg", "Ton adversaire est parti.");
       } else if (m.t === "countdown") {
         bbDuel.stop();
-        phase = "countdown";
+        phase = "countdown"; clearInterval(resumeTimer); updatePause();
         wantOpen = true;
         st = null;
         $("ar-again").hidden = true;
@@ -4150,12 +4166,30 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
         if (m.bots) bots = m.bots;
         say("ar-top", playersLine());
         say("ar-msg", "Prépare-toi…");
+      } else if (m.t === "paused") {
+        phase = "paused"; clearInterval(resumeTimer);
+        say("ar-msg", "PAUSE. Touche REPRENDRE quand tu es prêt.");
+        if (kind === "boyblocks") bbDuel.setPause("PAUSE");
+        updatePause(); draw();
+      } else if (m.t === "resume") {
+        phase = "resuming"; resumeAt = Date.now() + (m.ms || 3000);
+        clearInterval(resumeTimer);
+        var tickDown = function () {
+          if (phase !== "resuming") { clearInterval(resumeTimer); return; }
+          say("ar-msg", "Reprise dans " + pauseLabel() + "…");
+          if (kind === "boyblocks") bbDuel.setPause(pauseLabel());
+          draw();
+        };
+        tickDown(); resumeTimer = setInterval(tickDown, 200);
+        updatePause();
       } else if (m.t === "sync") {
         if (kind === "boyblocks" && st) bbDuel.onSync(m.log || []);
       } else if (m.t === "state") {
         st = m;
         if (kind === "boyblocks") bbDuel.onState(m, you, names);
         if (m.over) { phase = "over"; wantOpen = false; endText(m); if (m.reason !== "left") { $("ar-again").hidden = false; $("ar-again").disabled = false; } } else { phase = "playing"; say("ar-msg", ""); }
+        clearInterval(resumeTimer);
+        updatePause();
         draw();
       }
     }
@@ -4173,8 +4207,10 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     function banner(c, text, y, w) {
       var W = canvas.width;
       ctx.fillStyle = c.ink; ctx.fillRect(Math.round((W - w) / 2), y, w, 22);
-      ctx.fillStyle = c.lcd; ctx.fillText(text, Math.round((W - text.length * 8) / 2), y + 15);
+      ctx.fillStyle = c.lcd; ctx.fillText(text, Math.round((W - ctx.measureText(text).width) / 2), y + 15);
     }
+    // nom court pour l'écran de jeu (police pixel : pas d'emoji, coupé sans casser un caractère)
+    function shortName(i, def) { return bots[i] ? "BOYBOT" : Array.from(names[i] || def).slice(0, 8).join(""); }
     function resultWord(m) { return m.winner === "team" ? "FIN" : m.winner === "draw" ? "EGALITE" : m.winner === you ? "GAGNE !" : "PERDU"; }
 
     function draw() {
@@ -4191,11 +4227,13 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       if (kind === "snake") drawSnake(c);
       else if (kind === "space") drawSpace(c);
       else drawBlocks(c);
+      var pl = pauseLabel();
+      if (pl) { font(); ctx.fillStyle = c.ink; banner(c, pl, Math.round(canvas.height / 2) - 11, Math.max(64, pl.length * 8 + 24)); }
     }
 
     function drawSnake(c) {
       var CELL = 10, HUD = 24;
-      var a = (you === 0 ? ">" : "") + (names[0] || "J1").slice(0, 8), b = (names[1] || "J2").slice(0, 8) + (you === 1 ? "<" : "");
+      var a = (you === 0 ? ">" : "") + shortName(0, "J1"), b = shortName(1, "J2") + (you === 1 ? "<" : "");
       ctx.fillText(a + " " + st.players[0].score, 4, 15);
       var rt = st.players[1].score + " " + b; ctx.fillText(rt, 236 - rt.length * 8, 15);
       ctx.fillRect(0, HUD - 1, 240, 1);
@@ -4310,7 +4348,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     }
 
     /* ----- envoi des commandes ----- */
-    function send(o) { if (ws && ws.readyState === 1 && phase === "playing") ws.send(JSON.stringify(o)); }
+    function send(o) { if (ws && ws.readyState === 1 && (phase === "playing" || (phase === "resuming" && kind !== "boyblocks"))) ws.send(JSON.stringify(o)); }
     function dir(d) { send({ t: "dir", d: d }); }
     function act(a) { send({ t: "act", a: a }); }
     function toGameX(clientX) { var r = canvas.getBoundingClientRect(); return (clientX - r.left) * (144 / r.width); }
@@ -4409,6 +4447,13 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       say("ar-note", ""); start(c);
     });
     $("ar-leave").addEventListener("click", function () { $("ar-again").hidden = true; leave(); show(false); });
+    $("ar-pause").addEventListener("click", function () {
+      if (phase === "playing") sendRaw({ t: "pause" });
+      else if (phase === "paused") sendRaw({ t: "resume" });
+    });
+    // l'appli passe en arrière-plan pendant une partie contre BOYBOT : pause automatique
+    document.addEventListener("visibilitychange", function () { if (document.hidden && current === "arena" && botRoom() && phase === "playing") sendRaw({ t: "pause" }); });
+    window.addEventListener("bg:pause", function () { if (current === "arena" && botRoom() && phase === "playing") sendRaw({ t: "pause" }); });
     $("ar-again").addEventListener("click", function () {
       if (!ws || ws.readyState !== 1) { say("ar-msg", "Connexion perdue. Quitte puis recrée une partie.", true); return; }
       $("ar-again").disabled = true;
@@ -4418,9 +4463,11 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
 
     function leave() {
       bbDuel.stop();
+      clearInterval(resumeTimer);
       wantOpen = false;
       if (ws) { var w = ws; ws = null; try { w.close(); } catch (e) { /* ignore */ } }
       phase = "idle";
+      updatePause();
       if (spaceTimer) { clearInterval(spaceTimer); spaceTimer = null; }
     }
     function enter() {

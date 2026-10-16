@@ -10,11 +10,13 @@ export const BOT_NAME = "BOYBOT 🤖";
 export const BOT_UID = "boybot";
 
 // Réglages par difficulté.
-const CFG = {
+export const CFG = {
   snake: {
-    easy:   { every: 2, flood: false, headOn: false, noise: 4, blunder: 0.02 },   // regarde un pas sur deux, se piège parfois
-    normal: { every: 1, flood: true,  headOn: false, noise: 2, blunder: 0.006 },
-    hard:   { every: 1, flood: true,  headOn: true,  noise: 0.5, blunder: 0.001 },
+    // lazy : parfois il tourne un tour en retard (réflexes plus lents) ; nearest : choisit la pomme la plus proche ;
+    // flood : vérifie qu'il ne s'enferme pas ; headOn : évite le face-à-face ; blunder : rare inattention face à un obstacle.
+    easy:   { lazy: 0.50, nearest: 0.4, flood: 0, headOn: false, race: false, blunder: 0.004 },
+    normal: { lazy: 0.10, nearest: 0.85, flood: 1, headOn: false, race: false, blunder: 0.001 },
+    hard:   { lazy: 0.0,  nearest: 1.0, flood: 3, headOn: true,  race: false, blunder: 0.0 },
   },
   boyblocks: {
     easy:   { think: [2200, 3800], top: 6, wild: 0.25 },   // lent, choisit souvent un coup moyen
@@ -38,61 +40,99 @@ export function makeBot(game, level, seed) {
 }
 
 /* ---------------- Snake ---------------- */
+// Recherche de chemin (parcours en largeur) vers une pomme choisie et GARDÉE jusqu'à ce qu'elle soit mangée :
+// pas d'hésitation ni de tours autour de la pomme. Sans chemin : mode survie (case qui laisse le plus de place).
+// Le niveau ne change que des défauts « humains » : réflexes plus lents, pomme moins bien choisie, pas d'anticipation.
 const DIRS = { U: [0, -1], D: [0, 1], L: [-1, 0], R: [1, 0] };
 const OPP = { U: "D", D: "U", L: "R", R: "L" };
 const COLS = 24, ROWS = 24;
+const key = (x, y) => y * COLS + x;
+const inside = (x, y) => x >= 0 && y >= 0 && x < COLS && y < ROWS;
 
 function snakeBot(cfg, rand) {
-  let n = 0;
+  let target = null;   // pomme visée {x, y}
   return {
     // appelé à chaque tour, AVANT que le serveur fasse avancer la partie
     act(g, i) {
       const me = g.players[i], other = g.players[1 - i];
       if (!me || !me.alive || g.over || me.queue.length) return [];
-      if (++n % cfg.every !== 0 && !deadAhead(g, me, me.dir)) return [];
+      // cases occupées au prochain tour (les queues avancent, sauf si le serpent mange : prudence, on les garde sauf la sienne)
       const blocked = new Set();
-      g.players.forEach((p) => { if (!p.alive) return; p.body.forEach((c, k) => { if (k < p.body.length - 1) blocked.add(c.x + "," + c.y); }); });
+      g.players.forEach((p) => { if (!p.alive) return; p.body.forEach((c, k) => { if (!(p === me && k === p.body.length - 1)) blocked.add(key(c.x, c.y)); }); });
       const head = me.body[0];
-      let best = null, bestScore = -Infinity;
-      for (const d of Object.keys(DIRS)) {
-        if (d === OPP[me.dir]) continue;
-        const x = head.x + DIRS[d][0], y = head.y + DIRS[d][1];
-        let s;
-        const wall = x < 0 || y < 0 || x >= COLS || y >= ROWS || blocked.has(x + "," + y);
-        if (wall && rand() >= cfg.blunder) s = -1000;            // obstacle vu (sauf distraction rare)
-        else if (wall) s = 0;
-        else {
-          s = -2 * foodDist(g, x, y);
-          if (cfg.flood) { const room = flood(blocked, x, y, me.body.length * 2); if (room < me.body.length) s -= 400 - room; }
-          if (cfg.headOn && other && other.alive) {
-            const oh = other.body[0];
-            if (Math.abs(oh.x - x) + Math.abs(oh.y - y) === 1) s -= 60;   // évite le face-à-face
-          }
+      const order = [me.dir].concat(Object.keys(DIRS).filter((d) => d !== me.dir && d !== OPP[me.dir]));   // tout droit d'abord
+      const safe = order.filter((d) => { const x = head.x + DIRS[d][0], y = head.y + DIRS[d][1]; return inside(x, y) && !blocked.has(key(x, y)); });
+      if (!safe.length) return [];                                            // plus aucune issue : rien à faire
+      const oh = other && other.alive ? other.body[0] : null;
+      const risky = (d) => { if (!cfg.headOn || !oh) return false; const x = head.x + DIRS[d][0], y = head.y + DIRS[d][1]; return Math.abs(oh.x - x) + Math.abs(oh.y - y) === 1; };
+      // Difficile : anticipe l'adversaire (les cases où sa tête peut aller comptent comme occupées pour mesurer la place)
+      const roomBlocked = cfg.headOn && oh ? new Set(blocked) : blocked;
+      if (roomBlocked !== blocked) Object.values(DIRS).forEach((v) => { const x = oh.x + v[0], y = oh.y + v[1]; if (inside(x, y)) roomBlocked.add(key(x, y)); });
+
+      // 1. pomme visée : on la garde tant qu'elle existe (évite d'osciller entre deux pommes)
+      if (!target || !g.food.some((f) => f.x === target.x && f.y === target.y)) target = pickFood(g, head, oh, cfg, rand, blocked);
+      // 2. chemin le plus court vers elle
+      let choice = null;
+      if (target) {
+        const dist = bfs(blocked, target.x, target.y);                       // distance de chaque case jusqu'à la pomme
+        const ranked = safe.filter((d) => dist.has(key(head.x + DIRS[d][0], head.y + DIRS[d][1])))
+          .sort((a, b) => dist.get(key(head.x + DIRS[a][0], head.y + DIRS[a][1])) - dist.get(key(head.x + DIRS[b][0], head.y + DIRS[b][1])));
+        for (const d of ranked) {
+          if (risky(d)) continue;
+          if (cfg.flood && room(roomBlocked, head.x + DIRS[d][0], head.y + DIRS[d][1], me.body.length * cfg.flood + 2) < me.body.length * cfg.flood + 2) continue;   // piège
+          choice = d; break;
         }
-        s += (rand() - 0.5) * cfg.noise * 2;
-        if (s > bestScore) { bestScore = s; best = d; }
+        if (!choice && !cfg.flood && ranked.length) choice = ranked[0];      // Facile : ne voit pas les pièges
       }
-      return best && best !== me.dir ? [{ t: "dir", d: best }] : [];
+      // 3. secours : pas de chemin sûr vers la pomme -> la case qui laisse le plus de place (on survit en attendant)
+      if (!choice) {
+        let best = -1;
+        for (const d of safe) { const r = room(roomBlocked, head.x + DIRS[d][0], head.y + DIRS[d][1], 400) - (risky(d) ? 50 : 0); if (r > best) { best = r; choice = d; } }
+        target = null;
+      }
+      // 4. défauts « humains » du niveau : réflexe en retard (continue tout droit un tour si c'est sans danger)
+      if (choice !== me.dir && safe.includes(me.dir) && rand() < cfg.lazy) choice = me.dir;
+      // inattention très rare : se lance tout droit sans regarder
+      if (rand() < cfg.blunder) choice = me.dir;
+      return choice && choice !== me.dir ? [{ t: "dir", d: choice }] : [];
     },
   };
 }
-function deadAhead(g, me, d) {
-  const h = me.body[0], x = h.x + DIRS[d][0], y = h.y + DIRS[d][1];
-  if (x < 0 || y < 0 || x >= COLS || y >= ROWS) return true;
-  return g.players.some((p) => p.alive && p.body.some((c, k) => k < p.body.length - 1 && c.x === x && c.y === y));
+// Pomme visée : la plus proche (ou, en Facile, parfois une autre) ; en Difficile, celle où l'on arrive avant l'adversaire.
+function pickFood(g, head, oh, cfg, rand, blocked) {
+  if (!g.food.length) return null;
+  const fromHead = bfs(blocked, head.x, head.y, true);
+  const d = (f) => (fromHead.has(key(f.x, f.y)) ? fromHead.get(key(f.x, f.y)) : 999);
+  let list = g.food.slice().sort((a, b) => d(a) - d(b));
+  if (cfg.race && oh) {
+    const mine = list.filter((f) => d(f) < Math.abs(oh.x - f.x) + Math.abs(oh.y - f.y));
+    if (mine.length) list = mine;
+  }
+  const pick = rand() < cfg.nearest ? list[0] : list[Math.floor(rand() * list.length)];
+  return { x: pick.x, y: pick.y };
 }
-function foodDist(g, x, y) {
-  let m = 99;
-  for (const f of g.food) m = Math.min(m, Math.abs(f.x - x) + Math.abs(f.y - y));
-  return m;
+// Parcours en largeur depuis (x, y) : distance de chaque case libre. startFree : la case de départ est occupée (tête).
+function bfs(blocked, x, y, startFree) {
+  const dist = new Map([[key(x, y), 0]]), todo = [[x, y]];
+  if (!startFree && blocked.has(key(x, y))) return new Map();
+  for (let h = 0; h < todo.length; h++) {
+    const [cx, cy] = todo[h], dc = dist.get(key(cx, cy));
+    for (const v of Object.values(DIRS)) {
+      const nx = cx + v[0], ny = cy + v[1], k = key(nx, ny);
+      if (!inside(nx, ny) || blocked.has(k) || dist.has(k)) continue;
+      dist.set(k, dc + 1); todo.push([nx, ny]);
+    }
+  }
+  return dist;
 }
-function flood(blocked, x, y, cap) {
-  const seen = new Set([x + "," + y]), todo = [[x, y]];
+// Place libre accessible depuis une case (limitée à cap pour rester rapide).
+function room(blocked, x, y, cap) {
+  const seen = new Set([key(x, y)]), todo = [[x, y]];
   while (todo.length && seen.size < cap) {
     const [cx, cy] = todo.pop();
-    for (const d of Object.values(DIRS)) {
-      const nx = cx + d[0], ny = cy + d[1], k = nx + "," + ny;
-      if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS || blocked.has(k) || seen.has(k)) continue;
+    for (const v of Object.values(DIRS)) {
+      const nx = cx + v[0], ny = cy + v[1], k = key(nx, ny);
+      if (!inside(nx, ny) || blocked.has(k) || seen.has(k)) continue;
       seen.add(k); todo.push([nx, ny]);
     }
   }
