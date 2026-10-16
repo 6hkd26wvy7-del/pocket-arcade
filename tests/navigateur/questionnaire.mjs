@@ -63,7 +63,7 @@ for (const [name, engine, opts] of [['webkit-iphone', webkit, devices['iPhone 13
       return r.fulfill({status:404,body:''}); }
     if(u.includes('supabase.js')) return r.fulfill({contentType:'text/javascript',body:fs.readFileSync(FT+'fake5.js','utf8')}); return r.fulfill({status:200,body:'',contentType:'text/css'}); });
   await page.goto('http://x.test/#admin'); await page.waitForTimeout(900);
-  const link = await page.isVisible('text=OUVRIR LES RETOURS'); await page.tap('text=OUVRIR LES RETOURS'); await page.waitForTimeout(600);
+  const link = await page.isVisible('text=RETOURS DU QUESTIONNAIRE'); await page.tap('text=RETOURS DU QUESTIONNAIRE'); await page.waitForTimeout(600);
   const kpis = await page.$$eval('.rt-kpi b', e=>e.map(x=>x.textContent));
   const top = await page.$$eval('.panel:has(h3:text("PROBLÈMES LES PLUS SIGNALÉS")) .rt-row .lab', e=>e.map(x=>x.textContent).slice(0,3));
   const coms = await page.$$eval('.rt-com p', e=>e.map(x=>x.textContent));

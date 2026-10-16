@@ -30,11 +30,16 @@ window.supabase = { createClient: function(){
      case 'beta_survey_get': return ok(window.__survey||null);
      case 'beta_survey_save': window.__saves=(window.__saves||0)+1; window.__survey={answers:JSON.parse(JSON.stringify(a.p_answers)),comment:a.p_comment,completed_at:a.p_complete?new Date().toISOString():(window.__survey&&window.__survey.completed_at)||null}; return ok({ok:true,completed_at:window.__survey.completed_at});
      case 'staff_beta_survey': return ok(window.__staffRows||[]);
+     case 'leaderboard': return ok([{rang:1,pseudo:'Zoe',score:120,moi:false},{rang:2,pseudo:'Max',score:90,moi:false},{rang:3,pseudo:'Quentin',score:40,moi:true}]);
+     case 'beta_space': if(!window.__beta) window.__beta={version:1,codes:['compte','snake','boyblocks','space','multi','amis','boybot','classements','progression','mobile','questionnaire'],required:['compte','snake','boyblocks','space','multi','amis','boybot','classements','progression','mobile','questionnaire'],missions:{},evidence:{compte:true,snake:12,boyblocks:3,space:0,amis:1,classements:15,progression:{xp:800,niveau:5,bc:300,badges:2},questionnaire:false},eligible:false,badge:false,bugs:0}; return ok(JSON.parse(JSON.stringify(window.__beta)));
+     case 'beta_mission_set': window.__beta.missions[a.p_code]={status:a.p_status,note:a.p_note}; return ok({ok:true,eligible:false});
+     case 'staff_beta_overview': return ok(window.__overview||{version:1,codes:['compte','snake'],required:['compte','snake'],beta_on:false,testers:[]});
+     case 'staff_beta_validate': window.__validated=a; return ok({ok:true,badge_added:true});
      case 'my_notifications': return ok([]);
      case 'get_maintenance': return ok({on:false,message:''});
      case 'my_friends': return ok(friends);
      case 'my_blocks': return ok(blocked.map(function(p){return {pseudo:p}}));
-     case 'public_profile': return a.p_pseudo==='Zoe' ? ok({pseudo:'Zoe',avatar:'av_05',level:5,relation:'friend',featured_badge:{code:'beta_founder',name:'BÊTA TESTEUR — ÉDITION FONDATRICE'},title:{code:'title_legend',name:'LÉGENDE'},xp:900,games:[{game:'snake',best:42,plays:7},{game:'blocks',best:1200,plays:2}],badges:['beta_founder']} ) : ok({pseudo:a.p_pseudo,avatar:'av_02',level:3,relation:'pending',featured_badge:null,title:null,xp:null,games:null,badges:null});
+     case 'public_profile': return a.p_pseudo==='Max' ? ok({pseudo:'Max',avatar:'av_03',level:2,relation:'none',featured_badge:null,title:null,xp:null,games:null,badges:null}) : a.p_pseudo==='Zoe' ? ok({pseudo:'Zoe',avatar:'av_05',level:5,relation:'friend',featured_badge:{code:'beta_founder',name:'BÊTA TESTEUR — ÉDITION FONDATRICE'},title:{code:'title_legend',name:'LÉGENDE'},xp:900,games:[{game:'snake',best:42,plays:7},{game:'blocks',best:1200,plays:2}],badges:['beta_founder']} ) : ok({pseudo:a.p_pseudo,avatar:'av_02',level:3,relation:'pending',featured_badge:null,title:null,xp:null,games:null,badges:null});
      case 'block_user': blocked.push(a.p_pseudo); friends=friends.filter(function(f){return f.pseudo!==a.p_pseudo}); return ok(null);
      case 'unblock_user': blocked=blocked.filter(function(p){return p!==a.p_pseudo}); return ok(null);
      case 'set_avatar': me.avatar=a.p_code; return ok(null);

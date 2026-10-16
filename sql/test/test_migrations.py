@@ -32,6 +32,9 @@ try:
     run_file(c, f"{REPO}/schema_v13_marketing.sql"); run_file(c, f"{REPO}/schema_v13_marketing.sql")
     run_file(c, f"{REPO}/schema_v14_boyblocks_9x9.sql"); run_file(c, f"{REPO}/schema_v14_boyblocks_9x9.sql")
     run_file(c, f"{REPO}/schema_v15_questionnaire.sql"); run_file(c, f"{REPO}/schema_v15_questionnaire.sql")
+    badges_avant = sql("select count(*) from user_badges")[0][0]
+    run_file(c, f"{REPO}/schema_v16_espace_beta.sql"); run_file(c, f"{REPO}/schema_v16_espace_beta.sql")
+    badges_apres = sql("select count(*) from user_badges")[0][0]
     run_file(c, f"{REPO}/schema_v6_v7.sql")   # la liste blanche relancée garde les fonctions du questionnaire
     sql("update public.app_settings set value = 'false' where key = 'maintenance'") if sql("select to_regclass('public.app_settings')")[0][0] else None
     print("app_settings:", sql("select * from public.app_settings"))
@@ -263,6 +266,35 @@ console.log(JSON.stringify({moves:g.log,score:g.score}));""" % os.path.join(os.p
     t("réponses d'équipe refusées à un joueur", lambda: must_fail(lambda: as_user(c, U2, "select staff_beta_survey()"), "forbidden"))
     t("table illisible en direct", lambda: must_fail(lambda: as_user(c, U2, "select * from beta_survey"), "permission denied"))
     t("équipe : réponses avec pseudo", lambda: [(r["pseudo"], r["answers"], r["comment"]) for r in as_user(c, U1, "select staff_beta_survey()")[0][0]])
+
+    print("== v16 : espace bêta, missions, badge sur validation")
+    t("migration : aucun badge attribué automatiquement", lambda: (badges_avant, badges_apres) if badges_avant == badges_apres else (_ for _ in ()).throw(Exception("badges modifiés")))
+    t("badge beta_tester exclusif, beta_founder intact", lambda: sql("select code, exclusive from badges where code in ('beta_tester','beta_founder') order by code"))
+    sp = as_user(c, U2, "select beta_space()")[0][0]
+    t("espace : 11 missions, rien de rempli, preuves présentes", lambda: (len(sp["codes"]), sp["missions"], sorted(sp["evidence"].keys())[:4], sp["eligible"]))
+    t("mission enregistrée", lambda: as_user(c, U2, "select beta_mission_set('snake', 'reussi', 'RAS')->>'ok'")[0][0])
+    t("mission modifiée (une seule ligne)", lambda: (as_user(c, U2, "select beta_mission_set('snake', 'probleme', 'virage raté')"), sql("select count(*), max(status) from beta_missions where user_id = %s and code = 'snake'", (U2,))[0])[1])
+    t("mission inconnue refusée", lambda: must_fail(lambda: as_user(c, U2, "select beta_mission_set('pirate', 'reussi')"), "unknown mission"))
+    t("statut inconnu refusé", lambda: must_fail(lambda: as_user(c, U2, "select beta_mission_set('snake', 'parfait')"), "invalid status"))
+    t("visiteur refusé", lambda: must_fail(lambda: as_user(c, None, "select beta_space()"), "permission denied"))
+    t("table missions illisible en direct", lambda: must_fail(lambda: as_user(c, U2, "select * from beta_missions"), "permission denied"))
+    t("fonctions internes non appelables", lambda: must_fail(lambda: as_user(c, U2, "select beta_eligible(auth.uid())"), "permission denied"))
+    t("suivi refusé à un joueur", lambda: must_fail(lambda: as_user(c, U2, "select staff_beta_overview()"), "forbidden"))
+    t("validation refusée à un joueur", lambda: must_fail(lambda: as_user(c, U2, "select staff_beta_validate('joh', 'valide')"), "forbidden"))
+    t("badge refusé si pas éligible (missions incomplètes)", lambda: must_fail(lambda: as_user(c, U1, "select staff_beta_validate('joh', 'valide')"), "not eligible"))
+    for code in ["compte", "snake", "boyblocks", "space", "multi", "amis", "boybot", "classements", "progression", "mobile", "questionnaire"]:
+        as_user(c, U2, "select beta_mission_set(%s, %s)", (code, "impossible" if code == "multi" else "reussi"))
+    t("missions remplies mais questionnaire non envoyé = pas éligible", lambda: (sql("update beta_survey set completed_at = null where user_id = %s", (U2,)), as_user(c, U2, "select beta_space()->>'eligible'")[0][0])[1])
+    sql("update beta_survey set completed_at = now() where user_id = %s", (U2,))
+    t("éligible sans avoir trouvé de bug", lambda: (as_user(c, U2, "select beta_space()->>'eligible'")[0][0], sql("select count(*) from bug_reports where user_id = %s", (U2,))[0][0]))
+    ov = as_user(c, U1, "select staff_beta_overview()")[0][0]
+    t("suivi : testeur listé sans e-mail", lambda: [(x["pseudo"], x["eligible"], "email" in json.dumps(x)) for x in ov["testers"]])
+    t("validation « à revoir » sans badge", lambda: (as_user(c, U1, "select staff_beta_validate('joh', 'a_revoir', 'commentaires trop courts')"), sql("select count(*) from user_badges where badge_code = 'beta_tester'")[0][0])[1])
+    t("validation finale : badge attribué + notification", lambda: (as_user(c, U1, "select staff_beta_validate('joh', 'valide', 'merci')")[0][0], sql("select count(*) from notifications where user_id = %s and kind = 'badge'", (U2,))[0][0]))
+    t("badge unique (pas de doublon)", lambda: (as_user(c, U1, "select staff_beta_validate('joh', 'valide')")[0][0]["badge_added"], sql("select count(*) from user_badges where badge_code = 'beta_tester' and user_id = %s", (U2,))[0][0]))
+    t("badge permanent (non supprimable)", lambda: must_fail(lambda: sql("delete from user_badges where badge_code = 'beta_tester'"), "permanent"))
+    t("nouvelle manche : missions repartent à zéro, anciennes gardées", lambda: (as_user(c, U1, "select staff_beta_new_round()")[0][0], as_user(c, U2, "select beta_space()->'missions'")[0][0], sql("select count(*) from beta_missions where version = 1")[0][0]))
+    t("badge conservé après la nouvelle manche", lambda: as_user(c, U2, "select beta_space()->>'badge'")[0][0])
 
     print("== v9 : badges à paliers")
     t("sync_tiers tintintest", lambda: as_user(c, U1, "select sync_tiers()")[0][0])

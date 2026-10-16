@@ -145,8 +145,10 @@ input, select {
 .lb li.me { background: var(--ink); color: var(--lcd); border-bottom-color: var(--ink); }
 .lb .ps { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* Pages de jeu : pas de sélection de texte. Les gestes du navigateur (défilement) ne sont coupés QUE pendant une partie
+   (body.ingame) : sinon, sur iPhone, la page « Jouer en ligne » (BOYBOT) ne défilait qu'en glissant sur les bords. */
+body.ingame #view-snake, body.ingame #view-arena, body.ingame #view-blocks, body.ingame #view-space, body.ingame #view-boyblocks { touch-action: none; }
 #view-snake, #view-arena, #view-blocks, #view-space, #view-boyblocks {
-  touch-action: none;
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
@@ -426,6 +428,12 @@ body.ingame #g-exit { display: inline-block; position: fixed; z-index: 30; left:
 #bug-fab svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 @media (min-width: 721px) { #bug-fab { bottom: 20px; } }
 body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: auto; width: 38px; height: 38px; opacity: .7; }
+#pf-modal { position: fixed; inset: 0; z-index: 95; background: rgba(2, 6, 23, .78); display: flex; align-items: flex-start; justify-content: center;
+  overflow-y: auto; -webkit-overflow-scrolling: touch; padding: calc(env(safe-area-inset-top, 0px) + 60px) 16px 90px; }
+#pf-modal[hidden] { display: none; }
+#pf-card { width: min(440px, 100%); margin: 0; }
+.lb li.tap { cursor: pointer; -webkit-tap-highlight-color: rgba(124, 58, 237, .25); }
+.lb li.tap .ps { text-decoration: underline; text-decoration-color: rgba(255, 255, 255, .25); text-underline-offset: 3px; }
 #bug-modal { position: fixed; inset: 0; z-index: 100; background: rgba(2, 6, 23, .78); display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; -webkit-overflow-scrolling: touch;
   padding: calc(env(safe-area-inset-top, 0px) + 12px) max(12px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 12px) max(12px, env(safe-area-inset-left, 0px)); }
 #bug-modal[hidden] { display: none; }
@@ -460,6 +468,15 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
 .sv-nav .btn { flex: 1; }
 .sv-skip { background: none; border: 0; color: var(--muted); font: 600 14px var(--body); text-decoration: underline; padding: 10px; cursor: pointer; }
 #view-questionnaire textarea { width: 100%; min-height: 120px; border-radius: 12px; border: 2px solid var(--line); background: var(--card-hi); color: var(--text); font: 16px var(--body); padding: 10px; box-sizing: border-box; }
+.bt-pct { display: block; font-family: var(--display); font-size: 34px; }
+.bt-badge { font-weight: 700; margin: 6px 0 0; }
+.bt-ev { color: var(--green); font-size: 13px; margin: 0 0 8px; }
+.bt-m .sv-q { font-size: 18px; margin-top: 0; }
+.bt-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.bt-seg .sv-opt { min-height: 46px; text-align: center; font-size: 15px; padding: 8px; }
+.bt-m textarea { width: 100%; min-height: 70px; margin-top: 8px; border-radius: 12px; border: 2px solid var(--line); background: var(--card-hi); color: var(--text); font: 16px var(--body); padding: 8px; box-sizing: border-box; }
+.su-t { border-top: 1px solid var(--line); padding: 8px 0; }
+.su-t summary { font-weight: 700; cursor: pointer; }
 .rt-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .rt-kpi { background: var(--card-hi); border-radius: 12px; padding: 10px; text-align: center; }
 .rt-kpi b { display: block; font-family: var(--display); font-size: 26px; }
@@ -547,6 +564,19 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       <h2>Questionnaire bêta</h2>
       <div id="sv-body" class="panel"></div>
       <p id="sv-msg" class="msg" role="status"></p>
+    </section>
+
+    <section id="view-beta" hidden>
+      <h2>Espace bêta-testeur</h2>
+      <div id="bt-body"></div>
+      <p id="bt-msg" class="msg" role="status"></p>
+    </section>
+
+    <section id="view-suivi" hidden>
+      <h2>Suivi bêta</h2>
+      <p class="small"><a href="#admin">&larr; Administration</a></p>
+      <div id="su-body"></div>
+      <p id="su-msg" class="msg" role="status"></p>
     </section>
 
     <section id="view-retours" hidden>
@@ -677,6 +707,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
   <div id="ad-modal" role="dialog" aria-modal="true" aria-label="Vidéo publicitaire" hidden><div class="ad-box"><span class="ad-tag">PUB</span><p>Vidéo publicitaire de test : aucune vraie publicité.</p><p id="ad-count" class="ad-count"></p><p class="small">Ta partie reprend juste après.</p></div></div>
   <div id="premium-note" hidden></div>
   <div id="bug-modal" hidden role="dialog" aria-modal="true" aria-label="Signaler un bug"><div id="bug-card"></div></div>
+  <div id="pf-modal" hidden role="dialog" aria-modal="true" aria-label="Profil du joueur"><div class="panel" id="pf-card"><div id="pf-sheet"></div><p id="pf-msg" class="msg" role="status"></p></div></div>
 
   <footer class="foot"><a href="privacy.html">CONFIDENTIALITÉ</a> &middot; <a href="cgu.html">CONDITIONS</a></footer>
 
@@ -1323,6 +1354,10 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     if (current === "boutique") renderShop();
     if (current === "amis") renderFriends();
     if (current === "admin") renderAdmin();
+    if (current === "questionnaire") renderSurvey();
+    if (current === "beta") renderBeta();
+    if (current === "suivi") renderSuivi();
+    if (current === "retours") renderRetours();
     loadMaint();
   }
 
@@ -1489,6 +1524,12 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       var sc = document.createElement("span");
       sc.textContent = String(row.score);
       li.append(rk, ps, sc);
+      // appuyer sur un joueur = sa fiche publique (connexion nécessaire : vérifiée au moment de l'appui)
+      li.classList.add("tap"); li.tabIndex = 0; li.setAttribute("role", "button"); li.setAttribute("aria-label", "Profil de " + row.pseudo);
+      var rec = { game: scoreGame, score: row.score, rang: row.rang };
+      var openIt = function () { if (!session || !profile) { setMsg(me, "Connecte-toi pour voir le profil des joueurs."); return; } openProfile(row.pseudo, { modal: true, record: rec }); };
+      li.addEventListener("click", openIt);
+      li.addEventListener("keydown", function (e) { if (e.key === "Enter") openIt(); });
       list.append(li);
     });
     if (!simple) {
@@ -1517,6 +1558,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
   function stopChatTimer() { if (chatTimer) { clearInterval(chatTimer); chatTimer = null; } }
 
   async function renderFriends() {
+    if (pendingChat) { var pc = pendingChat; pendingChat = null; setTimeout(function () { openChat(pc); }, 400); }   // « MESSAGE » depuis une fiche profil
     var info = $("fr-info"), msg = $("fr-msg");
     setMsg(msg, "");
     ["fr-notifs", "fr-add", "fr-list", "fr-chat"].forEach(function (id) { $(id).hidden = true; });
@@ -1663,10 +1705,15 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     $("fr-list").append(d);
   }
 
-  async function openProfile(pseudo) {
-    var box = $("fr-profile"), msg = $("fr-msg");
+  // Fiche profil public. ctx (facultatif) : { modal: true, record: { game, score, rang } } quand elle s'ouvre depuis un classement.
+  // N'affiche que ce que la base rend public (pseudo, avatar, niveau, badge mis en avant ; statistiques pour les amis).
+  async function openProfile(pseudo, ctx) {
+    ctx = ctx || {};
+    var modal = !!ctx.modal, box = modal ? $("pf-sheet") : $("fr-profile"), msg = modal ? $("pf-msg") : $("fr-msg");
+    function close() { if (modal) $("pf-modal").hidden = true; else box.hidden = true; }
+    if (modal) { box.textContent = ""; box.append(el("p", "small", "Chargement…")); $("pf-modal").hidden = false; setMsg(msg, ""); }
     var r = await sb.rpc("public_profile", { p_pseudo: pseudo });
-    if (r.error || !r.data) { setMsg(msg, rewardError(r.error), true); return; }
+    if (r.error || !r.data) { if (modal) box.textContent = ""; setMsg(msg, rewardError(r.error), true); return; }
     var p = r.data;
     box.textContent = "";
     var head = el("div", "pf-head");
@@ -1707,7 +1754,8 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
         }
       } catch (e) { /* migration pas encore appliquée */ }
     } else {
-      box.append(el("p", "small", "Les statistiques sont visibles par les amis."));
+      if (ctx.record) box.append(el("p", "", "Record " + (GAME_LABEL[ctx.record.game] || ctx.record.game) + " : " + ctx.record.score + " (n°" + ctx.record.rang + " au classement)"));
+      box.append(el("p", "small", "Les autres statistiques et badges sont visibles par ses amis."));
     }
     var acts = el("div", "row");
     acts.style.marginTop = "10px";
@@ -1717,12 +1765,39 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       b.addEventListener("click", fn);
       acts.append(b);
     }
+    if (p.relation === "none") {
+      btn("AJOUTER EN AMI", false, async function () {
+        var res = await sb.rpc("send_friend_request", { p_pseudo: p.pseudo });
+        if (res.error) { setMsg(msg, rewardError(res.error), true); return; }
+        setMsg(msg, "Demande d'ami envoyée à " + p.pseudo + "."); this.disabled = true;
+      });
+    } else if (p.relation === "pending") {
+      var pend = el("button", "btn mini alt", "DEMANDE EN COURS"); pend.type = "button"; pend.disabled = true; acts.append(pend);
+    }
+    if (p.relation === "friend" && cfg.ARENA_URL) {
+      // Défi 1V1 : réutilise les salles en ligne et la messagerie entre amis (le code de la salle est envoyé en message).
+      btn("DÉFIER", false, function () {
+        var pick = el("div", "row");
+        [["S", "SNAKE"], ["X", "BOYBLOCKS"]].forEach(function (g) {
+          var b = el("button", "btn mini", g[1]); b.type = "button";
+          b.addEventListener("click", async function () {
+            var code = arena.challenge(g[0]);
+            var res = await sb.rpc("send_message", { p_pseudo: p.pseudo, p_body: "⚔️ Je te défie à " + g[1] + " ! Va dans Jouer en ligne et entre le code " + code + "." });
+            if (res.error) { setMsg(msg, rewardError(res.error), true); return; }
+            close(); location.hash = "#arena";
+          });
+          pick.append(b);
+        });
+        acts.after(pick);
+        setMsg(msg, "Choisis le jeu : la salle est créée et ton ami reçoit le code par message.");
+      });
+    }
     if (p.relation === "friend") {
-      btn("MESSAGE", false, function () { box.hidden = true; openChat(p.pseudo); });
+      btn("MESSAGE", false, function () { close(); if (modal) { pendingChat = p.pseudo; location.hash = "#amis"; } else openChat(p.pseudo); });
       btn("RETIRER", true, async function () {
         if (!window.confirm("Retirer " + p.pseudo + " de tes amis ?")) return;
         await sb.rpc("remove_friend", { p_pseudo: p.pseudo });
-        box.hidden = true;
+        close();
         if (chatWith === p.pseudo) { chatWith = null; stopChatTimer(); $("fr-chat").hidden = true; }
         await loadFriendsList();
       });
@@ -1732,17 +1807,18 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
         if (!window.confirm("Bloquer " + p.pseudo + " ? Il ne pourra plus te contacter et l'amitié sera retirée.")) return;
         var res = await sb.rpc("block_user", { p_pseudo: p.pseudo });
         if (res.error) { setMsg(msg, rewardError(res.error), true); return; }
-        box.hidden = true;
+        close();
         if (chatWith === p.pseudo) { chatWith = null; stopChatTimer(); $("fr-chat").hidden = true; }
         setMsg(msg, p.pseudo + " est bloqué.");
         await loadFriendsList();
       });
     }
-    btn("FERMER", true, function () { box.hidden = true; });
+    btn("FERMER", true, close);
     box.append(acts);
     box.hidden = false;
-    if (box.scrollIntoView) box.scrollIntoView({ block: "nearest" });
+    if (!modal && box.scrollIntoView) box.scrollIntoView({ block: "nearest" });
   }
+  var pendingChat = null;
 
   async function answerFriend(pseudo, accept) {
     var r = await sb.rpc("respond_friend_request", { p_pseudo: pseudo, p_accept: accept });
@@ -1964,6 +2040,8 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       var ta = el("textarea"); ta.maxLength = 2000; ta.value = sv.comment; ta.setAttribute("aria-label", "Commentaire libre");
       ta.addEventListener("input", function () { sv.comment = ta.value; svSave(false); });
       body.append(ta);
+      var bugb = el("button", "sv-skip", "🐞 Signaler un bug précis (avec capture si tu veux)"); bugb.type = "button"; bugb.addEventListener("click", openBug);
+      body.append(bugb);
       var send = el("button", "btn", sv.completed_at ? "ENREGISTRER" : "ENVOYER"); send.type = "button";
       send.addEventListener("click", function () {
         send.disabled = true; setMsg($("sv-msg"), "Envoi…");
@@ -2094,6 +2172,182 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
         var q = SURVEY_Q[qid], lab = (Array.isArray(v) ? v : [v]).map(function (id) { var o = q.opts.find(function (o2) { return o2[0] === id; }); return o ? o[1] : id; }).join(", ");
         det.append(el("p", "small", q.text + " → " + lab));
       });
+      pt.append(det);
+    });
+  }
+
+  /* ---------- Espace bêta-testeur (missions) ---------- */
+  // Textes des missions (les codes, la manche et les missions obligatoires viennent de la base : app_settings.beta_missions).
+  var BETA_MISSIONS = {
+    compte: { t: "Compte et profil", d: "Crée ton compte, choisis un avatar, vérifie ton profil." },
+    snake: { t: "Snake solo", d: "Joue plusieurs parties de Snake : commandes, vitesse, pommes." },
+    boyblocks: { t: "BOYBLOCKS solo", d: "Joue à BOYBLOCKS : pose des pièces, combos, fin de partie (8×8 et 9×9 si proposée)." },
+    space: { t: "Space Attack solo", d: "Joue à Space Attack : déplacements, ennemis, bonus." },
+    multi: { t: "Modes multijoueurs", d: "Joue en ligne à deux : Snake, BOYBLOCKS ou Space Attack en équipe." },
+    amis: { t: "Amis et invitations", d: "Ajoute un ami, accepte une demande, envoie un message ou un défi." },
+    boybot: { t: "BOYBOT (3 difficultés)", d: "Joue contre ou avec BOYBOT en Facile, Normal et Difficile." },
+    classements: { t: "Classements et records", d: "Consulte les classements, bats ton record, ouvre le profil d'un joueur." },
+    progression: { t: "XP, BOYCOINS et badges", d: "Gagne de l'XP et des BOYCOINS, regarde tes badges et la boutique." },
+    mobile: { t: "Ergonomie mobile", d: "Défilement, boutons, lisibilité, installation sur l'écran d'accueil." },
+    questionnaire: { t: "Questionnaire final", d: "Réponds au questionnaire bêta (environ 3 minutes)." }
+  };
+  var BETA_STATUS = [["non_teste", "Non testé"], ["reussi", "Réussi ✓"], ["probleme", "Problème ⚠"], ["impossible", "Impossible"]];
+  function betaEvidence(code, ev) {   // indice tiré de la base : jamais une validation automatique
+    if (!ev) return "";
+    var n = ev[code];
+    if (code === "compte") return n ? "Compte créé." : "";
+    if (code === "snake" || code === "boyblocks" || code === "space") return n ? n + " score(s) enregistré(s)." : "";
+    if (code === "amis") return n ? n + " ami(s)." : "";
+    if (code === "classements") return n ? n + " score(s) au classement." : "";
+    if (code === "progression") return n ? "Niveau " + n.niveau + ", " + n.xp + " XP, " + n.bc + " BOYCOINS, " + n.badges + " badge(s)." : "";
+    if (code === "questionnaire") return n ? "Questionnaire envoyé." : "";
+    return "";
+  }
+  async function renderBeta() {
+    var body = $("bt-body"), msg = $("bt-msg"); body.textContent = ""; setMsg(msg, "");
+    if (!online || !session || !profile) { body.append(el("p", "", "Connecte-toi pour accéder à l'espace bêta-testeur.")); var a = el("a", "btn", "SE CONNECTER"); a.href = "#compte"; body.append(a); return; }
+    setMsg(msg, "Chargement…");
+    var r = await sb.rpc("beta_space");
+    if (r.error) { setMsg(msg, /beta/.test(String(r.error.message)) ? "Espace réservé aux bêta-testeurs." : "Espace indisponible pour l'instant.", true); return; }
+    setMsg(msg, "");
+    var B = r.data, codes = B.codes || [];
+    function done() { return codes.filter(function (c) { return B.missions[c] && B.missions[c].status !== "non_teste"; }).length; }
+    // en-tête : progression + badge
+    var head = el("div", "panel"), pct = el("b", "bt-pct"), prog = el("div", "sv-prog"), bar = el("i"), sub = el("p", "small");
+    prog.append(bar); head.append(el("p", "sv-sec", "Ta progression · manche " + B.version), pct, prog, sub);
+    var badge = el("p", "bt-badge");
+    head.append(badge);
+    var tools = el("div", "sv-nav");
+    var bug = el("button", "btn", "🐞 SIGNALER UN BUG"); bug.type = "button"; bug.addEventListener("click", openBug);
+    var q = el("a", "btn alt", "QUESTIONNAIRE"); q.href = "#questionnaire";
+    tools.append(bug, q); head.append(tools);
+    body.append(head);
+    function refresh() {
+      var d = done(), p = codes.length ? Math.round(100 * d / codes.length) : 0;
+      pct.textContent = p + " %"; bar.style.width = p + "%";
+      sub.textContent = d + " mission(s) sur " + codes.length + " remplie(s). Enregistré automatiquement. « Problème » ou « Impossible » comptent aussi : pas besoin de trouver un bug.";
+      badge.textContent = B.badge ? "🏅 Badge BÊTA-TESTEUR BOYGAMES obtenu. Merci !" :
+        B.eligible ? "🏅 Tout est rempli : ton badge BÊTA-TESTEUR attend la validation de l'équipe." :
+        "🏅 Badge BÊTA-TESTEUR : remplis toutes les missions et envoie le questionnaire, puis l'équipe valide.";
+    }
+    refresh();
+    codes.forEach(function (code) {
+      var M = BETA_MISSIONS[code] || { t: code, d: "" }, cur = B.missions[code] || { status: "non_teste", note: "" };
+      var card = el("div", "panel bt-m");
+      card.append(el("p", "sv-q", M.t + ((B.required || []).indexOf(code) >= 0 ? "" : " (facultative)")), el("p", "sv-hint", M.d));
+      var ev = betaEvidence(code, B.evidence); if (ev) card.append(el("p", "bt-ev", "Déjà constaté : " + ev));
+      var seg = el("div", "bt-seg"), note = el("textarea"), nmsg = el("p", "msg");
+      note.maxLength = 500; note.placeholder = "Facultatif : qu'est-ce qui s'est passé ?"; note.value = cur.note || ""; note.setAttribute("aria-label", "Précision pour " + M.t);
+      note.hidden = !(cur.status === "probleme" || cur.status === "impossible");
+      function save() {
+        return sb.rpc("beta_mission_set", { p_code: code, p_status: cur.status, p_note: note.value }).then(function (res) {
+          if (res.error) { setMsg(nmsg, "Non enregistré. Réessaie.", true); return; }
+          setMsg(nmsg, ""); B.missions[code] = { status: cur.status, note: note.value }; if (res.data) B.eligible = res.data.eligible; refresh();
+        });
+      }
+      BETA_STATUS.forEach(function (s) {
+        var b = el("button", "sv-opt", s[1]); b.type = "button"; b.setAttribute("aria-pressed", String(cur.status === s[0]));
+        b.addEventListener("click", function () {
+          cur.status = s[0];
+          seg.querySelectorAll("button").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+          note.hidden = !(s[0] === "probleme" || s[0] === "impossible");
+          save();
+        });
+        seg.append(b);
+      });
+      var nt = null; note.addEventListener("input", function () { clearTimeout(nt); nt = setTimeout(save, 800); });
+      card.append(seg, note, nmsg);
+      body.append(card);
+    });
+  }
+
+  /* ---------- Suivi bêta (équipe) ---------- */
+  async function renderSuivi() {
+    var body = $("su-body"), msg = $("su-msg"); body.textContent = ""; setMsg(msg, "");
+    if (!sb || !session || !role) { body.append(el("div", "panel", "Accès réservé à l'équipe.")); return; }
+    setMsg(msg, "Chargement…");
+    var r = await sb.rpc("staff_beta_overview");
+    if (r.error) { setMsg(msg, "Suivi indisponible (migration v16 non appliquée ?).", true); return; }
+    setMsg(msg, "");
+    var O = r.data, codes = O.codes || [], T = O.testers || [], isAdmin = role === "founder" || role === "admin";
+    function filled(t) { return codes.filter(function (c) { return t.missions[c] && t.missions[c] !== "non_teste"; }).length; }
+    function panel(title) { var p = el("div", "panel"); p.append(el("h3", "", title)); body.append(p); return p; }
+    // chiffres clés + outils
+    var k = panel("SUIVI BÊTA · MANCHE " + O.version), kp = el("div", "rt-kpis");
+    var avg = T.length ? Math.round(T.reduce(function (a, t) { return a + 100 * filled(t) / (codes.length || 1); }, 0) / T.length) : 0;
+    [[T.length, "testeurs"], [avg + " %", "avancement moyen"], [T.filter(function (t) { return t.badge; }).length + " / " + T.filter(function (t) { return t.eligible; }).length, "badges / éligibles"]].forEach(function (x) {
+      var d = el("div", "rt-kpi"); d.append(el("b", "", String(x[0])), el("span", "", x[1])); kp.append(d);
+    });
+    k.append(kp, el("p", "small", O.beta_on ? "Bêta privée activée : seuls les membres (et l'équipe) peuvent jouer." : "Bêta privée désactivée sur cette base : tout compte peut tester."));
+    var tools = el("div", "row");
+    var csv = el("button", "btn mini", "EXPORT CSV"); csv.type = "button";
+    csv.addEventListener("click", function () {
+      var cols = ["pseudo", "membre_beta", "progression_pct"].concat(codes).concat(["questionnaire_envoye", "bugs", "eligible", "badge", "decision", "notes"]);
+      var lines = [cols.join(";")].concat(T.map(function (t) {
+        var notes = Object.keys(t.notes || {}).map(function (c) { return c + ": " + t.notes[c]; }).join(" | ");
+        return [t.pseudo, t.member ? "oui" : "non", Math.round(100 * filled(t) / (codes.length || 1))].concat(codes.map(function (c) { return t.missions[c] || "non_teste"; }))
+          .concat([t.survey ? t.survey.slice(0, 10) : "non", t.bugs, t.eligible ? "oui" : "non", t.badge ? "oui" : "non", t.decision ? t.decision.decision : "", notes])
+          .map(function (v) { v = String(v); return /[;"\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(";");
+      }));
+      var blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+      var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "boygames-suivi-beta-manche" + O.version + ".csv";
+      document.body.append(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    });
+    var lr = el("a", "btn mini alt", "RETOURS DU QUESTIONNAIRE"); lr.href = "#retours";
+    var lb = el("a", "btn mini alt", "BUGS SIGNALÉS"); lb.href = "#admin";
+    tools.append(csv, lr, lb);
+    if (isAdmin) {
+      var nr = el("button", "btn mini alt", "NOUVELLE MANCHE"); nr.type = "button";
+      nr.addEventListener("click", async function () {
+        if (!window.confirm("Ouvrir une nouvelle manche de missions (après une mise à jour) ? Les réponses actuelles sont conservées, chaque testeur repart de zéro.")) return;
+        var x = await sb.rpc("staff_beta_new_round"); if (x.error) { setMsg(msg, "Impossible : " + x.error.message, true); return; } renderSuivi();
+      });
+      tools.append(nr);
+    }
+    k.append(tools);
+    // missions : réussites et problèmes récurrents
+    var pm = panel("MISSIONS");
+    codes.forEach(function (c) {
+      var n = { reussi: 0, probleme: 0, impossible: 0, non_teste: 0 };
+      T.forEach(function (t) { n[t.missions[c] || "non_teste"]++; });
+      var row = el("div", "rt-row"), tot = T.length || 1;
+      row.title = (BETA_MISSIONS[c] || { t: c }).t + " : " + n.reussi + " réussi(s), " + n.probleme + " problème(s), " + n.impossible + " impossible(s), " + n.non_teste + " non testé(s)";
+      row.append(el("span", "lab", (BETA_MISSIONS[c] || { t: c }).t), el("span", "val", "✓" + n.reussi + " ⚠" + n.probleme + " ✗" + n.impossible));
+      var tr = el("div", "track"), f = el("div", "fill"); f.style.width = (100 * (n.reussi + n.probleme + n.impossible) / tot) + "%"; tr.append(f); row.append(tr);
+      pm.append(row);
+    });
+    pm.append(el("p", "small", "Barre = part des testeurs qui ont rempli la mission. ⚠ = problème signalé, ✗ = impossible à tester."));
+    // testeurs
+    var pt = panel("TESTEURS");
+    if (!T.length) pt.append(el("p", "small", "Aucun testeur pour l'instant."));
+    T.forEach(function (t) {
+      var det = el("details", "su-t"), p = Math.round(100 * filled(t) / (codes.length || 1));
+      var sum = el("summary", "", t.pseudo + " — " + p + " %" + (t.badge ? " · 🏅" : t.eligible ? " · éligible" : "") + (t.bugs ? " · " + t.bugs + " bug(s)" : ""));
+      det.append(sum);
+      det.append(el("p", "small", (t.member ? "Membre de la bêta" : "Hors liste bêta") + " · questionnaire : " + (t.survey ? "envoyé le " + new Date(t.survey).toLocaleDateString("fr-FR") : t.survey_draft ? "en cours" : "non commencé") + " · dernière mission : " + (t.last_update ? new Date(t.last_update).toLocaleDateString("fr-FR") : "—")));
+      codes.forEach(function (c) {
+        var st = t.missions[c] || "non_teste", lab = (BETA_STATUS.filter(function (s) { return s[0] === st; })[0] || [st, st])[1];
+        var ev = betaEvidence(c, t.evidence);
+        det.append(el("p", "small", (BETA_MISSIONS[c] || { t: c }).t + " : " + lab + (t.notes && t.notes[c] ? " — « " + t.notes[c] + " »" : "") + (ev ? " (preuve : " + ev + ")" : "")));
+      });
+      if (t.decision) det.append(el("p", "small", "Décision : " + (t.decision.decision === "valide" ? "badge validé" : "à revoir") + " par " + (t.decision.by || "?") + (t.decision.note ? " — " + t.decision.note : "")));
+      if (isAdmin && !t.badge) {
+        var row = el("div", "row"), m2 = el("p", "msg");
+        var ok = el("button", "btn mini", "VALIDER LE BADGE"); ok.type = "button"; ok.disabled = !t.eligible;
+        if (!t.eligible) det.append(el("p", "small", "Pas encore éligible : toutes les missions obligatoires doivent être remplies et le questionnaire envoyé."));
+        ok.addEventListener("click", async function () {
+          if (!window.confirm("Attribuer le badge permanent BÊTA-TESTEUR BOYGAMES à " + t.pseudo + " ?")) return;
+          var x = await sb.rpc("staff_beta_validate", { p_pseudo: t.pseudo, p_decision: "valide", p_note: "" });
+          if (x.error) { setMsg(m2, "Refusé : " + x.error.message, true); return; } renderSuivi();
+        });
+        var ko = el("button", "btn mini alt", "À REVOIR"); ko.type = "button";
+        ko.addEventListener("click", async function () {
+          var note = window.prompt("Pourquoi ? (visible par l'équipe seulement)", ""); if (note === null) return;
+          var x = await sb.rpc("staff_beta_validate", { p_pseudo: t.pseudo, p_decision: "a_revoir", p_note: note });
+          if (x.error) { setMsg(m2, "Refusé : " + x.error.message, true); return; } renderSuivi();
+        });
+        row.append(ok, ko); det.append(row, m2);
+      }
       pt.append(det);
     });
   }
@@ -2283,9 +2537,10 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       });
       p9.append(b9);
 
-      var prt = panel("RETOURS BÊTA");
-      prt.append(el("p", "small", "Réponses des testeurs au questionnaire : statistiques, problèmes les plus signalés, commentaires."));
-      var art = el("a", "btn", "OUVRIR LES RETOURS"); art.href = "#retours"; prt.append(art);
+      var prt = panel("SUIVI BÊTA");
+      prt.append(el("p", "small", "Testeurs, missions, badges BÊTA-TESTEUR à valider, export CSV ; réponses au questionnaire."));
+      var asu = el("a", "btn", "OUVRIR LE SUIVI"); asu.href = "#suivi";
+      var art = el("a", "btn alt", "RETOURS DU QUESTIONNAIRE"); art.href = "#retours"; prt.append(asu, document.createTextNode(" "), art);
 
       var pmk = panel("MARKETING");
       pmk.append(el("p", "small", "Vidéos fabriquées chaque jour à partir de vraies parties : aperçu, validation, calendrier. Rien n'est publié sans validation."));
@@ -2652,9 +2907,11 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     $("acc-mail").textContent = session.user.email || "";
     $("acc-country").textContent = profile.country === "FR" ? "PAYS : FRANCE" : "PAYS : AUTRE";
     var sl = el("p", "", "");
+    var sb2 = el("a", "btn", "ESPACE BÊTA-TESTEUR");
+    sb2.href = "#beta";
     var sa = el("a", "btn alt", "QUESTIONNAIRE BÊTA");
     sa.href = "#questionnaire";
-    sl.append(sa);
+    sl.append(sb2, document.createTextNode(" "), sa);
     $("acc-level").after(sl);
     if (role) {
       var al = el("p", "", "");
@@ -4759,13 +5016,17 @@ return {SIZE: SIZE, SIZES: SIZES, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid
       updatePause();
       if (spaceTimer) { clearInterval(spaceTimer); spaceTimer = null; }
     }
+    var pendingRoom = null;
     function enter() {
       show(false);
       say("ar-note", "");
       if (!online || !session || !profile) say("ar-note", "Connecte-toi pour jouer en ligne.", true);
       else if (!cfg.ARENA_URL) say("ar-note", "Le serveur de jeu n'est pas encore branché.", true);
+      else if (pendingRoom) { var c = pendingRoom; pendingRoom = null; start(c); }
     }
-    return { enter: enter, leave: leave };
+    // Défi lancé depuis une fiche profil : crée le code tout de suite (envoyé à l'ami), la salle s'ouvre sur « Jouer en ligne ».
+    function challenge(letter) { var c = newCode(letter); pendingRoom = c; return c; }
+    return { enter: enter, leave: leave, challenge: challenge };
   })();
 
 
@@ -4884,6 +5145,8 @@ return {SIZE: SIZE, SIZES: SIZES, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid
     $("bug-modal").addEventListener(ev, function (e) { e.stopPropagation(); if (ev === "keydown" && e.key === "Escape") closeBug(); });
   });
   $("bug-modal").addEventListener("pointerdown", function (e) { if (e.target === $("bug-modal")) closeBug(); });
+  $("pf-modal").addEventListener("click", function (e) { if (e.target === $("pf-modal")) $("pf-modal").hidden = true; });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("pf-modal").hidden) $("pf-modal").hidden = true; });
 
   /* ---------- Plein écran pendant une partie ---------- */
   var GAME_CANVAS = { snake: "screen", blocks: "bl-screen", boyblocks: "bb-screen", space: "sp-screen", arena: "ar-screen" };
@@ -4920,7 +5183,7 @@ return {SIZE: SIZE, SIZES: SIZES, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid
   });
 
   /* ---------- Router ---------- */
-  var VIEWS = ["menu", "scores", "amis", "boutique", "compte", "admin", "marketing", "questionnaire", "retours", "snake", "arena", "blocks", "boyblocks", "space"];
+  var VIEWS = ["menu", "scores", "amis", "boutique", "compte", "admin", "marketing", "questionnaire", "retours", "beta", "suivi", "snake", "arena", "blocks", "boyblocks", "space"];
 
   function route() {
     var h = (location.hash || "#menu").slice(1);
@@ -4933,7 +5196,7 @@ return {SIZE: SIZE, SIZES: SIZES, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid
     if (h !== "amis") stopChatTimer();
     current = h;
     VIEWS.forEach(function (v) { $("view-" + v).hidden = v !== h; });
-    var tabOf = { boutique: "compte", admin: "compte", marketing: "compte", questionnaire: "compte", retours: "compte", arena: "menu", snake: "menu", blocks: "menu", boyblocks: "menu", space: "menu" };
+    var tabOf = { boutique: "compte", admin: "compte", marketing: "compte", questionnaire: "compte", retours: "compte", beta: "compte", suivi: "compte", arena: "menu", snake: "menu", blocks: "menu", boyblocks: "menu", space: "menu" };
     document.querySelectorAll("[data-nav]").forEach(function (a) {
       var on = a.getAttribute("data-nav") === (tabOf[h] || h);
       a.classList.toggle("on", on);
@@ -4948,6 +5211,9 @@ return {SIZE: SIZE, SIZES: SIZES, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid
     if (h === "marketing") renderMarketing();
     if (h === "questionnaire") renderSurvey();
     if (h === "retours") renderRetours();
+    if (h === "beta") renderBeta();
+    if (h === "suivi") renderSuivi();
+    $("pf-modal").hidden = true;
     if (h !== "snake") loadMaint();
     if (h === "compte") renderAccount();
     if (h === "snake") snake.enter();

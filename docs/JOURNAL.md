@@ -6,6 +6,28 @@ Le plus récent en haut. Chaque entrée : ce qui a été fait, où, et ce qui re
 
 ---
 
+## 16/10/2026 (soir) — défilement iPhone, profils depuis les classements, espace bêta, badge, suivi (TEST)
+
+- Défilement iPhone : la page « Jouer en ligne » (section BOYBOT) avait `touch-action: none` en permanence ; la règle
+  ne s'applique plus que pendant une partie (`body.ingame`). Protection anti-sélection conservée. Testé iPhone (PWA).
+- Classements : appuyer sur un joueur ouvre sa fiche publique (fenêtre) : avatar, niveau, badge mis en avant, record
+  du classement ; stats/badges détaillés pour les amis (règle de confidentialité existante) ; AJOUTER EN AMI ;
+  DÉFIER (ami) = salle Snake ou BOYBLOCKS créée + code envoyé par message ; MESSAGE ; BLOQUER. Aucune donnée privée.
+- Questionnaire : déjà terminé (23 questions validées) ; ajout d'un lien « signaler un bug » à la dernière étape.
+- Espace bêta-testeur (`#beta`, Profil → ESPACE BÊTA-TESTEUR) : 11 missions, 4 statuts, note facultative, enregistrement
+  automatique, progression en %, preuves déjà en base affichées (jamais validées automatiquement), bouton bug (capture
+  facultative, outil existant), lien questionnaire. Manches : nouvelle manche possible après une mise à jour.
+- Badge « BÊTA-TESTEUR BOYGAMES » (`beta_tester`, exclusif = permanent) : éligible si toutes les missions obligatoires
+  sont remplies (réussi / problème / impossible) + questionnaire envoyé ; attribué seulement par un admin ;
+  trouver un bug n'est pas nécessaire ; `beta_founder` et les autres badges intacts ; aucun badge attribué par la migration.
+- Suivi bêta (`#suivi`, Administration → SUIVI BÊTA) : testeurs, avancement, missions (réussites / problèmes),
+  questionnaire, bugs, preuves, décisions, VALIDER LE BADGE / À REVOIR, NOUVELLE MANCHE, EXPORT CSV ; liens vers
+  Retours du questionnaire et bugs.
+- Migration v16 sur TEST après sauvegarde vérifiée (id 7). Données intactes (5 profils, 70 scores, 14 badges, 457 BC).
+- Tests : SQL 145, serveur 91, navigateur 20 (nouveau `beta-profils.mjs` sur iPhone). Serveur non redéployé (inchangé).
+- À noter : la bêta privée est ACTIVÉE sur TEST ; un compte hors liste bêta ne peut ni jouer en ligne ni ouvrir
+  l'espace bêta (Administration → bêta privée pour l'ajouter).
+
 ## 16/10/2026 (suite) — BOYBOT Snake corrigé + pause (retours de Joh)
 
 - Constat mesuré : en Facile, BOYBOT réfléchissait un tour sur deux et un « bruit » aléatoire plus fort que l'attrait
