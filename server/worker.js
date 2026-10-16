@@ -6,6 +6,7 @@ import * as SN from "./arena-engine.js";
 import * as SPC from "./space-engine.js";
 import * as BK from "./blocks-engine.js";
 import * as BBD from "./boyblocks-duel.js";
+import * as BOT from "./boybot.js";
 
 // Les 3 jeux en ligne. La première lettre du code de salle dit de quel jeu il s'agit : S, P, B ou X.
 const KINDS = {
@@ -115,7 +116,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const m = url.pathname.match(/^\/play\/([SPBXY][A-Z0-9]{3,7})$/);
-    if (!m) return new Response("BOYGAMES arena server v5 (duel BoyBlocks 8x8 et 9x9)", { status: 200 });
+    if (!m) return new Response("BOYGAMES arena server v6 (BOYBOT)", { status: 200 });
     if (request.headers.get("Upgrade") !== "websocket") return new Response("Expected websocket", { status: 426 });
     const allowed = String(env.ALLOWED_ORIGINS || "").split(",").map((s) => s.trim()).filter(Boolean);
     const origin = request.headers.get("Origin");
@@ -144,6 +145,23 @@ export class ArenaRoom {
     this.code = "";
     this.again = [false, false];
     this.endCloseMs = env.END_CLOSE_MS !== undefined ? Number(env.END_CLOSE_MS) : 90000;
+    this.bot = null; // { index, level, brain } quand BOYBOT occupe la 2e place
+  }
+
+  // Un joueur est « là » s'il a une connexion ouverte, ou si c'est BOYBOT.
+  present(p) { return !!(p && (p.ws || p.bot)); }
+  names() { return this.slots.map((p) => (p ? p.pseudo : null)); }
+  bots() { return this.slots.map((p) => !!(p && p.bot)); }
+
+  // BOYBOT prend la place libre : seulement dans une salle neuve, à la demande du premier joueur.
+  addBot(level) {
+    if (this.phase !== "lobby" || this.slots[1] || !BOT.LEVELS.includes(level)) return false;
+    this.slots[1] = { uid: BOT.BOT_UID, pseudo: BOT.BOT_NAME, ws: null, bot: true };
+    this.bot = { index: 1, level, brain: null };
+    return true;
+  }
+  newBrain() {
+    if (this.bot) this.bot.brain = BOT.makeBot(this.kind.name, this.bot.level, crypto.getRandomValues(new Uint32Array(1))[0]);
   }
 
   async fetch(request) {
@@ -190,6 +208,9 @@ export class ArenaRoom {
             return;
           }
           const idx = this.seat(uid, pseudo, ws);
+          if (idx === 0 && msg.bot !== undefined && !this.addBot(String(msg.bot))) {
+            if (!(this.bot && this.slots[1] && this.slots[1].bot)) { this.slots[0] = null; this.send(ws, { t: "error", code: "bot" }); try { ws.close(4005, "bot"); } catch (e) { /* ignore */ } return; }
+          }
           if (idx < 0) { this.send(ws, { t: "error", code: "full" }); try { ws.close(4002, "full"); } catch (e) { /* ignore */ } return; }
           authed = true;
           me = { index: idx };
@@ -242,15 +263,16 @@ export class ArenaRoom {
   }
 
   afterJoin() {
-    const names = this.slots.map((p) => (p ? p.pseudo : null));
-    this.slots.forEach((p, i) => { if (p && p.ws) this.send(p.ws, { t: "lobby", code: this.code, kind: this.kind.name, you: i, players: names, phase: this.phase }); });
+    const names = this.names(), bots = this.bots();
+    this.slots.forEach((p, i) => { if (p && p.ws) this.send(p.ws, { t: "lobby", code: this.code, kind: this.kind.name, you: i, players: names, bots, phase: this.phase }); });
     if (this.phase === "playing" || this.phase === "over") {
       this.slots.forEach((p, i) => { if (p && p.ws && this.game) this.send(p.ws, snapshot(this.game, this.kind)); });
     }
-    if (this.phase === "lobby" && this.slots[0] && this.slots[1] && this.slots[0].ws && this.slots[1].ws) {
+    if (this.phase === "lobby" && this.present(this.slots[0]) && this.present(this.slots[1]) && this.slots.some((p) => p && p.ws)) {
       this.phase = "countdown";
-      this.broadcast({ t: "countdown", ms: this.countdownMs, players: names });
+      this.broadcast({ t: "countdown", ms: this.countdownMs, players: names, bots });
       this.game = this.kind.create(crypto.getRandomValues(new Uint32Array(1))[0]);
+      this.newBrain();
       setTimeout(() => this.start(), this.countdownMs);
     }
   }
@@ -264,6 +286,9 @@ export class ArenaRoom {
   }
 
   tick() {
+    if (this.bot && this.bot.brain && !this.game.over) {
+      for (const m of this.bot.brain.act(this.game, this.bot.index, this.dtMs)) this.kind.input(this.game, this.bot.index, m);
+    }
     this.kind.step(this.game, this.dtMs);
     this.broadcast(snapshot(this.game, this.kind));
     if (this.game.over) this.finish(this.game.reason);
@@ -273,12 +298,12 @@ export class ArenaRoom {
     const p = this.slots[index];
     if (!p || p.ws !== ws) return; // il a déjà été remplacé par une nouvelle connexion
     p.ws = null;
-    if (this.phase === "lobby") { this.slots[index] = null; return; }
+    if (this.phase === "lobby") { this.slots[index] = null; if (this.bot && !this.slots.some((q) => q && q.ws)) { this.slots = [null, null]; this.bot = null; } return; }
     if (this.phase === "over") {
       // revanche impossible si l'autre est parti
       this.again[index] = false;
       this.broadcast({ t: "left", index });
-      if (!this.slots.some((q) => q && q.ws)) { clearTimeout(this.closeTimer); this.slots = [null, null]; }
+      if (!this.slots.some((q) => q && q.ws)) { clearTimeout(this.closeTimer); this.slots = [null, null]; this.bot = null; }
       return;
     }
     if (this.phase === "playing" || this.phase === "countdown") {
@@ -318,16 +343,17 @@ export class ArenaRoom {
   // Un joueur demande à rejouer. Quand les deux sont d'accord, une nouvelle partie démarre.
   onAgain(index) {
     if (this.phase !== "over") return;
-    if (!this.slots[0] || !this.slots[1] || !this.slots[0].ws || !this.slots[1].ws) return;
+    if (!this.present(this.slots[0]) || !this.present(this.slots[1])) return;
     this.again[index] = true;
+    if (this.bot) this.again[this.bot.index] = true;
     this.broadcast({ t: "rematch", wants: this.again });
     if (this.again[0] && this.again[1]) {
       clearTimeout(this.closeTimer);
       this.again = [false, false];
       this.phase = "countdown";
-      const names = this.slots.map((p) => (p ? p.pseudo : null));
-      this.broadcast({ t: "countdown", ms: this.countdownMs, players: names });
+      this.broadcast({ t: "countdown", ms: this.countdownMs, players: this.names(), bots: this.bots() });
       this.game = this.kind.create(crypto.getRandomValues(new Uint32Array(1))[0]);
+      this.newBrain();
       setTimeout(() => this.start(), this.countdownMs);
     }
   }

@@ -6,6 +6,20 @@ Le plus récent en haut. Chaque entrée : ce qui a été fait, où, et ce qui re
 
 ---
 
+## 16/10/2026 — BOYBOT 🤖, joueur virtuel (TEST)
+
+- Architecture : BOYBOT vit dans la salle de jeu du serveur (place 2). À chaque tour il envoie les mêmes ordres
+  qu'un téléphone (direction, déplacement, pose), validés par les mêmes moteurs ; aucun jeu modifié.
+- Snake : cherche les pommes, évite murs et corps, mesure l'espace libre (Normal/Difficile), évite le face-à-face (Difficile).
+- BoyBlocks : évalue chaque pose (points, cases isolées, lignes presque pleines, pièces restantes posables), rythme humain.
+- Space co-op : esquive les tirs, va chercher les bonus, vise l'ennemi le plus bas, visée imparfaite.
+- Difficultés mesurées (moyennes) : Snake seul 5 / 47 / 67 pommes ; BoyBlocks 2 min 141 / 320 / 622 pts ;
+  Space seul vague 3 / 3,3 / 4,3 (Facile / Normal / Difficile).
+- Téléphone : section « JOUER AVEC BOYBOT 🤖 (BÊTA) » dans Jouer en ligne, difficulté mémorisée, « robot » affiché.
+- Aucun impact récompenses : les duels n'attribuent ni XP, ni BC, ni classement ; drapeau `bots` pour l'avenir.
+- Tests : 10 nouveaux tests serveur (83 au total), test navigateur `boybot.mjs` (Chromium + iPhone WebKit).
+- À faire plus tard : ouvrir BOYBOT à tous (après la bêta), réglages fins de difficulté après essais réels.
+
 ## 15/10/2026 (soir, suite) — multijoueur harmonisé avec le solo (TEST)
 
 - Snake 1V1 : quadrillage discret, pommes du solo, yeux dans le sens de la marche, glissé aussi sensible qu'en solo.

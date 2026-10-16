@@ -547,6 +547,21 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
           <button class="btn alt" id="ar-create-Y" type="button" hidden>BOYBLOCKS 9×9 (ESSAI)</button>
         </div>
         <hr class="sep">
+        <div id="ar-bot">
+          <h3 style="margin:0 0 8px;font-size:11px;font-weight:normal">JOUER AVEC BOYBOT 🤖 (BÊTA)</h3>
+          <p>Personne sous la main ? BOYBOT est un joueur virtuel (un robot, pas un humain). Parties d'entraînement : pas de classement, d'XP ni de BOYCOINS.</p>
+          <div class="row" role="group" aria-label="Difficulté de BOYBOT" style="flex-wrap:nowrap">
+            <button class="tab" type="button" data-bot-level="easy" aria-pressed="false">FACILE</button>
+            <button class="tab" type="button" data-bot-level="normal" aria-pressed="true">NORMAL</button>
+            <button class="tab" type="button" data-bot-level="hard" aria-pressed="false">DIFFICILE</button>
+          </div>
+          <div class="row" style="flex-direction:column;margin-top:10px">
+            <button class="btn" id="ar-bot-S" type="button">SNAKE CONTRE BOYBOT</button>
+            <button class="btn" id="ar-bot-X" type="button">BOYBLOCKS CONTRE BOYBOT</button>
+            <button class="btn" id="ar-bot-P" type="button">SPACE ATTACK AVEC BOYBOT</button>
+          </div>
+        </div>
+        <hr class="sep">
         <label for="ar-code">OU ENTRE LE CODE D'UN AMI</label>
         <input id="ar-code" maxlength="8" autocomplete="off" autocapitalize="characters" spellcheck="false">
         <div class="row" style="margin-top:10px"><button class="btn alt" id="ar-join" type="button">REJOINDRE</button></div>
@@ -3713,7 +3728,13 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     var SIZES = { snake: [240, 264], space: [144, 208], blocks: [240, 236], boyblocks: [720, 1040] };
     var canvas = $("ar-screen"), ctx = canvas.getContext("2d");
     var ws = null, code = "", kind = "snake", you = -1, names = ["", ""], st = null, phase = "idle";
-    var retries = 0, wantOpen = false, touch = null;
+    var retries = 0, wantOpen = false, touch = null, botReq = null, bots = [false, false];
+    var BOT_LEVEL_FR = { easy: "facile", normal: "normal", hard: "difficile" };
+    function botLevel() { var v = null; try { v = localStorage.getItem("boygames-bot-level"); } catch (e) { /* ignore */ } return BOT_LEVEL_FR[v] ? v : "normal"; }
+    function playersLine() {
+      if (bots[1 - you] && names[1 - you]) return "Toi et " + names[1 - you] + " (robot, niveau " + BOT_LEVEL_FR[botReq || "normal"] + ")";
+      return names[0] + " et " + names[1];
+    }
     var bbDuel = makeBoyBlocks("ar-screen", { active: function () { return kind === "boyblocks" && phase === "playing"; }, send: function (o) { send(o); } });
     canvas.style.touchAction = "none";
 
@@ -3745,7 +3766,9 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       mine.addEventListener("open", function () {
         sb.auth.getSession().then(function (r) {
           var tok = r && r.data && r.data.session ? r.data.session.access_token : "";
-          mine.send(JSON.stringify({ t: "hello", token: tok }));
+          var hello = { t: "hello", token: tok };
+          if (botReq) hello.bot = botReq;
+          mine.send(JSON.stringify(hello));
         });
       });
       mine.addEventListener("message", function (ev) { if (mine === ws) onMsg(ev.data); });
@@ -3766,14 +3789,14 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       try { m = JSON.parse(raw); } catch (e) { return; }
       if (m.t === "error") {
         wantOpen = false;
-        var txt = m.code === "full" ? "Cette salle est déjà pleine." : m.code === "auth" ? "Connexion refusée. Reconnecte-toi puis réessaie." : m.code === "banned" ? "Ton compte est suspendu." : m.code === "beta" ? "Bêta privée : ton compte n'est pas encore ajouté." : m.code === "maintenance" ? "Maintenance en cours, réessaie plus tard." : "Erreur de connexion.";
+        var txt = m.code === "bot" ? "BOYBOT n'a pas pu rejoindre la salle. Réessaie." : m.code === "full" ? "Cette salle est déjà pleine." : m.code === "auth" ? "Connexion refusée. Reconnecte-toi puis réessaie." : m.code === "banned" ? "Ton compte est suspendu." : m.code === "beta" ? "Bêta privée : ton compte n'est pas encore ajouté." : m.code === "maintenance" ? "Maintenance en cours, réessaie plus tard." : "Erreur de connexion.";
         say("ar-note", txt, true);
         show(false);
       } else if (m.t === "lobby") {
         retries = 0;
-        you = m.you; names = m.players; phase = m.phase || "lobby";
+        you = m.you; names = m.players; phase = m.phase || "lobby"; bots = m.bots || [false, false];
         st = null;
-        say("ar-top", names[1] ? names[0] + " et " + names[1] : "Salle " + m.code + " : en attente d'un ami. Donne-lui ce code.");
+        say("ar-top", names[1] ? playersLine() : "Salle " + m.code + " : en attente d'un ami. Donne-lui ce code.");
         draw();
       } else if (m.t === "rematch") {
         if (m.wants && m.wants[1 - you] && !m.wants[you]) say("ar-msg", "Ton adversaire veut rejouer !");
@@ -3787,7 +3810,8 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
         st = null;
         $("ar-again").hidden = true;
         $("ar-again").disabled = false;
-        say("ar-top", names[0] + " et " + names[1]);
+        if (m.bots) bots = m.bots;
+        say("ar-top", playersLine());
         say("ar-msg", "Prépare-toi…");
       } else if (m.t === "sync") {
         if (kind === "boyblocks" && st) bbDuel.onSync(m.log || []);
@@ -4022,10 +4046,25 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       for (var i = 0; i < 4; i++) out += CODE_CHARS.charAt(buf[i] % CODE_CHARS.length);
       return out;
     }
-    function start(c) { code = c; phase = "lobby"; st = null; you = -1; names = ["", ""]; retries = 0; spaceX = 72; startSpaceKeys(); connect(); }
+    function start(c, bot) { code = c; botReq = bot || null; bots = [false, false]; phase = "lobby"; st = null; you = -1; names = ["", ""]; retries = 0; spaceX = 72; startSpaceKeys(); connect(); }
 
     ["S", "P", "B", "X", "Y"].forEach(function (k) {
       $("ar-create-" + k).addEventListener("click", function () { say("ar-note", ""); start(newCode(k)); });
+    });
+    function showBotLevel() {
+      var lv = botLevel();
+      document.querySelectorAll("[data-bot-level]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-bot-level") === lv)); });
+    }
+    document.querySelectorAll("[data-bot-level]").forEach(function (b) {
+      b.addEventListener("click", function () { try { localStorage.setItem("boygames-bot-level", b.getAttribute("data-bot-level")); } catch (e) { /* ignore */ } showBotLevel(); });
+    });
+    showBotLevel();
+    ["S", "X", "P"].forEach(function (k) {
+      $("ar-bot-" + k).addEventListener("click", function () {
+        say("ar-note", "");
+        var letter = k === "X" && bbWantedSize() === 9 && bb9Enabled() ? "Y" : k;   // BoyBlocks : même grille qu'en solo
+        start(newCode(letter), botLevel());
+      });
     });
     $("ar-join").addEventListener("click", function () {
       var c = $("ar-code").value.trim().toUpperCase();
