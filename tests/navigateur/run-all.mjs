@@ -26,6 +26,7 @@ const TESTS = {
   "beta-profils.mjs": ["beta-profils OK"],
   "invitations.mjs": ["invitations OK"],
   "joueurs.mjs": ["joueurs OK"],
+  "motdepasse.mjs": ["motdepasse OK"],
   "iphone.mjs": ["envoyés identiques: true", "Score vérifié et enregistré", "protection ok", "accueil ok"],
 };
 let bad = 0;

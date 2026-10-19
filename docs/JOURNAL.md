@@ -6,6 +6,25 @@ Le plus récent en haut. Chaque entrée : ce qui a été fait, où, et ce qui re
 
 ---
 
+## 19/10/2026 — reprise : comptes, mot de passe, signalements, sécurité (TEST)
+
+- État vérifié : dépôt propre (dernier commit du 16/10), site TEST = `main`, base v20, serveur v6.
+- Compte de Joh17 : sain en base (e-mail confirmé, bêta, non suspendu, dernière partie le 18/10, sessions renouvelées
+  sans erreur). Le symptôme exact n'est pas dans les journaux disponibles (24 h). Manque réel trouvé : **aucune
+  récupération de mot de passe** (le formulaire disait « si tu l'oublies, ton compte est perdu »).
+  -> Fonction cloud `admin-reset-link` (TEST, droits vérifiés côté serveur, e-mail jamais renvoyé, journalisée) :
+  Administration → Joueurs → fiche → LIEN MOT DE PASSE OUBLIÉ (1 h, usage unique) ; le joueur ouvre le lien, est
+  connecté et choisit un nouveau mot de passe ; Profil → CHANGER MON MOT DE PASSE ; aide « mot de passe oublié ».
+- Signalement n°3 (badge -> retour en haut de page) : position de la page conservée après un choix de badge / favori.
+- Signalement n°4 (« enlever l'abonnement à 1 € ») : offre Premium masquée (réglage existant, journalisé) ; objets
+  « réservés Premium » cachés en boutique tant que l'offre est masquée. Rien supprimé.
+- Onglet Marketing : aperçus vidéo en erreur 400 depuis le verrouillage des fonctions (règle de stockage appelant
+  `is_admin()`) -> migration v21 (rôle lu dans `user_roles`) : Fondateur 14 fichiers visibles, joueur 0.
+- Contrôles : soldes BC = journal pour tous, aucun négatif, aucun score hors plafond ; les 2 journées > 40 BC datent
+  d'avant le passage du plafond à 40 (15/10 14 h 21 UTC).
+- Étude sans activation : `docs/ETUDE-SOUTIEN-BETA-PUBLIQUE.md` (dons, pubs, bêta publique, piste visuelle).
+- Tests : SQL 175, moteur, morcelé, serveur 91, logique 8, navigateur 23 (`motdepasse.mjs`).
+
 ## 16/10/2026 — fiche administrative des joueurs (TEST)
 
 - Administration → Joueurs : chaque ligne s'ouvre en fiche (profil, niveau/XP/BC, records, badges, bêta et missions,

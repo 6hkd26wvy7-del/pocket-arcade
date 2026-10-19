@@ -6,7 +6,10 @@ window.supabase = { createClient: function(){
   var err=function(m){return Promise.resolve({data:null,error:{message:m}})};
   var tables={ badges:[{code:'first_game',name:'Premiers pas',description:'Termine ta première partie.',exclusive:false},{code:'beta_founder',name:'BÊTA TESTEUR — ÉDITION FONDATRICE',description:'Un des 10 premiers.',exclusive:true},{code:'founder',name:'FONDATEUR',description:'Le créateur.',exclusive:true}], news:[], shop_items:[] };
   return {
-   auth:{ onAuthStateChange:function(fn){ fn('INITIAL_SESSION',{user:{id:'u1',email:'a@b.fr'}}); }, signOut:function(){return ok({})}, getSession:function(){return ok({session:{access_token:'tok'}})} },
+   auth:{ onAuthStateChange:function(fn){ fn('INITIAL_SESSION',{user:{id:'u1',email:'a@b.fr'}}); }, signOut:function(){return ok({})}, getSession:function(){return ok({session:{access_token:'tok'}})},
+     verifyOtp:function(o){ window.__otp=o; return window.__otpFail ? err('Token has expired or is invalid') : ok({session:{access_token:'tok2'}}); },
+     updateUser:function(o){ window.__newPass=o.password; return ok({user:{id:'u1'}}); } },
+   functions:{ invoke:function(n,o){ window.__invoked={name:n,body:o.body}; return ok({ok:true,pseudo:o.body.pseudo,link:o.body.base+'?reset=HASHEDTOKEN0123456789abcdef'}); } },
    from:function(t){ return { select:function(){ return { eq:function(){return {maybeSingle:function(){return ok({pseudo:'Quentin',country:'FR'})}}}, order:function(){ var r=ok(tables[t]||[]); r.limit=function(){return ok(tables[t]||[])}; return r; } }; } } },
    rpc:function(n,a){
     window.__calls.push(n+(a?JSON.stringify(a):''));

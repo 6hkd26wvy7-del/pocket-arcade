@@ -906,7 +906,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
             if (at >= 0) list.splice(at, 1); else { if (list.length >= 3) list.shift(); list.push(key); }
             var res = await sb.rpc("set_favorites", { p_list: list });
             if (res.error) { setMsg(msg, "Impossible de changer tes favoris.", true); return; }
-            route();
+            rerouteKeepScroll();
           });
           row.append(b);
         })(t);
@@ -1256,6 +1256,8 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       me.items.forEach(function (x) { if (x.code === it.code) owned = x; });
       var row = el("div", "line");
       var nm = el("span", "", it.name + (owned ? "" : " (" + it.price + " BC)"));
+      var premiumShown = !!(monet && monet.premium && monet.premium.enabled);
+      if (it.premium_only && !owned && !me.premium && !premiumShown) return;   // objet Premium caché si l'offre est masquée
       if (it.premium_only) nm.append(el("span", "prem", "PREMIUM"));
       row.append(nm);
       var locked = it.premium_only && !owned && !me.premium;
@@ -1359,6 +1361,28 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     try { localStorage.setItem(INVITE_KEY, m[1].toUpperCase()); } catch (e) { /* ignore */ }
     try { history.replaceState(null, "", location.pathname + (location.hash && !/invite=/.test(location.hash) ? location.hash : "#compte")); } catch (e) { /* ignore */ }
   })();
+  // Lien de réinitialisation du mot de passe (…/?reset=JETON), généré par l'équipe depuis la fiche du joueur.
+  var resetToken = (function () {
+    var m = location.search.match(/[?&]reset=([A-Za-z0-9_-]{20,200})/);
+    if (!m) return "";
+    try { history.replaceState(null, "", location.pathname + "#compte"); } catch (e) { /* ignore */ }
+    return m[1];
+  })(), pwRecovery = false, resetNotice = "";
+  async function consumeResetLink() {
+    if (!resetToken || !sb) return;
+    var t = resetToken; resetToken = "";
+    var r = await sb.auth.verifyOtp({ token_hash: t, type: "recovery" });
+    if (r.error) { resetNotice = "Ce lien de réinitialisation a expiré ou a déjà servi. Demande-en un nouveau à l'équipe."; if (current === "compte") renderAccount(); else location.hash = "#compte"; return; }
+    pwRecovery = true; accNotice = "Connecté grâce au lien : choisis maintenant ton nouveau mot de passe.";
+    if (location.hash !== "#compte") location.hash = "#compte"; else renderAccount();
+  }
+  // Redessine la page sans la faire remonter (signalement n°3 : « quand tu cliques sur un badge tu retournes en haut »)
+  function rerouteKeepScroll() {
+    var y = window.scrollY;
+    route();
+    window.scrollTo(0, y);
+    [60, 250, 600].forEach(function (ms) { setTimeout(function () { if (Math.abs(window.scrollY - y) > 2) window.scrollTo(0, y); }, ms); });
+  }
   function pendingInvite() { try { return localStorage.getItem(INVITE_KEY) || ""; } catch (e) { return ""; } }
   var INVITE_TEXT = { joined: "Invitation acceptée : bienvenue dans la bêta de BOYGAMES !", already: "", invalid: "Code d'invitation inconnu ou annulé.",
     expired: "Ce code d'invitation a expiré. Demande-en un nouveau.", used: "Ce code d'invitation a déjà été utilisé.", too_many: "Trop d'essais. Réessaie dans une heure." };
@@ -2462,7 +2486,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
 
   // Fiche administrative d'un joueur (lecture : staff_player_detail ; actions = fonctions d'équipe existantes, vérifiées côté serveur)
   var ACTION_FR = { suspension: "Suspension", reactivation: "Réactivation", beta_ajout: "Ajout à la bêta", beta_retrait: "Retrait de la bêta", role: "Changement de rôle",
-    badge_beta_tester_valide: "Badge BÊTA-TESTEUR validé", badge_beta_tester_a_revoir: "Badge BÊTA-TESTEUR : à revoir", signalement_done: "Signalement traité", badge_exclusif: "Badge exclusif reçu" };
+    badge_beta_tester_valide: "Badge BÊTA-TESTEUR validé", lien_mot_de_passe: "Lien « mot de passe oublié » généré", badge_beta_tester_a_revoir: "Badge BÊTA-TESTEUR : à revoir", signalement_done: "Signalement traité", badge_exclusif: "Badge exclusif reçu" };
   async function renderFiche(pseudo) {
     var body = $("jo-body"), msg = $("jo-msg");
     body.textContent = ""; setMsg(msg, "Chargement de la fiche…"); window.scrollTo(0, 0);
@@ -2533,6 +2557,28 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       } else act("RÉACTIVER", false, "Lever la suspension de " + P.pseudo + " ?", function () { return sb.rpc("staff_unban", { p_pseudo: P.pseudo }); }, "Suspension levée.");
       if (isAdmin && B.eligible && !F.badges.some(function (x) { return x.code === "beta_tester"; }))
         act("VALIDER LE BADGE BÊTA-TESTEUR", false, "Attribuer le badge permanent BÊTA-TESTEUR BOYGAMES à " + P.pseudo + " ?", function () { return sb.rpc("staff_beta_validate", { p_pseudo: P.pseudo, p_decision: "valide", p_note: "" }); }, "Badge attribué.");
+    }
+    // Mot de passe oublié : lien personnel à usage unique (fonction cloud « admin-reset-link », aucun e-mail envoyé)
+    if (isAdmin && (!F.role || isFounder)) {
+      var rl = el("button", "btn mini alt", "LIEN MOT DE PASSE OUBLIÉ"); rl.type = "button";
+      var rlOut = el("div", "");
+      rl.addEventListener("click", async function () {
+        if (!window.confirm("Générer un lien personnel (1 h, usage unique) permettant à " + P.pseudo + " de choisir un nouveau mot de passe ? Envoie-le-lui toi-même, à lui seul.")) return;
+        rl.disabled = true;
+        var res = await sb.functions.invoke("admin-reset-link", { body: { pseudo: P.pseudo, base: location.origin + location.pathname } });
+        rl.disabled = false;
+        if (res.error || !res.data || !res.data.link) { setMsg(msg, "Lien non généré (" + ((res.error && res.error.message) || "erreur") + ").", true); return; }
+        var link = res.data.link; rlOut.textContent = "";
+        rlOut.append(el("p", "small", "Lien pour " + P.pseudo + " (valable 1 h, une seule fois) :"), el("p", "small", link));
+        var rowl = el("div", "row");
+        var cp = el("button", "btn mini", "COPIER"); cp.type = "button";
+        cp.addEventListener("click", function () { (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(function () { setMsg(msg, "Lien copié."); }, function () { window.prompt("Copie ce lien :", link); }); });
+        rowl.append(cp);
+        if (navigator.share) { var sh = el("button", "btn mini alt", "PARTAGER"); sh.type = "button"; sh.addEventListener("click", function () { navigator.share({ title: "BOYGAMES", text: "Ton lien pour choisir un nouveau mot de passe BOYGAMES (valable 1 h)", url: link }).catch(function () {}); }); rowl.append(sh); }
+        rlOut.append(rowl);
+        setMsg(msg, "Lien généré et inscrit à l'historique.");
+      });
+      pa.append(rl, rlOut);
     }
     if (isFounder && F.role !== "founder") {
       var rr = el("div", "row"); pa.append(el("p", "small", "Rôle dans l'équipe :"), rr);
@@ -3046,6 +3092,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       renderMe();
     }
     if (accNotice) { setMsg(msg, accNotice); accNotice = ""; }
+    if (resetNotice) setMsg(msg, resetNotice, true);   // reste affiché tant qu'on est sur la page Compte
     if (inviteNotice) { setMsg(msg, inviteNotice); inviteNotice = ""; }
   }
 
@@ -3074,7 +3121,8 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       "<input id=\"in-email\" type=\"email\" inputmode=\"email\" autocomplete=\"email\" autocapitalize=\"off\" required>" +
       "<label for=\"in-pass\" style=\"margin-top:10px\">MOT DE PASSE</label>" +
       "<input id=\"in-pass\" type=\"password\" autocomplete=\"" + (isSignup ? "new-password" : "current-password") + "\" minlength=\"8\" required>" +
-      (isSignup ? "<p class=\"hint\">8 caractères minimum. Note-le bien : si tu l'oublies, ton compte est perdu et personne ne peut le retrouver.</p>" : "") +
+      (isSignup ? "<p class=\"hint\">8 caractères minimum. Note-le bien. En cas d'oubli, l'équipe peut t'envoyer un lien pour en choisir un nouveau.</p>" :
+        "<details class=\"hint\" style=\"margin-top:8px\"><summary>Mot de passe oublié ?</summary><p>Pas de panique : ton compte, tes scores et tes BOYCOINS sont conservés. Préviens le Fondateur (par message ou de vive voix) : il t'envoie un lien personnel, valable 1 heure, pour choisir un nouveau mot de passe.</p></details>") +
       "<div class=\"row\" style=\"margin-top:12px\"><button class=\"btn\" type=\"submit\">" + (isSignup ? "CRÉER MON COMPTE" : "ME CONNECTER") + "</button></div>" +
       "</form>";
     $("m-signup").addEventListener("click", function () { authMode = "signup"; renderAccount(); });
@@ -3151,6 +3199,22 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     $("acc-pseudo").textContent = profile.pseudo;
     $("acc-mail").textContent = session.user.email || "";
     $("acc-country").textContent = profile.country === "FR" ? "PAYS : FRANCE" : "PAYS : AUTRE";
+    var pw = el("details", "panel"); pw.open = pwRecovery;
+    pw.append(el("summary", "", pwRecovery ? "CHOISIS TON NOUVEAU MOT DE PASSE" : "CHANGER MON MOT DE PASSE"));
+    var pl1 = el("label", "", "NOUVEAU MOT DE PASSE"), pi1 = document.createElement("input"); pi1.type = "password"; pi1.autocomplete = "new-password"; pi1.id = "in-newpass";
+    var pl2 = el("label", "", "CONFIRMATION"), pi2 = document.createElement("input"); pi2.type = "password"; pi2.autocomplete = "new-password"; pi2.id = "in-newpass2";
+    pl1.setAttribute("for", "in-newpass"); pl2.setAttribute("for", "in-newpass2");
+    var pb = el("button", "btn", "ENREGISTRER"); pb.type = "button";
+    pb.addEventListener("click", async function () {
+      if (pi1.value.length < 8) { setMsg(msg, "Le mot de passe doit faire au moins 8 caractères.", true); return; }
+      if (pi1.value !== pi2.value) { setMsg(msg, "Les deux mots de passe ne sont pas identiques.", true); return; }
+      pb.disabled = true; var u = await sb.auth.updateUser({ password: pi1.value }); pb.disabled = false;
+      if (u.error) { setMsg(msg, /different|same/i.test(u.error.message) ? "Choisis un mot de passe différent de l'ancien." : "Mot de passe non modifié. Réessaie.", true); return; }
+      pwRecovery = false; pi1.value = pi2.value = ""; pw.open = false;
+      setMsg(msg, "Mot de passe modifié. Utilise-le à ta prochaine connexion.");
+    });
+    pw.append(pl1, pi1, pl2, pi2, pb);
+    $("acc-level").after(pw);
     if (access && access.beta_on && !access.allowed) {
       var ib = el("div", "panel");
       ib.append(el("p", "", "La bêta est privée. Tu as reçu un code d'invitation ?"));
@@ -3233,7 +3297,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
               var res = await sb.rpc("set_featured_badge", { p_code: me.featured_badge === b.code ? "" : b.code });
               if (res.error) { setMsg(msg, rewardError(res.error), true); return; }
               await loadMe();
-              route();
+              rerouteKeepScroll();
             });
           }
           grid.append(card);
@@ -5291,7 +5355,7 @@ return {SIZE: SIZE, SIZES: SIZES, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid
 
 
   /* ---------- Signaler un bug (toutes les pages, y compris en jeu) ---------- */
-  var APP_BUILD = "2026.10.16-3f8d88";
+  var APP_BUILD = "2026.10.19-bea181";
   var recentErrors = [];
   function pushErr(t) { recentErrors.push(String(t).slice(0, 160)); if (recentErrors.length > 5) recentErrors.shift(); }
   window.addEventListener("error", function (e) { pushErr((e.message || "error") + " @" + String(e.filename || "").split("/").pop() + ":" + (e.lineno || "")); });
@@ -5474,6 +5538,7 @@ return {SIZE: SIZE, SIZES: SIZES, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid
     if (h === "beta") renderBeta();
     if (h === "suivi") renderSuivi();
     if (h === "joueurs") { jo.sel = null; renderJoueurs(true); }
+    if (h !== "compte") resetNotice = "";
     $("pf-modal").hidden = true;
     if (h !== "snake") loadMaint();
     if (h === "compte") renderAccount();
@@ -5500,6 +5565,7 @@ return {SIZE: SIZE, SIZES: SIZES, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid
   renderNav();
 
   if (sb) {
+    consumeResetLink();
     sb.auth.onAuthStateChange(function (event, s) {
       /* Deferred on purpose: calling the client inside this callback can deadlock. */
       setTimeout(function () { refreshAuth(s); }, 0);

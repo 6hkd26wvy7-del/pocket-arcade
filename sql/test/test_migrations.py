@@ -39,6 +39,7 @@ try:
     run_file(c, f"{REPO}/schema_v18_invitations.sql"); run_file(c, f"{REPO}/schema_v18_invitations.sql")
     run_file(c, f"{REPO}/schema_v19_liste_joueurs.sql"); run_file(c, f"{REPO}/schema_v19_liste_joueurs.sql")
     run_file(c, f"{REPO}/schema_v20_fiche_joueur.sql"); run_file(c, f"{REPO}/schema_v20_fiche_joueur.sql")
+    run_file(c, f"{REPO}/schema_v21_stockage_marketing.sql"); run_file(c, f"{REPO}/schema_v21_stockage_marketing.sql")
     run_file(c, f"{REPO}/schema_v6_v7.sql")   # la liste blanche relancée garde les fonctions du questionnaire
     sql("update public.app_settings set value = 'false' where key = 'maintenance'") if sql("select to_regclass('public.app_settings')")[0][0] else None
     print("app_settings:", sql("select * from public.app_settings"))

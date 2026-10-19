@@ -3371,7 +3371,8 @@ do $$ begin
     on conflict (id) do update set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
     -- lecture (aperçu) réservée à l'équipe ; aucun envoi ni suppression par le site
     execute 'drop policy if exists "marketing : lecture equipe" on storage.objects';
-    execute 'create policy "marketing : lecture equipe" on storage.objects for select to authenticated using (bucket_id = ''marketing'' and public.is_admin())';
+    -- v21 : rôle lu directement (public.is_admin() n'est pas exécutable par les joueurs connectés)
+    execute 'create policy "marketing : lecture equipe" on storage.objects for select to authenticated using (bucket_id = ''marketing'' and exists (select 1 from public.user_roles r where r.user_id = auth.uid() and r.role in (''founder'', ''admin'')))';
   end if;
 end $$;
 
