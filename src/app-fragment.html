@@ -696,6 +696,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     <section id="view-snake" hidden>
       <div class="stage">
         <canvas id="screen" class="screen" width="144" height="208" tabindex="0" aria-label="Écran du jeu Snake. Glisse un doigt pour tourner."></canvas>
+        <div id="snake-hero" class="hero-slot" hidden aria-hidden="true"></div>   <!-- emplacement réservé : animation du héros (nouveau design), voir docs/FINS-DE-PARTIE.md -->
         <p id="snake-msg" class="msg" role="status"></p>
         <div class="row">
           <button class="btn" id="b-pause" type="button">PAUSE</button>
@@ -3348,6 +3349,30 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     c.fillStyle = "#FDE68A"; c.fillRect(sx + 3, sy + 8, 2, 1); c.fillRect(sx + 7, sy + 8, 2, 1);
   }
 
+  /*SNAKE-LOGIC-START*/
+  // Logique pure de Snake (testée sans navigateur : tests/logique/snake.test.mjs)
+  var SNK = (function () {
+    var START_LEN = 3;
+    function key(x, y) { return y * 1000 + x; }
+    // Cases libres de la grille : un seul passage, sans boucle d'essais au hasard (aucun blocage possible, même grille presque pleine).
+    function freeCells(body, cols, rows) {
+      var taken = {}, out = [], i, x, y;
+      for (i = 0; i < body.length; i++) taken[key(body[i].x, body[i].y)] = true;
+      for (y = 0; y < rows; y++) for (x = 0; x < cols; x++) if (!taken[key(x, y)]) out.push({ x: x, y: y });
+      return out;
+    }
+    // Nouvelle nourriture, ou null quand il ne reste aucune case libre (= grille pleine = victoire).
+    function pickFood(body, cols, rows, rand) {
+      var free = freeCells(body, cols, rows);
+      return free.length ? free[Math.min(free.length - 1, Math.floor(rand() * free.length))] : null;
+    }
+    function isFull(body, cols, rows) { return body.length >= cols * rows; }
+    // Score maximal : une pomme par case libre au départ.
+    function maxScore(cols, rows) { return cols * rows - START_LEN; }
+    return { START_LEN: START_LEN, freeCells: freeCells, pickFood: pickFood, isFull: isFull, maxScore: maxScore };
+  })();
+  /*SNAKE-LOGIC-END*/
+
   var snake = (function () {
     var W = 144, H = 208, CELL = 8, HUD = 16;
     var COLS = W / CELL, ROWS = (H - HUD) / CELL;
@@ -3361,9 +3386,10 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     var body, dir, queue, food, score, speed, acc, last, deathAt;
     var state = "ready", soundOn = true, audio = null, running = false;
 
-    var continues = 0;
+    var continues = 0, won = false;
     function reset() {
       resetRun("snake");
+      won = false; clearVictory();
       var cx = Math.floor(COLS / 2), cy = Math.floor(ROWS / 2);
       continues = 0; clearContinue($("snake-msg").nextElementSibling);
       body = [{ x: cx, y: cy }, { x: cx - 1, y: cy }, { x: cx - 2, y: cy }];
@@ -3376,19 +3402,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       setMsg($("snake-msg"), "");
     }
 
-    function spawnFood() {
-      var free = [];
-      for (var y = 0; y < ROWS; y++) {
-        for (var x = 0; x < COLS; x++) {
-          var taken = false;
-          for (var i = 0; i < body.length; i++) {
-            if (body[i].x === x && body[i].y === y) { taken = true; break; }
-          }
-          if (!taken) free.push({ x: x, y: y });
-        }
-      }
-      food = free.length ? free[Math.floor(Math.random() * free.length)] : null;
-    }
+    function spawnFood() { food = SNK.pickFood(body, COLS, ROWS, Math.random); }
 
     function beep(freq, ms, delay) {
       if (!soundOn) return;
@@ -3442,21 +3456,40 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       beep(110, 260, 0.3);
     }
 
+    // Grille entièrement remplie : victoire exceptionnelle, distincte du Game Over (écran, fanfare, message, événements pour la suite).
     function win() {
-      beep(660, 100);
-      beep(880, 100, 0.12);
-      beep(1320, 200, 0.24);
+      if (won || state === "over") return;
+      won = true;
+      beep(660, 100); beep(880, 100, 0.12); beep(1320, 200, 0.24); beep(1760, 360, 0.36);
       finish();
+      showVictory();
+      // Points d'accroche, sans effet aujourd'hui : l'animation du héros (nouveau design) et le badge « grille complète » s'y brancheront.
+      // La récompense réelle (badge) passera par la base, jamais par le site : voir docs/FINS-DE-PARTIE.md.
+      document.dispatchEvent(new CustomEvent("boygames:victory", { detail: { game: "snake", score: score, perfect: true, ranked: continues === 0 } }));
+    }
+    function clearVictory() { var v = $("snake-win"); if (v) v.remove(); var h = $("snake-hero"); if (h) h.hidden = true; }
+    function showVictory() {
+      clearVictory();
+      var box = el("div", "row"); box.id = "snake-win"; box.setAttribute("role", "status");
+      var t = el("p", "msg", "VICTOIRE PARFAITE ! Toute la grille est remplie : " + score + " points, le maximum possible."); t.style.flexBasis = "100%";
+      var again = el("button", "btn", "REJOUER"); again.type = "button";
+      again.addEventListener("click", function () { reset(); state = "playing"; });
+      var home = el("button", "btn alt", "ACCUEIL"); home.type = "button";
+      home.addEventListener("click", function () { location.hash = "#menu"; });
+      box.append(t, again, home);
+      $("snake-msg").after(box);
+      var h = $("snake-hero"); if (h) h.hidden = false;
     }
 
     function finish() {
+      if (state === "over") return;    // une partie ne se termine qu'une fois (pas de double envoi de score)
       state = "over";
       if (continues > 0) submitContinued("snake", score, continues, $("snake-msg"));   // hors classement
       else {
         if (score > best) { best = score; saveLocalBest("snake", best); }
         if (score > 0) submit(score);
       }
-      if (body.length < COLS * ROWS) offerContinue($("snake-msg").nextElementSibling, $("snake-msg"), "snake", continues, revive);
+      if (!SNK.isFull(body, COLS, ROWS)) offerContinue($("snake-msg").nextElementSibling, $("snake-msg"), "snake", continues, revive);
     }
     // Reprise après une vidéo : le score est gardé, le serpent repart du centre (raccourci), il faut glisser pour repartir.
     function revive() {
@@ -3612,7 +3645,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
         panel(["PAUSE", "", "TOUCHE POUR", "REPRENDRE"]);
       } else if (state === "over") {
         var newBest = continues === 0 && score > 0 && score >= Math.max(best, onlineBest);
-        var lines = [body.length >= COLS * ROWS ? "BRAVO !" : "PERDU", "SCORE " + score];
+        var lines = won ? ["VICTOIRE !", "GRILLE COMPLETE", "SCORE " + score] : ["PERDU", "SCORE " + score];
         if (continues > 0) lines.push("HORS CLASSEMENT");
         else if (newBest) lines.push("NOUVEAU REC !");
         lines.push("", "TOUCHE POUR", "REJOUER");
@@ -3826,6 +3859,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       acc = 0;
     }
     function finish() {
+      if (state === "over") return;    // fin unique : pas de double envoi de score
       state = "over";
       if (score > best) { best = score; saveLocalBest("blocks", best); }
       if (score > 0) submit(score);

@@ -35,6 +35,7 @@ Lire d'abord `docs/JOURNAL.md` (état et prochaines étapes), puis `docs/AUDIT-2
 ```
 cd server && for f in test/*.test.mjs; do node $f; done          # 91
 node tests/logique/space.test.mjs                                 # 8
+node tests/logique/snake.test.mjs                                 # 6
 python3 sql/test/test_migrations.py                               # 192 (pip install pgserver psycopg2-binary)
 python3 sql/test/test_installation_et_moteur.py                   # moteur JS = SQL sur 300 parties
 python3 sql/test/test_execution_morcelee.py                       # pip install sqlparse
