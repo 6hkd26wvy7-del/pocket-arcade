@@ -188,11 +188,15 @@ await t("salle: revanche avec BOYBOT, salle pleine pour un autre, difficulte inc
   const r2 = new ArenaRoom({}, env); const z = await phone(r2, "SBOT3", U1, "expert"); assert.equal(z.last("error").code, "bot");
 });
 await t("pause contre BOYBOT : tout s'arrete, reprise apres le compte a rebours, au meme tour", async () => {
-  const room = new ArenaRoom({}, { ...env, TICK_MS: 10, DT_MS: 140, RESUME_MS: 60 });
+  // Tour assez lent pour que la partie ne finisse pas avant la pause, même sur une machine chargée ;
+  // on attend les événements (phase "playing", message "paused") au lieu de durées fixes.
+  const until = async (cond, what) => { for (let i = 0; i < 400 && !cond(); i++) await wait(5); assert.ok(cond(), what); };
+  const room = new ArenaRoom({}, { ...env, TICK_MS: 30, DT_MS: 140, RESUME_MS: 60 });
   const a = await phone(room, "SBOTP", U1, "normal");
-  await wait(120);
-  a.say({ t: "pause" }); await wait(30);
-  assert.ok(a.last("paused"), "pause confirmée");
+  await until(() => room.phase === "playing" && a.last("state"), "partie en cours");
+  a.say({ t: "pause" });
+  await until(() => a.last("paused"), "pause confirmée");
+  await wait(20);
   const tick0 = a.last("state").tick, n0 = a.inbox.length;
   await wait(200);
   assert.equal(a.inbox.filter((m, i) => i >= n0 && m.t === "state").length, 0, "aucun tour pendant la pause");
@@ -203,9 +207,9 @@ await t("pause contre BOYBOT : tout s'arrete, reprise apres le compte a rebours,
   assert.equal(a.last("resume").ms, 60);
   a.say({ t: "dir", d: "U" }); await wait(10); assert.deepEqual(g.players[0].queue, ["U"], "direction choisie pendant le compte à rebours");
   assert.equal(g.tick, tick0); assert.equal(g.players[1].body.map((c) => c.x + "," + c.y).join(" "), bot, "BOYBOT figé pendant le compte à rebours");
-  await wait(120);
-  assert.ok(g.tick > tick0, "la partie a repris"); assert.equal(room.phase === "playing" || room.phase === "over", true);
-  assert.ok(a.inbox.filter((m) => m.t === "state" && m.tick === tick0 + 1).length >= 1, "reprise au tour suivant, sans saut");
+  await until(() => g.tick > tick0, "la partie a repris");
+  await until(() => a.inbox.some((m) => m.t === "state" && m.tick === tick0 + 1), "reprise au tour suivant, sans saut");
+  assert.equal(room.phase === "playing" || room.phase === "over", true);
 });
 await t("pause refusee entre deux humains (regles des duels inchangees)", async () => {
   const room = new ArenaRoom({}, { ...env, TICK_MS: 10, DT_MS: 140 });

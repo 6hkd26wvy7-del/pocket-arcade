@@ -1,0 +1,27 @@
+# Tests locaux de BOYGAMES : serveur de duels + logique Space. Aucun secret, aucun accès à Supabase ni à la production,
+# aucun déploiement. Lecture seule sur le dépôt.
+name: Tests
+on:
+  pull_request: {}
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+permissions:
+  contents: read
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  serveur:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Serveur de duels
+        working-directory: server
+        run: for f in test/*.test.mjs; do echo "== $f"; node "$f" || exit 1; done
+      - name: Logique Space
+        run: node tests/logique/space.test.mjs
