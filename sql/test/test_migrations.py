@@ -47,6 +47,7 @@ try:
     run_file(c, f"{REPO}/schema_v20_fiche_joueur.sql"); run_file(c, f"{REPO}/schema_v20_fiche_joueur.sql")
     run_file(c, f"{REPO}/schema_v21_stockage_marketing.sql"); run_file(c, f"{REPO}/schema_v21_stockage_marketing.sql")
     run_file(c, f"{REPO}/schema_v22_tickets_partie.sql"); run_file(c, f"{REPO}/schema_v22_tickets_partie.sql")
+    run_file(c, f"{REPO}/schema_v23_dons.sql"); run_file(c, f"{REPO}/schema_v23_dons.sql")
     run_file(c, f"{REPO}/schema_v6_v7.sql")   # la liste blanche relancée garde les fonctions du questionnaire
     sql("update public.app_settings set value = 'false' where key = 'maintenance'") if sql("select to_regclass('public.app_settings')")[0][0] else None
     print("app_settings:", sql("select * from public.app_settings"))
@@ -328,6 +329,16 @@ console.log(JSON.stringify({moves:g.log,score:g.score}));""" % os.path.join(os.p
     t("anti-devinette : 10 essais ratés par heure", lambda: as_user(c, U3, "select beta_redeem('XXXXXXXX')->>'status'")[0][0])
     sql("delete from beta_invite_fails"); sql("insert into beta_members (user_id) values (%s) on conflict do nothing", (U3,))
     sql("update app_settings set value = '{\"on\": false}' where key = 'beta'")
+
+    print("== v23 : dons volontaires (désactivés)")
+    t("désactivés par défaut, aucune adresse publiée", lambda: as_user(c, None, "select monetization_public()->'donate'")[0][0])
+    t("adresse hors services de dons refusée", lambda: must_fail(lambda: as_user(c, U1, """select staff_monetization_set('donate', '{"enabled": true, "url": "https://arnaque.example/pay", "message": ""}'::jsonb)"""), "invalid url"))
+    t("activation sans adresse refusée", lambda: must_fail(lambda: as_user(c, U1, """select staff_monetization_set('donate', '{"enabled": true, "url": "", "message": ""}'::jsonb)"""), "invalid url"))
+    t("réglage refusé à un joueur", lambda: must_fail(lambda: as_user(c, U2, """select staff_monetization_set('donate', '{"enabled": false, "url": "", "message": ""}'::jsonb)"""), "forbidden"))
+    as_user(c, U1, """select staff_monetization_set('donate', '{"enabled": true, "url": "https://ko-fi.com/boygames", "message": "Merci !"}'::jsonb)""")
+    t("activé avec une page Ko-fi : visible par tous", lambda: as_user(c, None, "select monetization_public()->'donate'->>'url'")[0][0])
+    as_user(c, U1, """select staff_monetization_set('donate', '{"enabled": false, "url": "https://ko-fi.com/boygames", "message": ""}'::jsonb)""")
+    t("désactivé de nouveau : adresse masquée", lambda: as_user(c, None, "select monetization_public()->'donate'")[0][0])
 
     print("== v22 : ticket de partie, scores vraisemblables")
     t("envoi direct de score fermé aux joueurs", lambda: must_fail(lambda: as_user(c, U2, "select submit_score('snake', 10)"), "permission denied"))

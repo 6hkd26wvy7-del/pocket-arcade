@@ -12,6 +12,9 @@ L'offre Premium à 0,99 €/mois est **masquée** sur TEST (signalement n°4) ; 
 | Stripe Payment Link | frais par transaction seulement | lien + reçu automatique | compte Stripe et identité à créer par Quentin |
 | Achat intégré iOS (application native) | 15 à 30 % Apple | seulement avec une appli App Store | inutile tant que BOYGAMES reste un site/PWA |
 
+**Prêt (v23, désactivé)** : Administration → Monétisation → « Dons volontaires » (adresse Ko-fi, Liberapay, Buy Me a Coffee,
+PayPal ou HelloAsso uniquement) ; une carte « Soutenir BOYGAMES » apparaît alors dans le Profil.
+
 Recommandation : **bouton « Soutenir » vers une page Ko-fi ou Liberapay**, sans contrepartie en jeu (pas de BC, pas
 d'avantage) ; éventuellement un badge cosmétique « Soutien » attribué manuellement par l'équipe. Mineurs : afficher
 « demande l'accord d'un parent ».
@@ -39,12 +42,16 @@ Recommandation : rester **sans publicité pendant la bêta** ; si besoin plus ta
 | Invitations / bêta privée | fait (v18) ; pour une bêta publique : désactiver la bêta privée ou distribuer un lien multi-usage |
 | Modération (signalements, suspension, filtre de mots, journal) | fait (v20) |
 | Sécurité base (RLS, liste blanche, sauvegardes) | vérifiée le 16 et le 19/10 |
-| Anti-triche scores Snake / Space solo | **à faire** (scores déclarés par le téléphone, plafonnés) |
+| Anti-triche scores Snake / Space / Block Drop solo | fait le 19/10 (v22) : ticket de partie + score vraisemblable pour la durée jouée |
 | Matchmaking « trouver un adversaire » | à faire (repli BOYBOT) |
 | Mentions légales, confidentialité, CGU, âge minimum | pages présentes ; à relire avant ouverture |
-| Production | base de production à mettre au niveau v21 **sur accord explicite** |
+| Production | base de production à mettre au niveau v23 **sur accord explicite** |
 
-## 4. Identité visuelle arcade premium (piste, après les corrections)
+## 4. Identité visuelle arcade premium
+
+Planche « Cartouche néon » : `docs/design/identite-arcade.html` (+ captures PNG). À valider avant application.
+
+Piste d'origine :
 
 - Nom et logo : « BOYGAMES » en lettrage néon à deux couches (violet #7C3AED + cyan #22D3EE), contour pixel 1 px,
   légère lueur ; icône d'appli = manette pixel stylisée dans un cadre arrondi.

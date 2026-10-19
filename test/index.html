@@ -2941,6 +2941,12 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
         var rDay = field(pmo, "Vidéos par joueur et par jour"); rDay.type = "number"; rDay.value = R.daily_max;
         var rBc = field(pmo, "BC par partie continuée (0 conseillé)"); rBc.type = "number"; rBc.value = R.bc_per_continue;
         button(pmo, "ENREGISTRER LES VIDÉOS", false, function () { saveMo("rewarded", { enabled: rOn.checked, continue_max: Number(rMax.value), daily_max: Number(rDay.value), games: R.games || ["snake", "space"], bc_per_continue: Number(rBc.value) }, "vidéos " + (rOn.checked ? "activées" : "désactivées")); });
+        var DN = MS.donate || {};
+        pmo.append(el("h4", "", "Dons volontaires (lien externe, aucun avantage en jeu)"));
+        var dOn = check(pmo, "Afficher le bouton « Soutenir BOYGAMES » dans le Profil", DN.enabled);
+        var dUrl = field(pmo, "Adresse de la page de dons (Ko-fi, Liberapay, Buy Me a Coffee, PayPal, HelloAsso)"); dUrl.type = "url"; dUrl.value = DN.url || ""; dUrl.placeholder = "https://ko-fi.com/…";
+        var dMsg = field(pmo, "Message (facultatif)", "textarea"); dMsg.rows = 2; dMsg.maxLength = 160; dMsg.value = DN.message || "";
+        button(pmo, "ENREGISTRER LES DONS", false, function () { saveMo("donate", { enabled: dOn.checked, url: dUrl.value.trim(), message: dMsg.value.trim() }, "dons " + (dOn.checked ? "affichés" : "masqués")); });
         var PR = MS.premium || {};
         pmo.append(el("h4", "", "BOYGAMES Premium"));
         var pOn = check(pmo, "Afficher l'offre (sans paiement)", PR.enabled);
@@ -3274,6 +3280,17 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
         if (pm && pm.pioneer_left > 0 && !me.premium) pc.append(el("p", "small", "Les " + pm.pioneer_left + " prochains abonnés recevront le badge à vie PIONNIER PREMIUM."));
         if (!me.premium) { var pb = el("button", "btn", "BIENTÔT DISPONIBLE"); pb.type = "button"; pb.disabled = true; pc.append(pb, el("p", "small", "Aucun paiement n'est possible pour l'instant.")); }
         $("acc-badges").before(pc);
+      }
+      // Dons volontaires (v23) : visibles seulement si l'équipe les a activés ; lien externe, aucun avantage en jeu
+      var dn = monet && monet.donate;
+      if (dn && dn.enabled && /^https:\/\//.test(dn.url || "")) {
+        var dc = el("div", "panel premium-card");
+        dc.append(el("h3", "", "💜 SOUTENIR BOYGAMES"));
+        dc.append(el("p", "", dn.message || "BOYGAMES est gratuit et sans abonnement. Si tu aimes le jeu, tu peux soutenir son développement par un don, du montant de ton choix."));
+        dc.append(el("p", "small", "Don volontaire, sans aucun avantage dans les jeux. Tu as moins de 18 ans ? Demande d'abord l'accord d'un parent."));
+        var da = el("a", "btn", "FAIRE UN DON"); da.href = dn.url; da.target = "_blank"; da.rel = "noopener noreferrer";
+        dc.append(da);
+        $("acc-badges").before(dc);
       }
       var avBox = $("acc-badges");
       if (avBox) {
@@ -5381,7 +5398,7 @@ return {SIZE: SIZE, SIZES: SIZES, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid
 
 
   /* ---------- Signaler un bug (toutes les pages, y compris en jeu) ---------- */
-  var APP_BUILD = "2026.10.19-f32404";
+  var APP_BUILD = "2026.10.19-cf45bf";
   var recentErrors = [];
   function pushErr(t) { recentErrors.push(String(t).slice(0, 160)); if (recentErrors.length > 5) recentErrors.shift(); }
   window.addEventListener("error", function (e) { pushErr((e.message || "error") + " @" + String(e.filename || "").split("/").pop() + ":" + (e.lineno || "")); });

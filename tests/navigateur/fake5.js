@@ -24,7 +24,7 @@ window.supabase = { createClient: function(){
      case 'set_favorites': window.__fav=a.p_list; return ok(null);
      case 'public_tiers': return ok({favorites:['boyblocks:5','snake:1'],games:[]});
      case 'me': return ok(Object.assign({}, me, {premium: !!window.__premium, premium_until: window.__premium ? '2026-11-15T00:00:00Z' : null}));
-     case 'monetization_public': return ok(window.__monet || {ads:{enabled:true,provider:'test',slots:{home:true,scores:true,shop:false}},rewarded:{enabled:true,continue_max:1,games:['snake','space']},premium:{enabled:true,price_eur:0.99,pioneer_limit:100,pioneer_left:99}});
+     case 'monetization_public': return ok(Object.assign({donate: window.__donate || {enabled:false}}, window.__monet || {ads:{enabled:true,provider:'test',slots:{home:true,scores:true,shop:false}},rewarded:{enabled:true,continue_max:1,games:['snake','space']},premium:{enabled:true,price_eur:0.99,pioneer_limit:100,pioneer_left:99}}));
      case 'rewarded_continue': return ok({ok:true,remaining_today:9,skip_ad:!!window.__premium});
      case 'submit_continued_score': window.__cont=a; return ok({xp:5,bc:0,level:5,level_up:false,ranked:false});
      case 'submit_score': window.__ranked=(window.__ranked||[]).concat([a]); return ok({xp:6,bc:2,level:5,level_up:false,new_badges:[]});

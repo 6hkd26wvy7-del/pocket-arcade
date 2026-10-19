@@ -6,6 +6,21 @@ Le plus récent en haut. Chaque entrée : ce qui a été fait, où, et ce qui re
 
 ---
 
+## 19/10/2026 (suite) — sécurité des scores, dons, identité visuelle (TEST)
+
+- Joh : nouveau compte fonctionnel (ancien supprimé par Quentin) ; ne pas chercher à fusionner.
+- Contrôles : aucune nouvelle erreur depuis les corrections, serveur de duels en ligne (refuse un faux jeton en 0,7 s),
+  refus des demandes d'ami tous traduits.
+- Sécurité des scores solo (v22, sauvegarde id 12) : ticket de partie `game_start` demandé au 1er instant de jeu,
+  score envoyé avec `submit_score_v2` (une fois, même joueur, même jeu, vraisemblable pour la durée : Snake 0,26 s/pomme,
+  Space 500 + 3 000 pts/s mesuré avec bots, Block Drop un tétris / 2 s) ; `submit_score` fermé aux joueurs.
+  Base et site basculés à ~40 s d'écart. Essai réel annulé : score normal accepté, ancien envoi fermé.
+- Dons volontaires (v23, sauvegarde id 13) : réglage « donate » DÉSACTIVÉ ; lien externe limité à Ko-fi, Liberapay,
+  Buy Me a Coffee, PayPal, HelloAsso ; carte « Soutenir BOYGAMES » dans le Profil une fois activé ; section admin.
+- Identité « Cartouche néon » : planche `docs/design/identite-arcade.html` (logo « B » en blocs + pièce, palette,
+  typographies, boutons « borne », cartouches de jeux, maquette d'accueil iPhone). Non appliquée : à valider.
+- Tests : SQL 192, moteur, morcelé, serveur 91, logique 8, navigateur 25 (`tickets.mjs`, `dons.mjs`).
+
 ## 19/10/2026 — reprise : comptes, mot de passe, signalements, sécurité (TEST)
 
 - État vérifié : dépôt propre (dernier commit du 16/10), site TEST = `main`, base v20, serveur v6.
