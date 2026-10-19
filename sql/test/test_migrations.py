@@ -359,7 +359,7 @@ console.log(JSON.stringify({moves:g.log,score:g.score}));""" % os.path.join(os.p
 
     print("== v17 : plafond Space Attack")
     t("score Space 45 000 accepté (bloqué à 20 000 avant)", lambda: play(U2, "space", 45000)["xp"])
-    t("score Space au-delà de 100 000 refusé", lambda: must_fail(lambda: play(U2, "space", 100001), "invalid score"))
+    t("score Space au-delà de 5 000 000 refusé (v25 ; 100 000 avant)", lambda: must_fail(lambda: play(U2, "space", 5000001, 2000), "invalid score"))
     t("plafond Snake inchangé", lambda: must_fail(lambda: play(U2, "snake", 430), "invalid score"))
 
     print("== v16 : espace bêta, missions, badge sur validation")

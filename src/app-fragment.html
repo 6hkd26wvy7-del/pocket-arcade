@@ -1288,6 +1288,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
   }
   // Ticket de partie (v22) : demandé à la base au premier instant de jeu ; le score n'est accepté qu'avec ce ticket et s'il
   // est vraisemblable pour la durée jouée. undefined = pas encore demandé, false = demande impossible, objet = en cours.
+  var SPACE_SCORE_MAX = 5000000;   // = game_max_score('space') (sql/schema_all.sql). Ne jamais tronquer plus bas : le vrai score serait perdu (bug du 19/10 : 100 000)
   var runIds = {};
   function resetRun(game) { runIds[game] = undefined; }
   function ensureRun(game) {
@@ -4503,7 +4504,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     function reset() { resetRun("space"); g = SP.create(); state = "ready"; targetX = null; continues = 0; setMsg($("sp-msg"), ""); clearContinue($("sp-msg").nextElementSibling); }
     function finish() {
       state = "over";
-      if (continues > 0) submitContinued("space", Math.min(g.score, 100000), continues, $("sp-msg"));   // hors classement
+      if (continues > 0) submitContinued("space", Math.min(g.score, SPACE_SCORE_MAX), continues, $("sp-msg"));   // hors classement
       else {
         if (g.score > best) { best = g.score; saveLocalBest("space", best); }
         if (g.score > 0) submit(g.score);
@@ -4533,7 +4534,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
         return;
       }
       setMsg(m, "Envoi du score…");
-      var r = await submitRanked("space", Math.min(value, 100000));   // plafond de la base (v17)
+      var r = await submitRanked("space", Math.min(value, SPACE_SCORE_MAX));   // garde-fou : même valeur que game_max_score('space') de la base (test de non-régression)
       if (r.error) {
         var em = String(r.error.message || "");
         if (em.indexOf("maintenance") >= 0) setMsg(m, "Maintenance en cours : score non enregistré.", true);
