@@ -43,13 +43,13 @@ async function play(uid, game, score, secs) {
   await db.exec(`update public.game_runs set started_at = now() - interval '${secs} seconds' where id = '${run}'`);
   return (await as(uid, "select public.submit_score_v2($1,$2,$3) r", [game, score, run]))[0].r;
 }
-const best = async (uid, game) => (await db.query("select max(score)::int m from public.scores where user_id = $1 and game = $2", [uid, game])).rows[0].m;
+const best = async (uid, game) => { const m = (await db.query("select max(score)::text m from public.scores where user_id = $1 and game = $2", [uid, game])).rows[0].m; return m === null ? null : Number(m); };
 const fails = (p, msg) => assert.rejects(p, (e) => e.message.includes(msg), "attendu : " + msg);
 let n = 0; const t = async (name, fn) => { try { await fn(); } catch (e) { console.error("ECHEC -", name, "\n", e.message); process.exit(1); } n++; console.log("ok -", name); };
 
-await t("plafonds : Space 5 000 000, Snake et Blocks inchangés", async () => {
-  const r = (await db.query("select public.game_max_score('space') s, public.game_max_score('snake') n, public.game_max_score('blocks') b, public.game_max_score('autre') x")).rows[0];
-  assert.deepEqual(r, { s: 5000000, n: 429, b: 50000, x: 0 });
+await t("limites : Space = entier sûr JavaScript (2^53-1), Snake 429 et Blocks inchangés", async () => {
+  const r = (await db.query("select public.game_max_score('space')::text s, public.game_max_score('snake') n, public.game_max_score('blocks') b, public.game_max_score('autre') x")).rows[0];
+  assert.deepEqual(r, { s: "9007199254740991", n: 429, b: 50000, x: 0 });
 });
 await t("le bug : une partie à 200 000 en 2 minutes est enregistrée en entier, le record monte", async () => {
   const u = await player();
@@ -62,10 +62,30 @@ await t("le bug : une partie à 200 000 en 2 minutes est enregistrée en entier,
 await t("limite exacte : 100 001 était refusé (v17), accepté maintenant", async () => {
   const u = await player(); await play(u, "space", 100001, 60); assert.equal(await best(u, "space"), 100001);
 });
-await t("le plafond absolu existe toujours : 5 000 001 refusé, 5 000 000 accepté", async () => {
+await t("très hauts scores : 1 000 000 puis 30 000 000 acceptés si la durée le permet, jamais tronqués ; au-delà de la vraisemblance, refus explicite", async () => {
   const u = await player();
-  await fails(play(u, "space", 5000001, 2000), "invalid score");
-  const v = await player(); await play(v, "space", 5000000, 2000); assert.equal(await best(v, "space"), 5000000);
+  const a = await play(u, "space", 1000000, 400); assert.equal(a.score, 1000000); assert.equal(a.best, 1000000);
+  await db.exec("update public.scores set created_at = now() - interval '1 minute'");
+  const b = await play(u, "space", 30000000, 10700); assert.equal(b.score, 30000000); assert.equal(b.best, 30000000);
+  await db.exec("update public.scores set created_at = now() - interval '1 minute'");
+  await fails(play(u, "space", 32200000, 10700), "implausible score");     // 500 + 3 000 x 10 700 s = 32 100 500
+  assert.equal(await best(u, "space"), 30000000);
+});
+await t("stockage : bigint sans perte de 2^31 à 2^53-1 (classement et profil exacts) ; 2^53 refusé explicitement, aucune troncature", async () => {
+  const owner = async (uid, sql, params) => db.transaction(async (tx) => { await tx.query("select set_config('request.jwt.claim.sub', $1, true)", [uid]); return (await tx.query(sql, params)).rows; });
+  for (const v of ["2147483647", "2147483648", "4294967296", "9007199254740991"]) {
+    const u = await player();
+    const r = (await owner(u, "select public.submit_score('space', $1::bigint) r", [v]))[0].r;   // couche stockage/XP/BC, sans la vraisemblance
+    assert.ok(r.xp <= 65 && r.bc <= 26, "gains plafonnés");
+    assert.equal((await db.query("select max(score)::text m from public.scores where user_id = $1", [u])).rows[0].m, v);
+    const lb = (await as(u, "select score::text s from public.leaderboard('space', null, 100) where moi")); assert.equal(lb[0].s, v);
+    assert.equal(Number(v).toString(), v.toString().replace(/^/, ""), "exact en JavaScript");
+    assert.ok(Number.isSafeInteger(Number(v)));
+  }
+  const u = await player();
+  await fails(owner(u, "select public.submit_score('space', 9007199254740992::bigint)"), "invalid score");
+  await assert.rejects(db.query("insert into public.scores (user_id, game, score) values ($1, 'space', 9007199254740992)", [u]), /scores_score_safe/);
+  assert.equal(Number.isSafeInteger(9007199254740992), false);
 });
 await t("l'anti-triche par durée est intact : 200 000 en 10 s refusé, ticket à usage unique", async () => {
   const u = await player();
@@ -87,7 +107,8 @@ await t("récompenses non gonflées : un score de 2 000 000 donne au plus 60 XP 
 await t("le site n'envoie plus de score tronqué : aucune troncature, constante = plafond absolu de la base", async () => {
   const html = read("../../src/app-fragment.html");
   const cap = Number(/var SPACE_SCORE_MAX = (\d+);/.exec(html)[1]);
-  assert.equal(cap, (await db.query("select public.game_max_score('space')::int c")).rows[0].c, "constante du site = plafond de la base");
+  assert.equal(String(cap), (await db.query("select public.game_max_score('space')::text c")).rows[0].c, "constante du site = plafond de la base");
+  assert.equal(cap, Number.MAX_SAFE_INTEGER);
   assert.ok(!/Math\.min\([^)]*(SPACE_SCORE_MAX|100000)[^)]*\)/.test(html), "plus aucun Math.min sur le score");
   assert.ok(/submitRanked\("space", value\)/.test(html) && /submitContinued\("space", g\.score,/.test(html), "le score envoyé est le score du jeu");
 });
@@ -109,19 +130,19 @@ await t("capture du 19/10 : 227 500 points, vague 64 → +65 XP, BOYCOINS plafon
   assert.equal(r.xp, 65); assert.ok(r.bc <= 26); assert.equal(r.best, 227500);
   assert.equal((await db.query("select count(*)::int c from public.scores where user_id = $1", [u])).rows[0].c, 1);
 });
-await t("limites : 5 000 000 accepté, 5 000 001 refusé avec message explicite, jamais tronqué ; le record reste celui d'avant", async () => {
+await t("limite de vraisemblance exacte (3 h) : 32 100 500 accepté, au-delà refusé explicitement ; le record reste celui d'avant", async () => {
   const u = await player(); await play(u, "space", 227500, 300);
   await db.exec("update public.scores set created_at = now() - interval '1 minute'");
-  await fails(play(u, "space", 5000001, 2000), "invalid score");
+  await fails(play(u, "space", 40000000, 10700), "implausible score");
   assert.equal(await best(u, "space"), 227500);
-  const r = await play(u, "space", 5000000, 2000);
-  assert.equal(r.score, 5000000); assert.equal(r.best, 5000000);
+  const r = await play(u, "space", 32100500, 10700);
+  assert.equal(r.score, 32100500); assert.equal(r.best, 32100500);
 });
 await t("échec de sauvegarde = rien d'écrit et ticket intact : renvoi du même ticket possible, une seule récompense", async () => {
   const u = await player();
   const run = (await as(u, "select public.game_start('space') r"))[0].r;
-  await db.exec(`update public.game_runs set started_at = now() - interval '2000 seconds' where id = '${run}'`);
-  await fails(as(u, "select public.submit_score_v2('space', 5000001, $1)", [run]), "invalid score");   // échec
+  await db.exec(`update public.game_runs set started_at = now() - interval '300 seconds' where id = '${run}'`);
+  await fails(as(u, "select public.submit_score_v2('space', 99999999, $1)", [run]), "implausible score");   // échec
   assert.equal((await db.query("select count(*)::int c from public.scores where user_id = $1", [u])).rows[0].c, 0);
   assert.equal((await db.query("select used_at from public.game_runs where id = $1", [run])).rows[0].used_at, null, "ticket non consommé");
   const ok = (await as(u, "select public.submit_score_v2('space', 227500, $1) r", [run]))[0].r;     // renvoi

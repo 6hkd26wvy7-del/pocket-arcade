@@ -1288,7 +1288,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
   }
   // Ticket de partie (v22) : demandé à la base au premier instant de jeu ; le score n'est accepté qu'avec ce ticket et s'il
   // est vraisemblable pour la durée jouée. undefined = pas encore demandé, false = demande impossible, objet = en cours.
-  var SPACE_SCORE_MAX = 5000000;   // = game_max_score('space') (sql/schema_all.sql). Borne absolue, jamais utilisée pour tronquer (bug du 19/10 : record bloqué à 100 000)
+  var SPACE_SCORE_MAX = 9007199254740991;   // = game_max_score('space') = Number.MAX_SAFE_INTEGER : seule limite technique (entier exact en JS, JSON et bigint). Jamais utilisée pour tronquer (bug du 19/10 : record bloqué à 100 000)
   var runIds = {};
   function resetRun(game) { runIds[game] = undefined; }
   function ensureRun(game) {
@@ -4559,7 +4559,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
         return;
       }
       setMsg(m, "Envoi du score…");
-      if (value > SPACE_SCORE_MAX) { setMsg(m, "Score hors limites (" + value + ") : non envoyé, merci de nous le signaler.", true); return; }   // jamais de troncature silencieuse
+      if (!Number.isSafeInteger(value) || value < 0 || value > SPACE_SCORE_MAX) { setMsg(m, "Score hors limites : non envoyé, merci de nous le signaler.", true); return; }   // jamais de troncature silencieuse
       var r = await submitRanked("space", value);
       var d = reportRanked(m, "space", value, r);
       if (!d) return;
