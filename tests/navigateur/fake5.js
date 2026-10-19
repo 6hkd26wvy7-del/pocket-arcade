@@ -28,6 +28,8 @@ window.supabase = { createClient: function(){
      case 'rewarded_continue': return ok({ok:true,remaining_today:9,skip_ad:!!window.__premium});
      case 'submit_continued_score': window.__cont=a; return ok({xp:5,bc:0,level:5,level_up:false,ranked:false});
      case 'submit_score': window.__ranked=(window.__ranked||[]).concat([a]); return ok({xp:6,bc:2,level:5,level_up:false,new_badges:[]});
+     case 'game_start': window.__runs=(window.__runs||0)+1; return ok('run-'+window.__runs);
+     case 'submit_score_v2': window.__ranked=(window.__ranked||[]).concat([{p_game:a.p_game,p_score:a.p_score,p_run:a.p_run}]); return ok({xp:6,bc:2,level:5,level_up:false,new_badges:[]});
      case 'my_missions': return ok([]);
      case 'my_role': return ok(window.__role||null);
      case 'beta_survey_get': return ok(window.__survey||null);

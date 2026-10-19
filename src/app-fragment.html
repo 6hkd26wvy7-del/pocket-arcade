@@ -1286,6 +1286,21 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     });
     row.prepend(b);
   }
+  // Ticket de partie (v22) : demandé à la base au premier instant de jeu ; le score n'est accepté qu'avec ce ticket et s'il
+  // est vraisemblable pour la durée jouée. undefined = pas encore demandé, false = demande impossible, objet = en cours.
+  var runIds = {};
+  function resetRun(game) { runIds[game] = undefined; }
+  function ensureRun(game) {
+    if (runIds[game] !== undefined || !online || !sb || !session || !profile) return;
+    var tag = { pending: true }; runIds[game] = tag;
+    sb.rpc("game_start", { p_game: game }).then(function (r) { if (runIds[game] === tag) runIds[game] = (r.error || !r.data) ? false : r.data; });
+  }
+  function takeRun(game) { var r = runIds[game]; runIds[game] = undefined; return typeof r === "string" ? r : null; }
+  async function submitRanked(game, value) {
+    var rid = takeRun(game);
+    if (!rid) return { error: { message: "no run" } };
+    return sb.rpc("submit_score_v2", { p_game: game, p_score: value, p_run: rid });
+  }
   async function submitContinued(game, value, used, msgEl) {
     if (!sb || !session || !profile) return;
     var r = await sb.rpc("submit_continued_score", { p_game: game, p_score: value, p_continues: used });
@@ -3331,6 +3346,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
 
     var continues = 0;
     function reset() {
+      resetRun("snake");
       var cx = Math.floor(COLS / 2), cy = Math.floor(ROWS / 2);
       continues = 0; clearContinue($("snake-msg").nextElementSibling);
       body = [{ x: cx, y: cy }, { x: cx - 1, y: cy }, { x: cx - 2, y: cy }];
@@ -3450,12 +3466,14 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
         return;
       }
       setMsg(m, "Envoi du score…");
-      var r = await sb.rpc("submit_score", { p_game: "snake", p_score: value });
+      var r = await submitRanked("snake", value);
       if (r.error) {
         var em = String(r.error.message || "");
         if (em.indexOf("maintenance") >= 0) setMsg(m, "Maintenance en cours : score non enregistré.", true);
         else if (em.indexOf("beta") >= 0) setMsg(m, "Bêta privée : ton compte n'est pas encore ajouté, score non enregistré.", true);
         else if (em.indexOf("banned") >= 0) setMsg(m, "Ton compte est suspendu : score non enregistré.", true);
+        else if (em === "no run") setMsg(m, "Score non enregistré : la partie a commencé avant ta connexion. Rejoue une partie.", true);
+        else if (em.indexOf("implausible") >= 0 || em.indexOf("invalid run") >= 0) setMsg(m, "Score refusé : partie non valide. Rejoue une partie.", true);
         else setMsg(m, "Score non envoyé. Joue une autre partie pour réessayer.", true);
         return;
       }
@@ -3587,6 +3605,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
 
     function frame(now) {
       if (current !== "snake") { running = false; return; }
+      if (state === "playing" && continues === 0) ensureRun("snake");
       if (last == null) last = now;
       var dt = Math.min(now - last, 250);
       last = now;
@@ -3758,6 +3777,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       if (!BL.fits(grid, cur, curX, curY)) finish();
     }
     function reset() {
+      resetRun("blocks");
       grid = BL.newGrid(); bag = []; next = null; score = 0; lines = 0; level = 1; acc = 0;
       state = "ready";
       setMsg($("bl-msg"), "");
@@ -3806,13 +3826,15 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
         return;
       }
       setMsg(m, "Envoi du score…");
-      var r = await sb.rpc("submit_score", { p_game: "blocks", p_score: value });
+      var r = await submitRanked("blocks", value);
       if (r.error) {
         var em = String(r.error.message || "");
         if (em.indexOf("maintenance") >= 0) setMsg(m, "Maintenance en cours : score non enregistré.", true);
         else if (em.indexOf("beta") >= 0) setMsg(m, "Bêta privée : ton compte n'est pas encore ajouté, score non enregistré.", true);
         else if (em.indexOf("banned") >= 0) setMsg(m, "Ton compte est suspendu : score non enregistré.", true);
         else if (em.indexOf("unknown game") >= 0) setMsg(m, "Ce jeu n'est pas encore ouvert au classement.", true);
+        else if (em === "no run") setMsg(m, "Score non enregistré : la partie a commencé avant ta connexion. Rejoue une partie.", true);
+        else if (em.indexOf("implausible") >= 0 || em.indexOf("invalid run") >= 0) setMsg(m, "Score refusé : partie non valide. Rejoue une partie.", true);
         else setMsg(m, "Score non envoyé. Joue une autre partie pour réessayer.", true);
         return;
       }
@@ -3884,6 +3906,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
 
     function frame(now) {
       if (current !== "blocks") { running = false; return; }
+      if (state === "playing") ensureRun("blocks");
       var dt = Math.min(100, now - last);
       last = now;
       if (state === "playing") {
@@ -4460,7 +4483,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     var best = localBest("space");
 
     var continues = 0;
-    function reset() { g = SP.create(); state = "ready"; targetX = null; continues = 0; setMsg($("sp-msg"), ""); clearContinue($("sp-msg").nextElementSibling); }
+    function reset() { resetRun("space"); g = SP.create(); state = "ready"; targetX = null; continues = 0; setMsg($("sp-msg"), ""); clearContinue($("sp-msg").nextElementSibling); }
     function finish() {
       state = "over";
       if (continues > 0) submitContinued("space", Math.min(g.score, 100000), continues, $("sp-msg"));   // hors classement
@@ -4493,13 +4516,15 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
         return;
       }
       setMsg(m, "Envoi du score…");
-      var r = await sb.rpc("submit_score", { p_game: "space", p_score: Math.min(value, 100000) });   // plafond de la base (v17)
+      var r = await submitRanked("space", Math.min(value, 100000));   // plafond de la base (v17)
       if (r.error) {
         var em = String(r.error.message || "");
         if (em.indexOf("maintenance") >= 0) setMsg(m, "Maintenance en cours : score non enregistré.", true);
         else if (em.indexOf("beta") >= 0) setMsg(m, "Bêta privée : ton compte n'est pas encore ajouté, score non enregistré.", true);
         else if (em.indexOf("banned") >= 0) setMsg(m, "Ton compte est suspendu : score non enregistré.", true);
         else if (em.indexOf("unknown game") >= 0) setMsg(m, "Ce jeu n'est pas encore ouvert au classement.", true);
+        else if (em === "no run") setMsg(m, "Score non enregistré : la partie a commencé avant ta connexion. Rejoue une partie.", true);
+        else if (em.indexOf("implausible") >= 0 || em.indexOf("invalid run") >= 0) setMsg(m, "Score refusé : partie non valide. Rejoue une partie.", true);
         else setMsg(m, "Score non envoyé. Joue une autre partie pour réessayer.", true);
         return;
       }
@@ -4592,6 +4617,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
 
     function frame(now) {
       if (current !== "space") { running = false; return; }
+      if (state === "playing" && continues === 0) ensureRun("space");
       var dt = Math.min(0.1, (now - last) / 1000);
       last = now;
       if (state === "playing") {

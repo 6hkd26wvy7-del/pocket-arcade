@@ -15,6 +15,12 @@ def must_fail(fn, word):
     raise AssertionError("aurait dû être refusé (" + word + ")")
 
 srv, d = start(); c = connect(srv)
+def play(uid, game, value, ago=600):
+    """Envoie un score comme le site depuis la v22 : ticket de partie puis submit_score_v2 (partie commencée il y a `ago` s)."""
+    rid = as_user(c, uid, "select game_start(%s)", (game,))[0][0]
+    sql("update game_runs set started_at = now() - make_interval(secs => %s) where id = %s", (ago, rid))
+    sql("update scores set created_at = now() - interval '1 minute' where user_id = %s", (uid,))
+    return as_user(c, uid, "select submit_score_v2(%s, %s, %s)", (game, value, rid))[0][0]
 def sql(q, a=None):
     with c.cursor() as cur:
         cur.execute(q, a)
@@ -40,6 +46,7 @@ try:
     run_file(c, f"{REPO}/schema_v19_liste_joueurs.sql"); run_file(c, f"{REPO}/schema_v19_liste_joueurs.sql")
     run_file(c, f"{REPO}/schema_v20_fiche_joueur.sql"); run_file(c, f"{REPO}/schema_v20_fiche_joueur.sql")
     run_file(c, f"{REPO}/schema_v21_stockage_marketing.sql"); run_file(c, f"{REPO}/schema_v21_stockage_marketing.sql")
+    run_file(c, f"{REPO}/schema_v22_tickets_partie.sql"); run_file(c, f"{REPO}/schema_v22_tickets_partie.sql")
     run_file(c, f"{REPO}/schema_v6_v7.sql")   # la liste blanche relancée garde les fonctions du questionnaire
     sql("update public.app_settings set value = 'false' where key = 'maintenance'") if sql("select to_regclass('public.app_settings')")[0][0] else None
     print("app_settings:", sql("select * from public.app_settings"))
@@ -107,7 +114,7 @@ try:
     t("boyblocks_finish (score recalculé)", lambda: as_user(c, U2, "select boyblocks_finish(%s, %s::jsonb)", (run_id, json.dumps(moves)))[0][0])
     t("partie déjà terminée refusée", lambda: must_fail(lambda: as_user(c, U2, "select boyblocks_finish(%s, %s::jsonb)", (run_id, json.dumps(moves))), "invalid run"))
     t("partie d'un autre joueur refusée", lambda: must_fail(lambda: as_user(c, U3, "select boyblocks_finish(%s, '[]'::jsonb)", (run_id,)), "invalid run"))
-    t("submit_score('boyblocks') refusé (score non vérifié)", lambda: must_fail(lambda: as_user(c, U2, "select submit_score('boyblocks', 99999)"), "unknown game"))
+    t("submit_score('boyblocks') refusé (score non vérifié)", lambda: must_fail(lambda: as_user(c, U2, "select submit_score('boyblocks', 99999)"), "permission denied"))   # v22 : plus aucun envoi direct
     t("bb_replay non appelable par un joueur", lambda: must_fail(lambda: as_user(c, U2, "select * from bb_replay(1, '[]'::jsonb)"), "permission denied"))
     t("tables BoyBlocks illisibles", lambda: must_fail(lambda: as_user(c, U2, "select * from boyblocks_runs"), "permission denied"))
     t("mission bb_1500 visible", lambda: [m for m in as_user(c, U2, "select code, progress from my_missions()") if m[0]=='bb_1500'])
@@ -165,7 +172,7 @@ console.log(JSON.stringify({moves:g.log,score:g.score}));""" % os.path.join(os.p
     def cap_applies():
         as_user(c, U1, "select staff_economy_set('game_bc_daily_cap', '2'::jsonb)")
         sql("update scores set created_at = now() - interval '1 minute'")
-        r = as_user(c, U2, "select submit_score('space', 6000)")[0][0]["bc"]
+        r = play(U2, "space", 6000)["bc"]
         as_user(c, U1, "select staff_economy_set('game_bc_daily_cap', '150'::jsonb)")
         return r
     t("plafond modifié appliqué aux parties (2 BC max)", lambda: cap_applies() <= 2 or (_ for _ in ()).throw(Exception("plafond non appliqué")))
@@ -322,10 +329,27 @@ console.log(JSON.stringify({moves:g.log,score:g.score}));""" % os.path.join(os.p
     sql("delete from beta_invite_fails"); sql("insert into beta_members (user_id) values (%s) on conflict do nothing", (U3,))
     sql("update app_settings set value = '{\"on\": false}' where key = 'beta'")
 
+    print("== v22 : ticket de partie, scores vraisemblables")
+    t("envoi direct de score fermé aux joueurs", lambda: must_fail(lambda: as_user(c, U2, "select submit_score('snake', 10)"), "permission denied"))
+    t("partie normale acceptée (Snake 40 pommes en 5 min)", lambda: play(U2, "snake", 40, 300)["xp"])
+    t("score impossible refusé (Snake 300 pommes en 10 s)", lambda: must_fail(lambda: play(U2, "snake", 300, 10), "implausible score"))
+    t("Space 100 000 en 10 s refusé", lambda: must_fail(lambda: play(U2, "space", 99000, 10), "implausible score"))
+    t("Block Drop 14 100 en 5 min accepté", lambda: play(U2, "blocks", 14100, 300)["xp"])
+    rid = as_user(c, U2, "select game_start('snake')")[0][0]
+    sql("update game_runs set started_at = now() - interval '5 minutes' where id = %s", (rid,)); sql("update scores set created_at = now() - interval '1 minute' where user_id = %s", (U2,))
+    as_user(c, U2, "select submit_score_v2('snake', 5, %s)", (rid,))
+    t("ticket utilisable une seule fois", lambda: must_fail(lambda: as_user(c, U2, "select submit_score_v2('snake', 5, %s)", (rid,)), "invalid run"))
+    rid2 = as_user(c, U2, "select game_start('space')")[0][0]
+    t("ticket d'un autre jeu refusé", lambda: must_fail(lambda: as_user(c, U2, "select submit_score_v2('snake', 5, %s)", (rid2,)), "invalid run"))
+    t("ticket d'un autre joueur refusé", lambda: must_fail(lambda: as_user(c, U1, "select submit_score_v2('space', 5, %s)", (rid2,)), "invalid run"))
+    t("jeu inconnu refusé", lambda: must_fail(lambda: as_user(c, U2, "select game_start('boyblocks')"), "unknown game"))
+    t("visiteur refusé", lambda: must_fail(lambda: as_user(c, None, "select game_start('snake')"), "permission denied"))
+    t("tickets illisibles en direct", lambda: must_fail(lambda: as_user(c, U2, "select * from game_runs"), "permission denied"))
+
     print("== v17 : plafond Space Attack")
-    t("score Space 45 000 accepté (bloqué à 20 000 avant)", lambda: (sql("update scores set created_at = now() - interval '1 minute' where user_id = %s", (U2,)), as_user(c, U2, "select submit_score('space', 45000)->>'xp'")[0][0])[1])
-    t("score Space au-delà de 100 000 refusé", lambda: (sql("update scores set created_at = now() - interval '1 minute' where user_id = %s", (U2,)), must_fail(lambda: as_user(c, U2, "select submit_score('space', 100001)"), "invalid score"))[1])
-    t("plafond Snake inchangé", lambda: (sql("update scores set created_at = now() - interval '1 minute' where user_id = %s", (U2,)), must_fail(lambda: as_user(c, U2, "select submit_score('snake', 430)"), "invalid score"))[1])
+    t("score Space 45 000 accepté (bloqué à 20 000 avant)", lambda: play(U2, "space", 45000)["xp"])
+    t("score Space au-delà de 100 000 refusé", lambda: must_fail(lambda: play(U2, "space", 100001), "invalid score"))
+    t("plafond Snake inchangé", lambda: must_fail(lambda: play(U2, "snake", 430), "invalid score"))
 
     print("== v16 : espace bêta, missions, badge sur validation")
     t("migration : aucun badge attribué automatiquement", lambda: (badges_avant, badges_apres) if badges_avant == badges_apres else (_ for _ in ()).throw(Exception("badges modifiés")))

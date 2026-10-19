@@ -2137,7 +2137,7 @@ revoke insert, update, delete, truncate on public.bug_reports from anon, authent
 -- Désormais : AUCUNE fonction n'est appelable, sauf la liste blanche ci-dessous.
 do $$
 declare r record;
-  api text[] := array['arena_check', 'beta_mission_set', 'beta_redeem', 'beta_space', 'beta_survey_get', 'beta_survey_save', 'block_user', 'boyblocks_finish', 'boyblocks_start', 'boyblocks_start_v2', 'boyblocks_start_v3', 'game_settings_public', 'my_tiers', 'public_tiers', 'set_favorites', 'sync_tiers', 'buy_item', 'claim_daily', 'claim_mission', 'claim_season_rewards', 'conversation', 'delete_my_account', 'economy_public', 'equip_item', 'get_maintenance', 'leaderboard', 'leaderboard_friends', 'leaderboard_season', 'mark_notifications_read', 'me', 'monetization_public', 'my_access', 'my_blocks', 'my_friends', 'my_missions', 'my_notifications', 'my_role', 'my_season_rewards', 'my_standing', 'public_profile', 'remove_friend', 'report_user', 'rewarded_continue', 'respond_friend_request', 'send_friend_request', 'send_message', 'set_avatar', 'set_featured_badge', 'submit_bug_report', 'submit_continued_score', 'submit_score', 'unblock_user'];
+  api text[] := array['arena_check', 'beta_mission_set', 'beta_redeem', 'beta_space', 'beta_survey_get', 'beta_survey_save', 'block_user', 'boyblocks_finish', 'boyblocks_start', 'boyblocks_start_v2', 'boyblocks_start_v3', 'game_settings_public', 'my_tiers', 'public_tiers', 'set_favorites', 'sync_tiers', 'buy_item', 'claim_daily', 'claim_mission', 'claim_season_rewards', 'conversation', 'delete_my_account', 'economy_public', 'equip_item', 'get_maintenance', 'leaderboard', 'leaderboard_friends', 'leaderboard_season', 'mark_notifications_read', 'me', 'monetization_public', 'my_access', 'my_blocks', 'my_friends', 'my_missions', 'my_notifications', 'my_role', 'my_season_rewards', 'my_standing', 'public_profile', 'remove_friend', 'report_user', 'rewarded_continue', 'respond_friend_request', 'send_friend_request', 'send_message', 'set_avatar', 'set_featured_badge', 'submit_bug_report', 'submit_continued_score', 'game_start', 'submit_score_v2', 'unblock_user'];
   anon_ok text[] := array['get_maintenance','leaderboard','leaderboard_season','monetization_public','game_settings_public'];
 begin
   revoke execute on all functions in schema public from public, anon, authenticated;
@@ -4116,3 +4116,65 @@ begin
 end $$;
 revoke all on function public.staff_player_detail(text) from public, anon;
 grant execute on function public.staff_player_detail(text) to authenticated;
+
+-- BOYGAMES schema v22 — ticket de partie et vraisemblance des scores solo. Voir schema_v22_tickets_partie.sql.
+create table if not exists public.game_runs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  game text not null check (game in ('snake', 'space', 'blocks')),
+  started_at timestamptz not null default now(),
+  used_at timestamptz
+);
+create index if not exists game_runs_user on public.game_runs (user_id, started_at desc);
+alter table public.game_runs enable row level security;
+revoke all on public.game_runs from anon, authenticated;
+
+-- Score maximal vraisemblable pour une durée donnée (en secondes). Volontairement large : ne refuse que l'impossible.
+create or replace function public.score_plausible(p_game text, p_score int, p_seconds numeric) returns boolean
+language plpgsql immutable as $$
+declare k int; total bigint := 0;
+begin
+  if p_game = 'snake' then
+    return p_score * 0.26 <= p_seconds + 2;                 -- vitesse max : 130 ms par case, au moins 2 cases par pomme
+  elsif p_game = 'space' then
+    return p_score <= 500 + p_seconds * 3000;              -- mesuré : ~2 700 pts/s avec 2 vaisseaux Difficile et bonus
+  elsif p_game = 'blocks' then
+    for k in 1 .. greatest(1, floor(p_seconds / 2)::int + 1) loop   -- un tétris toutes les 2 s, au niveau atteint
+      total := total + 800 * (1 + floor(0.4 * (k - 1)));
+      exit when total > p_score;
+    end loop;
+    return p_score <= total + 2000;                        -- + points de descente rapide
+  end if;
+  return false;
+end $$;
+
+-- Début de partie : ticket à usage unique
+create or replace function public.game_start(p_game text) returns uuid language plpgsql security definer set search_path = public as $$
+declare uid uuid := auth.uid(); rid uuid;
+begin
+  perform public.guard_action(uid);
+  if p_game not in ('snake', 'space', 'blocks') then raise exception 'unknown game'; end if;
+  if (select count(*) from public.game_runs where user_id = uid and started_at > now() - interval '10 minutes') >= 60 then raise exception 'too many'; end if;
+  delete from public.game_runs where user_id = uid and started_at < now() - interval '1 day';    -- ménage des vieux tickets
+  insert into public.game_runs (user_id, game) values (uid, p_game) returning id into rid;
+  return rid;
+end $$;
+
+-- Fin de partie : contrôle du ticket et de la vraisemblance, puis enregistrement habituel (submit_score)
+create or replace function public.submit_score_v2(p_game text, p_score int, p_run uuid) returns jsonb language plpgsql security definer set search_path = public as $$
+declare uid uuid := auth.uid(); r public.game_runs; secs numeric;
+begin
+  perform public.guard_action(uid);
+  select * into r from public.game_runs where id = p_run for update;
+  if not found or r.user_id <> uid or r.game <> p_game or r.used_at is not null then raise exception 'invalid run'; end if;
+  if r.started_at < now() - interval '3 hours' then raise exception 'invalid run'; end if;
+  secs := extract(epoch from now() - r.started_at);
+  update public.game_runs set used_at = now() where id = p_run;
+  if not public.score_plausible(p_game, p_score, secs) then raise exception 'implausible score'; end if;
+  return public.submit_score(p_game, p_score);
+end $$;
+
+revoke all on function public.score_plausible(text, int, numeric) from public, anon, authenticated;
+revoke all on function public.game_start(text), public.submit_score_v2(text, int, uuid) from public, anon;
+grant execute on function public.game_start(text), public.submit_score_v2(text, int, uuid) to authenticated;
+revoke execute on function public.submit_score(text, int) from public, anon, authenticated;     -- plus d'envoi direct
