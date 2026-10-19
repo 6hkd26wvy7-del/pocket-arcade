@@ -47,9 +47,9 @@ const best = async (uid, game) => { const m = (await db.query("select max(score)
 const fails = (p, msg) => assert.rejects(p, (e) => e.message.includes(msg), "attendu : " + msg);
 let n = 0; const t = async (name, fn) => { try { await fn(); } catch (e) { console.error("ECHEC -", name, "\n", e.message); process.exit(1); } n++; console.log("ok -", name); };
 
-await t("limites : Space = entier sûr JavaScript (2^53-1), Snake 429 et Blocks inchangés", async () => {
-  const r = (await db.query("select public.game_max_score('space')::text s, public.game_max_score('snake') n, public.game_max_score('blocks') b, public.game_max_score('autre') x")).rows[0];
-  assert.deepEqual(r, { s: "9007199254740991", n: 429, b: 50000, x: 0 });
+await t("limites : Space = entier sûr JavaScript (2^53-1), Snake 429 (maximum de la grille), Blocks sans plafond fixe", async () => {
+  const r = (await db.query("select public.game_max_score('space')::text s, public.game_max_score('snake') n, public.game_max_score('blocks')::text b, public.game_max_score('autre') x")).rows[0];
+  assert.deepEqual(r, { s: "9007199254740991", n: 429, b: "9007199254740991", x: 0 });
 });
 await t("le bug : une partie à 200 000 en 2 minutes est enregistrée en entier, le record monte", async () => {
   const u = await player();
@@ -184,6 +184,17 @@ await t("opération admin de restauration : rollback par défaut sans effet ; co
   await assert.rejects(db.exec(sql.replace(/\nrollback;/, "\ncommit;")), /aucune ligne Space/);   // rejeu : rien à corriger, abandon
   await db.exec("rollback");
   assert.deepEqual(await state(), apres);
+});
+
+await t("Block Drop : plus de plafond fixe de 50 000 ; borne par durée : score élevé en peu de temps refusé, score élevé sur longue partie accepté", async () => {
+  const u = await player();
+  await fails(play(u, "blocks", 100000, 30), "implausible score");      // trop haut pour 30 s (l'ancienne borne l'aurait laissé passer)
+  await db.exec("update public.scores set created_at = now() - interval '1 minute'");
+  await fails(play(u, "blocks", 60000, 60), "implausible score");
+  const a = await play(u, "blocks", 14100, 300); assert.equal(a.score, 14100);          // partie normale
+  await db.exec("update public.scores set created_at = now() - interval '1 minute'");
+  const b = await play(u, "blocks", 300000, 1200); assert.equal(b.score, 300000); assert.equal(b.best, 300000);   // longue partie légitime, au-dessus de 50 000
+  assert.equal(await best(u, "blocks"), 300000);
 });
 
 console.log(n + " tests OK");

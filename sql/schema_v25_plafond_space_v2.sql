@@ -9,7 +9,7 @@
 -- seconde pour Space, ticket valable 3 h). Gains d'XP (60 max) et BOYCOINS (barème et plafond journalier) inchangés.
 -- Autres ajouts : submit_score_v2 renvoie `score` (stocké) et `best` (record) ; submit_continued_score exige une continuation réellement
 -- accordée (rewarded_continue, usage unique) ; my_missions écrête sa progression à 2^31 - 1 (objectifs très inférieurs).
--- Limites conservées et signalées : Snake 429 (maximum de la grille), Block Drop 50 000, BoyBlocks (rejeu complet, colonne integer).
+-- Limites conservées et signalées : Snake 429 (maximum de la grille), BoyBlocks (rejeu complet, colonne integer).
 begin;
 
 do $$ begin
@@ -43,11 +43,11 @@ drop function if exists public.my_standing(text, text);
 create or replace function public.game_max_score(p_game text)
 returns bigint language sql immutable as $$
   -- Aucun plafond arbitraire pour Space : seule borne = plus grand entier exact en JavaScript (Number.MAX_SAFE_INTEGER, 2^53 - 1).
-  -- Snake : 429 = cases de la grille (18 x 24) moins le serpent de départ (3), maximum réel. Blocks : 50 000 inchangé (voir README/PR).
+  -- Snake : 429 = cases de la grille (18 x 24) moins le serpent de départ (3), maximum réel. Blocks : plus de plafond fixe non plus (borne par durée dans score_plausible).
   -- La vraisemblance (score_plausible : durée de la partie) reste la protection contre la triche.
   select case p_game
     when 'snake' then 429::bigint
-    when 'blocks' then 50000::bigint
+    when 'blocks' then 9007199254740991::bigint
     when 'space' then 9007199254740991::bigint
     else 0::bigint
   end;
@@ -72,18 +72,22 @@ create or replace function public.score_plausible(p_game text, p_score bigint, p
  LANGUAGE plpgsql
  IMMUTABLE
 AS $function$
-declare k int; total bigint := 0;
+declare k int; total bigint := 0; pieces bigint;
 begin
   if p_game = 'snake' then
     return p_score * 0.26 <= p_seconds + 2;                 -- vitesse max : 130 ms par case, au moins 2 cases par pomme
   elsif p_game = 'space' then
     return p_score <= 500 + p_seconds * 3000;              -- mesuré : ~2 700 pts/s avec 2 vaisseaux Difficile et bonus
   elsif p_game = 'blocks' then
-    for k in 1 .. greatest(1, floor(p_seconds / 2)::int + 1) loop   -- un tétris toutes les 2 s, au niveau atteint
+    -- v25 : borne par durée remplaçant le plafond fixe de 50 000. Hypothèses les plus généreuses possibles : 2,5 pièces par seconde
+    -- en continu (record humain soutenu ~2), uniquement des « tétris » (4 lignes = 10 pièces, soit 0,1 tétris par pièce), niveau +1 toutes
+    -- les 10 lignes (règles du jeu : 800 x niveau par tétris) et 36 points de descente rapide par pièce (2 x 18 lignes).
+    pieces := floor(p_seconds * 2.5)::bigint + 3;
+    for k in 1 .. ceil(pieces * 0.1)::int loop
       total := total + 800 * (1 + floor(0.4 * (k - 1)));
       exit when total > p_score;
     end loop;
-    return p_score <= total + 2000;                        -- + points de descente rapide
+    return p_score <= total + 36 * pieces;
   end if;
   return false;
 end $function$;
@@ -319,7 +323,7 @@ grant execute on function public.submit_score_v2(text, bigint, uuid), public.sub
 grant execute on function public.leaderboard(text, text, integer), public.leaderboard_season(text, text, integer) to anon, authenticated;
 
 do $$ begin
-  if public.game_max_score('space') <> 9007199254740991 or public.game_max_score('snake') <> 429 or public.game_max_score('blocks') <> 50000
+  if public.game_max_score('space') <> 9007199254740991 or public.game_max_score('snake') <> 429 or public.game_max_score('blocks') <> 9007199254740991
      or public.game_max_score('autre') <> 0
      or has_function_privilege('authenticated', 'public.submit_score(text,bigint)', 'execute')
      or not has_function_privilege('authenticated', 'public.submit_score_v2(text,bigint,uuid)', 'execute') then
