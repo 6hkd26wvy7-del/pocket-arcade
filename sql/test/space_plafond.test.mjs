@@ -84,13 +84,85 @@ await t("récompenses non gonflées : un score de 2 000 000 donne au plus 60 XP 
   const u = await player(); const r = await play(u, "space", 2000000, 1000);
   assert.ok(r.xp <= 65, "xp " + r.xp); assert.ok(r.bc <= 26, "bc " + r.bc);
 });
-await t("le site n'envoie plus de score tronqué : même constante que la base, aucune troncature à 100 000", async () => {
+await t("le site n'envoie plus de score tronqué : aucune troncature, constante = plafond absolu de la base", async () => {
   const html = read("../../src/app-fragment.html");
   const cap = Number(/var SPACE_SCORE_MAX = (\d+);/.exec(html)[1]);
   assert.equal(cap, (await db.query("select public.game_max_score('space')::int c")).rows[0].c, "constante du site = plafond de la base");
-  assert.ok(!/Math\.min\([^)]*,\s*100000\)/.test(html), "plus de Math.min(..., 100000)");
-  const uses = html.match(/Math\.min\([^)]*SPACE_SCORE_MAX\)/g) || [];
-  assert.equal(uses.length, 2, "envoi classé + partie continuée");
+  assert.ok(!/Math\.min\([^)]*(SPACE_SCORE_MAX|100000)[^)]*\)/.test(html), "plus aucun Math.min sur le score");
+  assert.ok(/submitRanked\("space", value\)/.test(html) && /submitContinued\("space", g\.score,/.test(html), "le score envoyé est le score du jeu");
+});
+await t("scores de référence 20 000, 100 000, 227 500 (capture), 500 000 : score réel = envoyé = accepté = stocké = classement = profil", async () => {
+  for (const [score, secs] of [[20000, 60], [100000, 120], [227500, 300], [500000, 400]]) {
+    const u = await player();
+    const r = await play(u, "space", score, secs);
+    assert.equal(r.score, score, "score accepté renvoyé");
+    assert.equal(r.best, score, "record en ligne renvoyé");
+    assert.equal(await best(u, "space"), score, "stocké en base");
+    const lb = (await as(u, "select * from public.leaderboard('space', null, 100)")).find((x) => x.moi);
+    assert.equal(lb.score, score, "classement monde");
+    const pf = (await as(u, "select public.public_profile($1) p", [`joueur_${k}`]))[0].p;
+    assert.ok(JSON.stringify(pf).includes(String(score)), "fiche profil");
+  }
+});
+await t("capture du 19/10 : 227 500 points, vague 64 → +65 XP, BOYCOINS plafonnés, une seule partie, record 227 500 (pas 100 000)", async () => {
+  const u = await player(); const r = await play(u, "space", 227500, 300);
+  assert.equal(r.xp, 65); assert.ok(r.bc <= 26); assert.equal(r.best, 227500);
+  assert.equal((await db.query("select count(*)::int c from public.scores where user_id = $1", [u])).rows[0].c, 1);
+});
+await t("limites : 5 000 000 accepté, 5 000 001 refusé avec message explicite, jamais tronqué ; le record reste celui d'avant", async () => {
+  const u = await player(); await play(u, "space", 227500, 300);
+  await db.exec("update public.scores set created_at = now() - interval '1 minute'");
+  await fails(play(u, "space", 5000001, 2000), "invalid score");
+  assert.equal(await best(u, "space"), 227500);
+  const r = await play(u, "space", 5000000, 2000);
+  assert.equal(r.score, 5000000); assert.equal(r.best, 5000000);
+});
+await t("échec de sauvegarde = rien d'écrit et ticket intact : renvoi du même ticket possible, une seule récompense", async () => {
+  const u = await player();
+  const run = (await as(u, "select public.game_start('space') r"))[0].r;
+  await db.exec(`update public.game_runs set started_at = now() - interval '2000 seconds' where id = '${run}'`);
+  await fails(as(u, "select public.submit_score_v2('space', 5000001, $1)", [run]), "invalid score");   // échec
+  assert.equal((await db.query("select count(*)::int c from public.scores where user_id = $1", [u])).rows[0].c, 0);
+  assert.equal((await db.query("select used_at from public.game_runs where id = $1", [run])).rows[0].used_at, null, "ticket non consommé");
+  const ok = (await as(u, "select public.submit_score_v2('space', 227500, $1) r", [run]))[0].r;     // renvoi
+  assert.equal(ok.score, 227500);
+  await fails(as(u, "select public.submit_score_v2('space', 227500, $1)", [run]), "invalid run");   // un 2e renvoi ne double rien
+  assert.equal((await db.query("select xp from public.player_stats where user_id = $1", [u])).rows[0].xp, ok.xp);
+  assert.equal((await db.query("select count(*)::int c from public.scores where user_id = $1", [u])).rows[0].c, 1);
+});
+await t("reprise par vidéo : récompense de participation liée à une vidéo réellement accordée, usage unique, hors classement", async () => {
+  await db.exec(`insert into public.monetization_settings (key, value) values ('rewarded', '{"enabled": true, "games": ["space"], "daily_max": 10, "continue_max": 1, "bc_per_continue": 5}')
+                 on conflict (key) do update set value = excluded.value`);
+  const u = await player();
+  await fails(as(u, "select public.submit_continued_score('space', 227500, 1)"), "no continue");       // sans vidéo : rien
+  await as(u, "select public.rewarded_continue('space')");
+  const xp0 = (await db.query("select xp from public.player_stats where user_id = $1", [u])).rows[0].xp;
+  const r = (await as(u, "select public.submit_continued_score('space', 227500, 1) r"))[0].r;
+  assert.equal(r.ranked, false); assert.equal(r.xp, 5);
+  await db.exec("update public.scores_continued set created_at = now() - interval '1 minute'");
+  await fails(as(u, "select public.submit_continued_score('space', 227500, 1)"), "no continue");       // pas de 2e récompense
+  assert.equal((await db.query("select xp from public.player_stats where user_id = $1", [u])).rows[0].xp, xp0 + 5);
+  assert.equal(await best(u, "space"), null, "la partie continuée n'entre pas dans les records");
+});
+
+await t("opération admin de restauration : rollback par défaut sans effet ; commit = une seule ligne corrigée, XP/BC intacts, journalisée, rejouable sans effet", async () => {
+  const u = await player(); const pseudo = `joueur_${k}`;
+  await play(u, "space", 100000, 300);   // la partie tronquée du 19/10
+  const sql = read("../admin_restauration_record_space.sql").replaceAll("MON_PSEUDO", pseudo);
+  const state = async () => ({ best: await best(u, "space"), n: (await db.query("select count(*)::int c from public.scores where user_id = $1", [u])).rows[0].c,
+    st: (await db.query("select xp, level, bc from public.player_stats where user_id = $1", [u])).rows[0], led: (await db.query("select count(*)::int c from public.bc_ledger where user_id = $1", [u])).rows[0].c });
+  const avant = await state();
+  await db.exec(sql);                                                     // rollback par défaut
+  assert.deepEqual(await state(), avant);
+  assert.equal((await db.query("select count(*)::int c from public.admin_actions where action = 'restauration_record_space'")).rows[0].c, 0);
+  await db.exec(sql.replace(/\nrollback;/, "\ncommit;"));               // application
+  const apres = await state();
+  assert.equal(apres.best, 227500); assert.equal(apres.n, avant.n); assert.deepEqual(apres.st, avant.st); assert.equal(apres.led, avant.led);
+  assert.equal((await db.query("select count(*)::int c from public.admin_actions where action = 'restauration_record_space' and target_user = $1", [u])).rows[0].c, 1);
+  assert.equal((await as(u, "select * from public.leaderboard('space', null, 100)")).find((x) => x.moi).score, 227500);
+  await assert.rejects(db.exec(sql.replace(/\nrollback;/, "\ncommit;")), /aucune ligne Space/);   // rejeu : rien à corriger, abandon
+  await db.exec("rollback");
+  assert.deepEqual(await state(), apres);
 });
 
 console.log(n + " tests OK");

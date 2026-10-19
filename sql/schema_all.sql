@@ -3019,6 +3019,7 @@ create table if not exists public.ad_events (
   game text not null default '', created_at timestamptz not null default now()
 );
 create index if not exists ad_events_user_day on public.ad_events (user_id, created_at);
+alter table public.ad_events add column if not exists used_at timestamptz;   -- v25 : continuation consommée par submit_continued_score
 alter table public.ad_events enable row level security;
 revoke all on public.ad_events from anon, authenticated;
 
@@ -3143,6 +3144,11 @@ begin
   if p_continues is null or p_continues < 1 or p_continues > least(5, coalesce((r ->> 'continue_max')::int, 1)) then raise exception 'invalid continues'; end if;
   select max(created_at) into last_at from public.scores_continued where user_id = uid;
   if last_at is not null and last_at > now() - interval '8 seconds' then raise exception 'too fast'; end if;
+  -- v25 : chaque score de partie continuée consomme UNE continuation réellement accordée (rewarded_continue) : sans elle, pas de récompense
+  update public.ad_events set used_at = now()
+   where id = (select id from public.ad_events where user_id = uid and kind = 'rewarded_continue' and game = p_game
+                  and used_at is null and created_at > now() - interval '3 hours' order by id limit 1 for update skip locked);
+  if not found then raise exception 'no continue'; end if;
   insert into public.player_stats (user_id) values (uid) on conflict do nothing;
   insert into public.scores_continued (user_id, game, score, continues) values (uid, p_game, p_score, p_continues);
   xp_gain := 5;                                                    -- XP de participation seulement
@@ -4162,7 +4168,7 @@ end $$;
 
 -- Fin de partie : contrôle du ticket et de la vraisemblance, puis enregistrement habituel (submit_score)
 create or replace function public.submit_score_v2(p_game text, p_score int, p_run uuid) returns jsonb language plpgsql security definer set search_path = public as $$
-declare uid uuid := auth.uid(); r public.game_runs; secs numeric;
+declare uid uuid := auth.uid(); r public.game_runs; secs numeric; res jsonb; top int;
 begin
   perform public.guard_action(uid);
   select * into r from public.game_runs where id = p_run for update;
@@ -4171,7 +4177,10 @@ begin
   secs := extract(epoch from now() - r.started_at);
   update public.game_runs set used_at = now() where id = p_run;
   if not public.score_plausible(p_game, p_score, secs) then raise exception 'implausible score'; end if;
-  return public.submit_score(p_game, p_score);
+  -- v25 : la réponse porte le score réellement stocké et le meilleur score en ligne, pour que le site n'affiche « Score enregistré » qu'avec la valeur confirmée
+  res := public.submit_score(p_game, p_score);     -- d'abord l'enregistrement, puis la lecture du record (ordre explicite)
+  select max(score) into top from public.scores where user_id = uid and game = p_game;
+  return res || jsonb_build_object('score', p_score, 'best', top);
 end $$;
 
 revoke all on function public.score_plausible(text, int, numeric) from public, anon, authenticated;

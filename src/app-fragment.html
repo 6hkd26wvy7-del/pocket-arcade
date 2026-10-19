@@ -1288,7 +1288,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
   }
   // Ticket de partie (v22) : demandé à la base au premier instant de jeu ; le score n'est accepté qu'avec ce ticket et s'il
   // est vraisemblable pour la durée jouée. undefined = pas encore demandé, false = demande impossible, objet = en cours.
-  var SPACE_SCORE_MAX = 5000000;   // = game_max_score('space') (sql/schema_all.sql). Ne jamais tronquer plus bas : le vrai score serait perdu (bug du 19/10 : 100 000)
+  var SPACE_SCORE_MAX = 5000000;   // = game_max_score('space') (sql/schema_all.sql). Borne absolue, jamais utilisée pour tronquer (bug du 19/10 : record bloqué à 100 000)
   var runIds = {};
   function resetRun(game) { runIds[game] = undefined; }
   function ensureRun(game) {
@@ -1297,10 +1297,68 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     sb.rpc("game_start", { p_game: game }).then(function (r) { if (runIds[game] === tag) runIds[game] = (r.error || !r.data) ? false : r.data; });
   }
   function takeRun(game) { var r = runIds[game]; runIds[game] = undefined; return typeof r === "string" ? r : null; }
+  // Envoi du score final. Le ticket n'est consommé par la base qu'en cas de succès complet (une erreur annule tout) : en cas
+  // d'échec réseau on garde ticket + score pour renvoyer EXACTEMENT la même partie, sans jamais doubler XP ni BOYCOINS.
+  var unsentRun = {};
+  async function sendRanked(game, value, rid) {
+    var r;
+    try { r = await sb.rpc("submit_score_v2", { p_game: game, p_score: value, p_run: rid }); }
+    catch (e) { r = { error: { message: "network" } }; }
+    if (r.error) {
+      var em = String(r.error.message || "");
+      if (!/invalid run|implausible|invalid score|banned|beta|maintenance|unknown game|no profile/.test(em)) unsentRun[game] = { run: rid, value: value };
+      else delete unsentRun[game];
+      return r;
+    }
+    delete unsentRun[game];
+    var d = r.data;
+    // « Score enregistré » seulement si la base confirme le score stocké et un record en ligne qui le contient
+    if (!d || typeof d !== "object" || d.score !== value || typeof d.best !== "number" || d.best < value) {
+      unsentRun[game] = null;
+      return { error: { message: "unconfirmed" } };
+    }
+    return r;
+  }
   async function submitRanked(game, value) {
     var rid = takeRun(game);
     if (!rid) return { error: { message: "no run" } };
-    return sb.rpc("submit_score_v2", { p_game: game, p_score: value, p_run: rid });
+    return sendRanked(game, value, rid);
+  }
+  var RANKED_ERRORS = [
+    ["maintenance", "Maintenance en cours : score non enregistré."],
+    ["beta", "Bêta privée : ton compte n'est pas encore ajouté, score non enregistré."],
+    ["banned", "Ton compte est suspendu : score non enregistré."],
+    ["invalid score", "Score hors limites : refusé par le serveur."],
+    ["unknown game", "Ce jeu n'est pas encore ouvert au classement."],
+    ["no run", "Score non enregistré : la partie a commencé avant ta connexion. Rejoue une partie."],
+    ["implausible", "Score refusé : partie non valide. Rejoue une partie."],
+    ["invalid run", "Score refusé : partie non valide, ou déjà enregistrée. Vérifie ton profil avant de rejouer."]
+  ];
+  // Affiche le résultat d'un envoi ; renvoie les données confirmées par la base, ou null (erreur affichée, avec « Réessayer » si sûr).
+  function reportRanked(m, game, value, r) {
+    if (!r.error) {
+      var d = r.data, txt = "Score enregistré : " + d.score + " (record en ligne : " + d.best + "). +" + d.xp + " XP, +" + d.bc + " BOYCOINS.";
+      if (d.level_up) txt += " NIVEAU " + d.level + " !";
+      if (d.new_badges && d.new_badges.length) txt += " Badge : " + d.new_badges.map(badgeName).join(", ") + ".";
+      setMsg(m, txt);
+      return d;
+    }
+    var em = String(r.error.message || ""), hit = RANKED_ERRORS.filter(function (e) { return em.indexOf(e[0]) >= 0; })[0];
+    if (hit) { setMsg(m, hit[1], true); return null; }
+    if (em === "unconfirmed") { setMsg(m, "Le serveur n'a pas confirmé le score : vérifie ton profil avant de rejouer.", true); return null; }
+    setMsg(m, "Score non envoyé (connexion). ", true);
+    if (unsentRun[game]) {
+      var a = document.createElement("a"); a.href = "#"; a.textContent = "Réessayer";
+      a.onclick = async function (ev) {
+        ev.preventDefault();
+        var u = unsentRun[game]; if (!u) return;
+        setMsg(m, "Envoi du score…");
+        var d2 = reportRanked(m, game, u.value, await sendRanked(game, u.value, u.run));
+        if (d2) { loadMe(); }
+      };
+      m.append(a, " (même partie, sans double récompense).");
+    }
+    return null;
   }
   async function submitContinued(game, value, used, msgEl) {
     if (!sb || !session || !profile) return;
@@ -3485,28 +3543,11 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       }
       setMsg(m, "Envoi du score…");
       var r = await submitRanked("snake", value);
-      if (r.error) {
-        var em = String(r.error.message || "");
-        if (em.indexOf("maintenance") >= 0) setMsg(m, "Maintenance en cours : score non enregistré.", true);
-        else if (em.indexOf("beta") >= 0) setMsg(m, "Bêta privée : ton compte n'est pas encore ajouté, score non enregistré.", true);
-        else if (em.indexOf("banned") >= 0) setMsg(m, "Ton compte est suspendu : score non enregistré.", true);
-        else if (em === "no run") setMsg(m, "Score non enregistré : la partie a commencé avant ta connexion. Rejoue une partie.", true);
-        else if (em.indexOf("implausible") >= 0 || em.indexOf("invalid run") >= 0) setMsg(m, "Score refusé : partie non valide. Rejoue une partie.", true);
-        else setMsg(m, "Score non envoyé. Joue une autre partie pour réessayer.", true);
-        return;
-      }
-      if (value > onlineBest) onlineBest = value;
-      var d = r.data;
-      if (d && typeof d === "object" && d.xp !== undefined) {
-        await loadBadgeCat();
-        var txt = "Score enregistré. +" + d.xp + " XP, +" + d.bc + " BOYCOINS.";
-        if (d.level_up) txt += " NIVEAU " + d.level + " !";
-        if (d.new_badges && d.new_badges.length) txt += " Badge : " + d.new_badges.map(badgeName).join(", ") + ".";
-        setMsg(m, txt);
-        loadMe();
-      } else {
-        setMsg(m, "Score enregistré sur ton compte.");
-      }
+      var d = reportRanked(m, "snake", value, r);
+      if (!d) return;
+      await loadBadgeCat();
+      if (d && value > onlineBest) onlineBest = value;
+      loadMe();
     }
 
     function action() {
@@ -3845,26 +3886,10 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       }
       setMsg(m, "Envoi du score…");
       var r = await submitRanked("blocks", value);
-      if (r.error) {
-        var em = String(r.error.message || "");
-        if (em.indexOf("maintenance") >= 0) setMsg(m, "Maintenance en cours : score non enregistré.", true);
-        else if (em.indexOf("beta") >= 0) setMsg(m, "Bêta privée : ton compte n'est pas encore ajouté, score non enregistré.", true);
-        else if (em.indexOf("banned") >= 0) setMsg(m, "Ton compte est suspendu : score non enregistré.", true);
-        else if (em.indexOf("unknown game") >= 0) setMsg(m, "Ce jeu n'est pas encore ouvert au classement.", true);
-        else if (em === "no run") setMsg(m, "Score non enregistré : la partie a commencé avant ta connexion. Rejoue une partie.", true);
-        else if (em.indexOf("implausible") >= 0 || em.indexOf("invalid run") >= 0) setMsg(m, "Score refusé : partie non valide. Rejoue une partie.", true);
-        else setMsg(m, "Score non envoyé. Joue une autre partie pour réessayer.", true);
-        return;
-      }
-      var d = r.data;
-      if (d && typeof d === "object" && d.xp !== undefined) {
-        var txt = "Score enregistré. +" + d.xp + " XP, +" + d.bc + " BOYCOINS.";
-        if (d.level_up) txt += " NIVEAU " + d.level + " !";
-        setMsg(m, txt);
-        loadMe();
-      } else {
-        setMsg(m, "Score enregistré sur ton compte.");
-      }
+      var d = reportRanked(m, "blocks", value, r);
+      if (!d) return;
+      await loadBadgeCat();
+      loadMe();
     }
 
     function action() {
@@ -4504,7 +4529,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     function reset() { resetRun("space"); g = SP.create(); state = "ready"; targetX = null; continues = 0; setMsg($("sp-msg"), ""); clearContinue($("sp-msg").nextElementSibling); }
     function finish() {
       state = "over";
-      if (continues > 0) submitContinued("space", Math.min(g.score, SPACE_SCORE_MAX), continues, $("sp-msg"));   // hors classement
+      if (continues > 0) submitContinued("space", g.score, continues, $("sp-msg"));   // hors classement
       else {
         if (g.score > best) { best = g.score; saveLocalBest("space", best); }
         if (g.score > 0) submit(g.score);
@@ -4534,27 +4559,12 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
         return;
       }
       setMsg(m, "Envoi du score…");
-      var r = await submitRanked("space", Math.min(value, SPACE_SCORE_MAX));   // garde-fou : même valeur que game_max_score('space') de la base (test de non-régression)
-      if (r.error) {
-        var em = String(r.error.message || "");
-        if (em.indexOf("maintenance") >= 0) setMsg(m, "Maintenance en cours : score non enregistré.", true);
-        else if (em.indexOf("beta") >= 0) setMsg(m, "Bêta privée : ton compte n'est pas encore ajouté, score non enregistré.", true);
-        else if (em.indexOf("banned") >= 0) setMsg(m, "Ton compte est suspendu : score non enregistré.", true);
-        else if (em.indexOf("unknown game") >= 0) setMsg(m, "Ce jeu n'est pas encore ouvert au classement.", true);
-        else if (em === "no run") setMsg(m, "Score non enregistré : la partie a commencé avant ta connexion. Rejoue une partie.", true);
-        else if (em.indexOf("implausible") >= 0 || em.indexOf("invalid run") >= 0) setMsg(m, "Score refusé : partie non valide. Rejoue une partie.", true);
-        else setMsg(m, "Score non envoyé. Joue une autre partie pour réessayer.", true);
-        return;
-      }
-      var d = r.data;
-      if (d && typeof d === "object" && d.xp !== undefined) {
-        var txt = "Score enregistré. +" + d.xp + " XP, +" + d.bc + " BOYCOINS.";
-        if (d.level_up) txt += " NIVEAU " + d.level + " !";
-        setMsg(m, txt);
-        loadMe();
-      } else {
-        setMsg(m, "Score enregistré sur ton compte.");
-      }
+      if (value > SPACE_SCORE_MAX) { setMsg(m, "Score hors limites (" + value + ") : non envoyé, merci de nous le signaler.", true); return; }   // jamais de troncature silencieuse
+      var r = await submitRanked("space", value);
+      var d = reportRanked(m, "space", value, r);
+      if (!d) return;
+      await loadBadgeCat();
+      loadMe();
     }
     function action() {
       if (state === "ready" || state === "paused") state = "playing";
