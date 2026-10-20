@@ -4203,8 +4203,8 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       }
       if (token !== startToken) return;
       g = BBE.newGame(seed, { ensureFit: true, rules: rules, size: size });
-      state = g.over ? "over" : "playing";
-      if (g.over) finish();
+      state = "playing";
+      if (g.over) finish();             // grille de départ déjà bloquée : finish() passe l'état à « over » (une seule fois)
     }
     function bbStartError(err) {
       var m = String((err && err.message) || "");
@@ -4217,6 +4217,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     }
 
     async function finish() {
+      if (state === "over") return;    // fin unique : pas de double vérification ni de double envoi
       state = "over"; overAt = Date.now();
       var sc = g.score;
       if (sc > best) { best = sc; saveLocalBest(g.size === 9 ? "boyblocks9" : "boyblocks", best); }
