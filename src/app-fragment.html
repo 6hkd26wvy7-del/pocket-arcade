@@ -4528,6 +4528,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     var continues = 0;
     function reset() { resetRun("space"); g = SP.create(); state = "ready"; targetX = null; continues = 0; setMsg($("sp-msg"), ""); clearContinue($("sp-msg").nextElementSibling); }
     function finish() {
+      if (state === "over") return;    // fin unique : pas de double envoi de score ni de double proposition de vidéo
       state = "over";
       if (continues > 0) submitContinued("space", g.score, continues, $("sp-msg"));   // hors classement
       else {

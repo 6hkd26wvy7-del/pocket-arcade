@@ -25,6 +25,12 @@ begin
   end if;
 end $$;
 
+do $$ begin
+  if (select data_type from information_schema.columns where table_schema = 'public' and table_name = 'scores' and column_name = 'score') = 'bigint' then
+    raise exception 'v25 DEJA APPLIQUEE : la v17 (plafond 100 000) ne doit plus etre relancee. Rien n''a ete modifie.';
+  end if;
+end $$;
+
 create or replace function public.game_max_score(p_game text)
 returns int language sql immutable as $$
   select case p_game

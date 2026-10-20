@@ -56,4 +56,19 @@ t("partie normale jusqu'au bout sans erreur", () => {
   while (!g.over && k++ < 60000) SP.step(g, 0.016, { targetX: 72 + 50 * Math.sin(k / 40) }, r);
   assert.ok(g.over || k >= 60000); assert.ok(g.score >= 0);
 });
+t("le jeu réel : fin unique, aucun score tronqué ni plafonné à 100 000, limite technique 2^53-1 seulement", () => {
+  const space = src.slice(src.indexOf("var space = (function"), src.indexOf("/*SPACE-LOGIC-START*/") > src.indexOf("var space = (function") ? src.indexOf("/*SPACE-LOGIC-START*/") : undefined);
+  assert.match(space, /function finish\(\) \{\s*if \(state === "over"\) return;/);
+  assert.doesNotMatch(src, /Math\.min\([^)]*100000\)/);
+  assert.match(src, /var SPACE_SCORE_MAX = 9007199254740991;/);
+  assert.equal(9007199254740991, Number.MAX_SAFE_INTEGER);
+  assert.match(space, /submitRanked\("space", value\)/);
+});
+t("score très élevé (227 500 puis 50 000 000) : le moteur continue de compter, entier exact, jamais ramené à 100 000", () => {
+  for (const start of [227_500, 50_000_000]) {
+    const g = SP.create(); g.score = start;
+    for (let w = 0; w < 200; w++) { g.enemies = []; SP.step(g, 0.016, { targetX: 70 }, seq([0.5])); }
+    assert.ok(Number.isSafeInteger(g.score) && g.score >= start, String(g.score));
+  }
+});
 console.log(n + " tests OK");

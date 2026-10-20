@@ -48,7 +48,9 @@ try:
     run_file(c, f"{REPO}/schema_v21_stockage_marketing.sql"); run_file(c, f"{REPO}/schema_v21_stockage_marketing.sql")
     run_file(c, f"{REPO}/schema_v22_tickets_partie.sql"); run_file(c, f"{REPO}/schema_v22_tickets_partie.sql")
     run_file(c, f"{REPO}/schema_v23_dons.sql"); run_file(c, f"{REPO}/schema_v23_dons.sql")
+    run_file(c, f"{REPO}/schema_v25_plafond_space_v2.sql"); run_file(c, f"{REPO}/schema_v25_plafond_space_v2.sql")
     run_file(c, f"{REPO}/schema_v6_v7.sql")   # la liste blanche relancée garde les fonctions du questionnaire
+    run_file(c, f"{REPO}/schema_v25_plafond_space_v2.sql")   # après toute relance d'une ancienne migration, relancer la v25
     sql("update public.app_settings set value = 'false' where key = 'maintenance'") if sql("select to_regclass('public.app_settings')")[0][0] else None
     print("app_settings:", sql("select * from public.app_settings"))
 
@@ -400,6 +402,15 @@ console.log(JSON.stringify({moves:g.log,score:g.score}));""" % os.path.join(os.p
     t("4 favoris refusé", lambda: must_fail(lambda: as_user(c, U1, "select set_favorites(array['a:0','b:0','c:0','d:0'])"), "too many"))
     t("public_tiers ami", lambda: as_user(c, U2, "select public_tiers('tintintest')")[0][0])
     t("public_tiers non-ami = vide", lambda: as_user(c, U3, "select public_tiers('tintintest')")[0][0])
+
+    print("== v25 : scores bigint, plus de plafond fixe")
+    int_sigs = "select string_agg(p.oid::regprocedure::text, ' | ') from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname in ('submit_score','submit_score_v2','submit_continued_score','score_plausible','bc_for_score') and pg_get_function_identity_arguments(p.oid) ~ '^text, integer'"
+    t("aucune ancienne version integer des fonctions de score", lambda: sql(int_sigs)[0][0] is None or (_ for _ in ()).throw(AssertionError(sql(int_sigs)[0][0])))
+    t("Space 227 500 (vague 64) accepté et stocké tel quel", lambda: (play(U2, "space", 227500, 120)["score"], sql(f"select max(score) from scores where user_id='{U2}' and game='space'")[0][0]) == (227500, 227500) or (_ for _ in ()).throw(AssertionError("tronqué")))
+    t("Space 30 000 000 sur une longue partie accepté, XP plafonnée", lambda: (lambda r: (r["score"], r["best"], r["xp"]))(play(U2, "space", 30000000, 10000)))
+    t("score au-delà de 2^53-1 refusé, jamais tronqué", lambda: must_fail(lambda: play(U2, "space", 9007199254740992, 10000), "score"))
+    t("relance de la v17 après la v25 refusée clairement", lambda: must_fail(lambda: run_file(c, f"{REPO}/schema_v17_plafond_space.sql"), "v25 DEJA APPLIQUEE"))
+    sql("rollback")
 
     print("== suppression de compte (avec badge exclusif)")
     t("delete_my_account de zed_test", lambda: as_user(c, U3, "select delete_my_account()"))
