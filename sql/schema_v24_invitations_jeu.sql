@@ -27,8 +27,8 @@ create table if not exists public.game_invites (
   mode text not null check (mode in ('live', 'async')),
   status text not null default 'pending' check (status in ('pending', 'accepted', 'declined', 'cancelled', 'expired', 'done')),
   room_code text,
-  from_score int check (from_score between 0 and 10000000),
-  to_score int check (to_score between 0 and 10000000),
+  from_score bigint check (from_score between 0 and 9007199254740991),
+  to_score bigint check (to_score between 0 and 9007199254740991),
   created_at timestamptz not null default now(),
   responded_at timestamptz,
   expires_at timestamptz not null,
@@ -169,13 +169,14 @@ grant execute on function public.my_game_invites() to authenticated;
 -- Défi asynchrone « score à battre » : chacun envoie son score une seule fois.
 -- LIMITE DU PROTOTYPE : le score vient du client (pas encore relié aux tickets de partie game_start / submit_score_v2) ;
 -- il ne donne ni XP, ni BOYCOINS, ni classement. À relier avant toute récompense.
-create or replace function public.invite_report_score(p_id uuid, p_score int)
+drop function if exists public.invite_report_score(uuid, integer);   -- ancienne signature du prototype (scores bigint comme la v25)
+create or replace function public.invite_report_score(p_id uuid, p_score bigint)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare uid uuid := auth.uid(); inv public.game_invites;
 begin
   perform public.guard_action(uid);
   perform public.expire_game_invites();
-  if p_score is null or p_score < 0 or p_score > 10000000 then raise exception 'invalid score'; end if;
+  if p_score is null or p_score < 0 or p_score > 9007199254740991 then raise exception 'invalid score'; end if;   -- pas de plafond arbitraire (décision du 19/10) : limite technique 2^53-1
   select * into inv from public.game_invites where id = p_id and uid in (from_id, to_id) and mode = 'async' for update;
   if not found then raise exception 'invite not found'; end if;
   if uid = inv.from_id then
@@ -191,7 +192,7 @@ begin
   end if;
   return jsonb_build_object('status', inv.status, 'from_score', inv.from_score, 'to_score', inv.to_score);
 end $$;
-revoke all on function public.invite_report_score(uuid, int) from public;
-grant execute on function public.invite_report_score(uuid, int) to authenticated;
+revoke all on function public.invite_report_score(uuid, bigint) from public;
+grant execute on function public.invite_report_score(uuid, bigint) to authenticated;
 
 commit;

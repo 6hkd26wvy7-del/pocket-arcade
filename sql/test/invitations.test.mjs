@@ -166,7 +166,7 @@ await t("défi asynchrone : score à battre, chacun une seule fois, résultat de
   await fails(as(A, "select public.invite_report_score($1, 130)", [inv.id]), "invite closed");
   const acc = await respond(B, inv.id, true); assert.equal(acc.from_score, 120); assert.equal(acc.room_code, null);
   await fails(as(B, "select public.invite_report_score($1, -1)", [inv.id]), "invalid score");
-  await fails(as(B, "select public.invite_report_score($1, 99999999)", [inv.id]), "invalid score");
+  await fails(as(B, "select public.invite_report_score($1, 9007199254740992)", [inv.id]), "invalid score");   // refus au-delà de 2^53-1 seulement
   const done = (await as(B, "select public.invite_report_score($1, 80) r", [inv.id]))[0].r;
   assert.deepEqual(done, { status: "done", from_score: 120, to_score: 80 });
   await fails(as(B, "select public.invite_report_score($1, 200)", [inv.id]), "invite closed");
@@ -174,6 +174,14 @@ await t("défi asynchrone : score à battre, chacun une seule fois, résultat de
   assert.equal((await mine(A)).outgoing[0].status, "done");
 });
 
+await t("défi asynchrone Space : très hauts scores (227 500 et 50 000 000) gardés tels quels, sans troncature", async () => {
+  await reset();
+  const inv = await send(A, "ben_t", "space", "async");
+  await as(A, "select public.invite_report_score($1, 227500)", [inv.id]);
+  await respond(B, inv.id, true);
+  const done = (await as(B, "select public.invite_report_score($1, 50000000) r", [inv.id]))[0].r;
+  assert.deepEqual(done, { status: "done", from_score: 227500, to_score: 50000000 });
+});
 await t("fin d'amitié ou blocage entre l'invitation et la réponse : invitation annulée", async () => {
   const inv = await send(A, "ben_t");
   await db.exec(`delete from public.friendships where user_a = least('${A}'::uuid,'${B}'::uuid) and user_b = greatest('${A}'::uuid,'${B}'::uuid)`);
@@ -192,6 +200,13 @@ await t("la table est fermée : aucun accès direct, aucun visiteur anonyme", as
   await assert.rejects(as(A, "select public.invite_room_code('snake')"), /permission denied/);
 });
 
+await t("relance de la liste blanche (schema_v6_v7) : les fonctions d'invitation restent appelables", async () => {
+  await db.exec(SQL("schema_v6_v7.sql"));
+  await reset();
+  const inv = await send(A, "ben_t");
+  assert.equal((await mine(B)).incoming.length, 1);
+  await respond(B, inv.id, false);
+});
 await t("joueur banni : aucune invitation", async () => {
   await db.exec(`insert into public.bans (user_id, reason) values ('${A}', 'test') on conflict do nothing`);
   await fails(send(A, "ben_t"), "banned");

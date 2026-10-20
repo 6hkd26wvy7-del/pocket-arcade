@@ -2137,7 +2137,7 @@ revoke insert, update, delete, truncate on public.bug_reports from anon, authent
 -- Désormais : AUCUNE fonction n'est appelable, sauf la liste blanche ci-dessous.
 do $$
 declare r record;
-  api text[] := array['arena_check', 'beta_mission_set', 'beta_redeem', 'beta_space', 'beta_survey_get', 'beta_survey_save', 'block_user', 'boyblocks_finish', 'boyblocks_start', 'boyblocks_start_v2', 'boyblocks_start_v3', 'game_settings_public', 'my_tiers', 'public_tiers', 'set_favorites', 'sync_tiers', 'buy_item', 'claim_daily', 'claim_mission', 'claim_season_rewards', 'conversation', 'delete_my_account', 'economy_public', 'equip_item', 'get_maintenance', 'leaderboard', 'leaderboard_friends', 'leaderboard_season', 'mark_notifications_read', 'me', 'monetization_public', 'my_access', 'my_blocks', 'my_friends', 'my_missions', 'my_notifications', 'my_role', 'my_season_rewards', 'my_standing', 'public_profile', 'remove_friend', 'report_user', 'rewarded_continue', 'respond_friend_request', 'send_friend_request', 'send_message', 'set_avatar', 'set_featured_badge', 'submit_bug_report', 'submit_continued_score', 'game_start', 'submit_score_v2', 'unblock_user'];
+  api text[] := array['arena_check', 'beta_mission_set', 'beta_redeem', 'beta_space', 'beta_survey_get', 'beta_survey_save', 'block_user', 'boyblocks_finish', 'boyblocks_start', 'boyblocks_start_v2', 'boyblocks_start_v3', 'game_settings_public', 'my_tiers', 'public_tiers', 'set_favorites', 'sync_tiers', 'buy_item', 'claim_daily', 'claim_mission', 'claim_season_rewards', 'conversation', 'delete_my_account', 'economy_public', 'equip_item', 'get_maintenance', 'leaderboard', 'leaderboard_friends', 'leaderboard_season', 'mark_notifications_read', 'me', 'monetization_public', 'my_access', 'my_blocks', 'my_friends', 'my_missions', 'my_notifications', 'my_role', 'my_season_rewards', 'my_standing', 'public_profile', 'remove_friend', 'report_user', 'rewarded_continue', 'respond_friend_request', 'send_friend_request', 'send_message', 'set_avatar', 'set_featured_badge', 'submit_bug_report', 'submit_continued_score', 'game_start', 'submit_score_v2', 'unblock_user', 'send_game_invite', 'respond_game_invite', 'cancel_game_invite', 'my_game_invites', 'invite_report_score'];
   anon_ok text[] := array['get_maintenance','leaderboard','leaderboard_season','monetization_public','game_settings_public'];
 begin
   revoke execute on all functions in schema public from public, anon, authenticated;
@@ -4230,8 +4230,8 @@ create table if not exists public.game_invites (
   mode text not null check (mode in ('live', 'async')),
   status text not null default 'pending' check (status in ('pending', 'accepted', 'declined', 'cancelled', 'expired', 'done')),
   room_code text,
-  from_score int check (from_score between 0 and 10000000),
-  to_score int check (to_score between 0 and 10000000),
+  from_score bigint check (from_score between 0 and 9007199254740991),
+  to_score bigint check (to_score between 0 and 9007199254740991),
   created_at timestamptz not null default now(),
   responded_at timestamptz,
   expires_at timestamptz not null,
@@ -4372,13 +4372,14 @@ grant execute on function public.my_game_invites() to authenticated;
 -- Défi asynchrone « score à battre » : chacun envoie son score une seule fois.
 -- LIMITE DU PROTOTYPE : le score vient du client (pas encore relié aux tickets de partie game_start / submit_score_v2) ;
 -- il ne donne ni XP, ni BOYCOINS, ni classement. À relier avant toute récompense.
-create or replace function public.invite_report_score(p_id uuid, p_score int)
+drop function if exists public.invite_report_score(uuid, integer);   -- ancienne signature du prototype (scores bigint comme la v25)
+create or replace function public.invite_report_score(p_id uuid, p_score bigint)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare uid uuid := auth.uid(); inv public.game_invites;
 begin
   perform public.guard_action(uid);
   perform public.expire_game_invites();
-  if p_score is null or p_score < 0 or p_score > 10000000 then raise exception 'invalid score'; end if;
+  if p_score is null or p_score < 0 or p_score > 9007199254740991 then raise exception 'invalid score'; end if;   -- pas de plafond arbitraire (décision du 19/10) : limite technique 2^53-1
   select * into inv from public.game_invites where id = p_id and uid in (from_id, to_id) and mode = 'async' for update;
   if not found then raise exception 'invite not found'; end if;
   if uid = inv.from_id then
@@ -4394,5 +4395,5 @@ begin
   end if;
   return jsonb_build_object('status', inv.status, 'from_score', inv.from_score, 'to_score', inv.to_score);
 end $$;
-revoke all on function public.invite_report_score(uuid, int) from public;
-grant execute on function public.invite_report_score(uuid, int) to authenticated;
+revoke all on function public.invite_report_score(uuid, bigint) from public;
+grant execute on function public.invite_report_score(uuid, bigint) to authenticated;
