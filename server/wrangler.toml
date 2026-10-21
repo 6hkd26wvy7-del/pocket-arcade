@@ -17,4 +17,4 @@ new_sqlite_classes = ["ArenaRoom"]
 SUPABASE_URL = "https://xgoqwxvgiavajnygoblt.supabase.co"
 SUPABASE_KEY = "sb_publishable_4CL4SJGei47uchomKgQlXA_6HtR7Yhf"
 # Sites autorisés à ouvrir une partie (adresse du jeu, sans / à la fin).
-ALLOWED_ORIGINS = "https://6hkd26wvy7-del.github.io"
+ALLOWED_ORIGINS = "https://6hkd26wvy7-del.github.io,https://preview.boygames-preview.pages.dev"

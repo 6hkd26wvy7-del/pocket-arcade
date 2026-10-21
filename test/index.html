@@ -5398,7 +5398,7 @@ return {SIZE: SIZE, SIZES: SIZES, PIECES: PIECES, rng: rng, emptyGrid: emptyGrid
 
 
   /* ---------- Signaler un bug (toutes les pages, y compris en jeu) ---------- */
-  var APP_BUILD = "2026.10.19-cf45bf";
+  var APP_BUILD = "2026.10.21-cf45bf";
   var recentErrors = [];
   function pushErr(t) { recentErrors.push(String(t).slice(0, 160)); if (recentErrors.length > 5) recentErrors.shift(); }
   window.addEventListener("error", function (e) { pushErr((e.message || "error") + " @" + String(e.filename || "").split("/").pop() + ":" + (e.lineno || "")); });
