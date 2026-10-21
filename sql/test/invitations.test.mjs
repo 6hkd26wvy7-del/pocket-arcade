@@ -158,29 +158,77 @@ await t("annulation : seul l'expéditeur, et plus de réponse possible ensuite",
   await send(A, "ben_t");   // on peut réinviter
 });
 
-await t("défi asynchrone : score à battre, chacun une seule fois, résultat des deux", async () => {
-  const inv = await send(A, "ben_t", "boyblocks", "async");
-  await fails(as(B, "select public.invite_report_score($1, 50)", [inv.id]), "invite closed");   // pas avant d'avoir accepté
-  await fails(as(C, "select public.invite_report_score($1, 50)", [inv.id]), "invite not found");
-  assert.equal((await as(A, "select public.invite_report_score($1, 120) r", [inv.id]))[0].r.status, "pending");
-  await fails(as(A, "select public.invite_report_score($1, 130)", [inv.id]), "invite closed");
-  const acc = await respond(B, inv.id, true); assert.equal(acc.from_score, 120); assert.equal(acc.room_code, null);
-  await fails(as(B, "select public.invite_report_score($1, -1)", [inv.id]), "invalid score");
-  await fails(as(B, "select public.invite_report_score($1, 9007199254740992)", [inv.id]), "invalid score");   // refus au-delà de 2^53-1 seulement
-  const done = (await as(B, "select public.invite_report_score($1, 80) r", [inv.id]))[0].r;
-  assert.deepEqual(done, { status: "done", from_score: 120, to_score: 80 });
-  await fails(as(B, "select public.invite_report_score($1, 200)", [inv.id]), "invite closed");
+// Partie réellement enregistrée avec son ticket (comme le site depuis la v22) : game_start puis submit_score_v2, partie de 10 minutes.
+async function play(uid, game, score) {
+  const rid = (await as(uid, "select public.game_start($1) r", [game]))[0].r;
+  await db.query("update public.game_runs set started_at = now() - interval '10 minutes' where id = $1", [rid]);
+  await db.query("update public.scores set created_at = created_at - interval '1 minute' where user_id = $1", [uid]);   // règle des 8 s
+  await as(uid, "select public.submit_score_v2($1, $2, $3)", [game, score, rid]);
+  return rid;
+}
+// Partie BoyBlocks vérifiée par le serveur (boyblocks_finish) : ici simulée directement dans boyblocks_runs.
+async function playBB(uid, score) {
+  return (await db.query("insert into public.boyblocks_runs (user_id, seed, started_at, finished_at, score, moves) values ($1, 1, now() - interval '5 minutes', now(), $2, 40) returning id", [uid, score])).rows[0].id;
+}
+const backdate = (id) => db.query("update public.game_invites set created_at = created_at - interval '1 hour', responded_at = responded_at - interval '1 hour' where id = $1", [id]);
+const report = (uid, inv, run) => as(uid, "select public.invite_report_score($1, $2) r", [inv, run]).then((r) => r[0].r);
+
+await t("défi asynchrone : le score vient de la partie enregistrée (ticket), jamais du téléphone ; chacun une seule fois", async () => {
+  await reset();
+  const inv = await send(A, "ben_t", "snake", "async");
+  await backdate(inv.id);
+  const ra = await play(A, "snake", 120);
+  await fails(report(B, inv.id, ra), "invite closed");                       // pas avant d'avoir accepté
+  await fails(report(C, inv.id, ra), "invite not found");
+  await fails(as(A, "select public.invite_report_score($1, 120::bigint)", [inv.id]), "does not exist");   // plus aucun score envoyé directement
+  await fails(report(A, inv.id, "00000000-0000-4000-8000-000000000000"), "invalid run");   // ticket inconnu
+  const rb0 = await play(B, "snake", 99);
+  await fails(report(A, inv.id, rb0), "invalid run");                        // partie d'un autre joueur
+  assert.equal((await report(A, inv.id, ra)).status, "pending");
+  await fails(report(A, inv.id, ra), "invite closed");
+  const acc = await respond(B, inv.id, true); assert.equal(Number(acc.from_score), 120); assert.equal(acc.room_code, null);
+  await fails(report(B, inv.id, rb0), "invalid run");                        // partie jouée AVANT d'accepter le défi
+  await backdate(inv.id);                                                    // la suite se joue « après » l'acceptation
+  const unused = (await as(B, "select public.game_start('snake') r"))[0].r;
+  await fails(report(B, inv.id, unused), "invalid run");                     // ticket sans score accepté par le serveur
+  const rbSpace = await play(B, "space", 5000);
+  await fails(report(B, inv.id, rbSpace), "invalid run");                    // mauvais jeu
+  const rb = await play(B, "snake", 80);
+  const done = await report(B, inv.id, rb);
+  assert.deepEqual([done.status, Number(done.from_score), Number(done.to_score)], ["done", 120, 80]);
+  await fails(report(B, inv.id, rb), "invite closed");
   assert.equal((await as(A, "select kind from public.my_notifications()"))[0].kind, "game_invite_done");
   assert.equal((await mine(A)).outgoing[0].status, "done");
 });
 
-await t("défi asynchrone Space : très hauts scores (227 500 et 50 000 000) gardés tels quels, sans troncature", async () => {
+await t("une même partie ne sert qu'à un seul défi", async () => {
   await reset();
+  const i1 = await send(A, "ben_t", "snake", "async"), i2 = await send(A, "cleo_t", "snake", "async");
+  await backdate(i1.id); await backdate(i2.id);
+  const ra = await play(A, "snake", 50);
+  await report(A, i1.id, ra);
+  await fails(report(A, i2.id, ra), "run already used");
+});
+
+await t("défi BoyBlocks : score lu sur la partie vérifiée (rejeu serveur), partie non terminée refusée", async () => {
+  await reset();
+  const inv = await send(A, "ben_t", "boyblocks", "async");
+  await backdate(inv.id);
+  const open = (await db.query("insert into public.boyblocks_runs (user_id, seed, started_at) values ($1, 1, now()) returning id", [A])).rows[0].id;
+  await fails(report(A, inv.id, open), "invalid run");
+  assert.equal(Number((await report(A, inv.id, await playBB(A, 3456))).from_score), 3456);
+});
+
+await t("défi asynchrone Space : le score enregistré est repris tel quel, sans troncature", async () => {
+  await reset();
+  const max = Number((await db.query("select public.game_max_score('space') m")).rows[0].m);
+  const high = max > 100000 ? 227500 : 99500;                               // 227 500 une fois la v25 appliquée
   const inv = await send(A, "ben_t", "space", "async");
-  await as(A, "select public.invite_report_score($1, 227500)", [inv.id]);
-  await respond(B, inv.id, true);
-  const done = (await as(B, "select public.invite_report_score($1, 50000000) r", [inv.id]))[0].r;
-  assert.deepEqual(done, { status: "done", from_score: 227500, to_score: 50000000 });
+  await backdate(inv.id);
+  await report(A, inv.id, await play(A, "space", high));
+  await respond(B, inv.id, true); await backdate(inv.id);
+  const done = await report(B, inv.id, await play(B, "space", 1234));
+  assert.deepEqual([Number(done.from_score), Number(done.to_score), done.status], [high, 1234, "done"]);
 });
 await t("fin d'amitié ou blocage entre l'invitation et la réponse : invitation annulée", async () => {
   const inv = await send(A, "ben_t");

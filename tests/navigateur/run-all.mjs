@@ -28,6 +28,7 @@ const TESTS = {
   "joueurs.mjs": ["joueurs OK"],
   "motdepasse.mjs": ["motdepasse OK"],
   "tickets.mjs": ["tickets OK"],
+  "defis.mjs": ["défi envoyé", "defis OK"],
   "dons.mjs": ["dons OK"],
   "iphone.mjs": ["envoyés identiques: true", "Score vérifié et enregistré", "protection ok", "accueil ok"],
 };

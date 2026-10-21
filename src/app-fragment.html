@@ -1298,10 +1298,11 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
   }
   function takeRun(game) { var r = runIds[game]; runIds[game] = undefined; return typeof r === "string" ? r : null; }
   async function submitRanked(game, value) {
-    reportInviteScore(game, value);
     var rid = takeRun(game);
     if (!rid) return { error: { message: "no run" } };
-    return sb.rpc("submit_score_v2", { p_game: game, p_score: value, p_run: rid });
+    var r = await sb.rpc("submit_score_v2", { p_game: game, p_score: value, p_run: rid });
+    if (!r.error) reportInviteScore(game, rid);   // défi à distance : la base relit le score de CETTE partie, le téléphone n'envoie aucun score
+    return r;
   }
   async function submitContinued(game, value, used, msgEl) {
     if (!sb || !session || !profile) return;
@@ -1609,11 +1610,16 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     if (accept) invState.active[inv.game] = { id: inv.id, side: "to" };
     invPoll();
   }
-  function reportInviteScore(game, value) {
+  // Défi à distance : on déclare la partie (ticket déjà consommé par la base), jamais un score.
+  function reportInviteScore(game, run) {
     var a = invState.active[game];
-    if (!a || !invReady()) return;
+    if (!a || !run || !invReady()) return;
     delete invState.active[game];
-    sb.rpc("invite_report_score", { p_id: a.id, p_score: Math.floor(value) }).then(function () { invPoll(); });
+    sb.rpc("invite_report_score", { p_id: a.id, p_run: run }).then(function (r) {
+      // partie refusée pour ce défi (commencée avant l'acceptation, déjà utilisée…) : le défi reste ouvert pour la prochaine partie
+      if (r.error && !/invite closed|invite not found/.test(String(r.error.message || "")) && !invState.active[game]) invState.active[game] = a;
+      invPoll();
+    });
   }
   async function invPoll() {
     if (!invReady()) return;
@@ -4296,6 +4302,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
         if (g !== mine) return;
         if (r.error) { setMsg($("bb-msg"), "Partie non enregistrée (" + (String(r.error.message).indexOf("invalid") >= 0 ? "vérification refusée" : "serveur indisponible") + ").", true); return; }
         var d = r.data || {};
+        reportInviteScore("boyblocks", id);
         var txt = "Score vérifié et enregistré. +" + d.xp + " XP, +" + d.bc + " BOYCOINS.";
         if (d.level_up) txt += " NIVEAU " + d.level + " !";
         if (d.new_badges && d.new_badges.length) txt += " Badge : " + d.new_badges.map(badgeName).join(", ") + ".";

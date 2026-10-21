@@ -166,25 +166,48 @@ end $$;
 revoke all on function public.my_game_invites() from public;
 grant execute on function public.my_game_invites() to authenticated;
 
--- Défi asynchrone « score à battre » : chacun envoie son score une seule fois.
--- LIMITE DU PROTOTYPE : le score vient du client (pas encore relié aux tickets de partie game_start / submit_score_v2) ;
--- il ne donne ni XP, ni BOYCOINS, ni classement. À relier avant toute récompense.
-drop function if exists public.invite_report_score(uuid, integer);   -- ancienne signature du prototype (scores bigint comme la v25)
-create or replace function public.invite_report_score(p_id uuid, p_score bigint)
+-- Défi asynchrone « score à battre » : chacun déclare UNE partie, jamais un score.
+-- Le score est lu côté serveur sur la partie enregistrée avec son ticket : Snake / Space = game_runs (v22) consommé par submit_score_v2,
+-- score = ligne `scores` écrite dans la même transaction ; BoyBlocks = boyblocks_runs terminé (rejeu vérifié par boyblocks_finish).
+-- La partie doit avoir commencé après l'envoi (expéditeur) ou l'acceptation (destinataire), et ne sert qu'à un seul défi.
+-- Aucun XP, BOYCOINS ni classement liés au défi (les gains restent ceux de la partie elle-même).
+alter table public.game_invites add column if not exists from_run uuid;
+alter table public.game_invites add column if not exists to_run uuid;
+create unique index if not exists game_invites_from_run on public.game_invites (from_run) where from_run is not null;
+create unique index if not exists game_invites_to_run on public.game_invites (to_run) where to_run is not null;
+drop function if exists public.invite_report_score(uuid, integer);   -- anciennes signatures du prototype (score envoyé par le téléphone)
+drop function if exists public.invite_report_score(uuid, bigint);
+create or replace function public.invite_report_score(p_id uuid, p_run uuid)
 returns jsonb language plpgsql security definer set search_path = public as $$
-declare uid uuid := auth.uid(); inv public.game_invites;
+declare uid uuid := auth.uid(); inv public.game_invites; since timestamptz; sc bigint; gr public.game_runs; br public.boyblocks_runs;
 begin
   perform public.guard_action(uid);
   perform public.expire_game_invites();
-  if p_score is null or p_score < 0 or p_score > 9007199254740991 then raise exception 'invalid score'; end if;   -- pas de plafond arbitraire (décision du 19/10) : limite technique 2^53-1
+  if p_run is null then raise exception 'invalid run'; end if;
   select * into inv from public.game_invites where id = p_id and uid in (from_id, to_id) and mode = 'async' for update;
   if not found then raise exception 'invite not found'; end if;
   if uid = inv.from_id then
     if inv.from_score is not null or inv.status not in ('pending', 'accepted') then raise exception 'invite closed'; end if;
-    update public.game_invites set from_score = p_score where id = inv.id returning * into inv;
+    since := inv.created_at;
   else
     if inv.status <> 'accepted' or inv.to_score is not null then raise exception 'invite closed'; end if;
-    update public.game_invites set to_score = p_score where id = inv.id returning * into inv;
+    since := inv.responded_at;
+  end if;
+  if exists (select 1 from public.game_invites where from_run = p_run or to_run = p_run) then raise exception 'run already used'; end if;
+  if inv.game = 'boyblocks' then
+    select * into br from public.boyblocks_runs where id = p_run and user_id = uid;
+    if not found or br.finished_at is null or br.score is null or br.started_at < since then raise exception 'invalid run'; end if;
+    sc := br.score;
+  else
+    select * into gr from public.game_runs where id = p_run and user_id = uid and game = inv.game;
+    if not found or gr.used_at is null or gr.started_at < since then raise exception 'invalid run'; end if;
+    select max(s.score) into sc from public.scores s where s.user_id = uid and s.game = inv.game and s.created_at = gr.used_at;
+    if sc is null then raise exception 'invalid run'; end if;
+  end if;
+  if uid = inv.from_id then
+    update public.game_invites set from_score = sc, from_run = p_run where id = inv.id returning * into inv;
+  else
+    update public.game_invites set to_score = sc, to_run = p_run where id = inv.id returning * into inv;
   end if;
   if inv.from_score is not null and inv.to_score is not null then
     update public.game_invites set status = 'done', responded_at = now() where id = inv.id returning * into inv;
@@ -192,7 +215,7 @@ begin
   end if;
   return jsonb_build_object('status', inv.status, 'from_score', inv.from_score, 'to_score', inv.to_score);
 end $$;
-revoke all on function public.invite_report_score(uuid, bigint) from public;
-grant execute on function public.invite_report_score(uuid, bigint) to authenticated;
+revoke all on function public.invite_report_score(uuid, uuid) from public;
+grant execute on function public.invite_report_score(uuid, uuid) to authenticated;
 
 commit;

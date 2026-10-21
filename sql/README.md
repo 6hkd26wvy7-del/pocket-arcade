@@ -35,5 +35,5 @@ python3 sql/test/test_execution_morcelee.py      # exécution en plusieurs morce
 
 ## v24 — invitations de jeu entre amis (prototype, non appliquée)
 `schema_v24_invitations_jeu.sql` : table `game_invites` fermée (RLS sans règle) + 5 fonctions réservées aux joueurs connectés.
-Testée sur un vrai PostgreSQL 16 en mémoire (PGlite), jamais sur Supabase : `cd sql/test && npm install && node invitations.test.mjs` (14 tests : amis seulement,
-destinataire seul, expiration, anti-spam, défi à distance, table fermée). Application sur TEST : fichier entier d'un seul bloc, après la v23, sur accord.
+Testée sur un vrai PostgreSQL 16 en mémoire (PGlite), jamais sur Supabase : `cd sql/test && npm install && node invitations.test.mjs` (18 tests : amis seulement,
+destinataire seul, expiration, anti-spam, défi à distance lu sur le ticket de partie, table fermée). Application sur TEST : fichier entier d'un seul bloc, après la v23, sur accord.
