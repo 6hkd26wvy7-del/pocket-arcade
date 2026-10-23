@@ -30,6 +30,8 @@ window.supabase = { createClient: function(){
      case 'submit_score': window.__ranked=(window.__ranked||[]).concat([a]); return ok({xp:6,bc:2,level:5,level_up:false,new_badges:[],score:a.p_score,best:Math.max(a.p_score,window.__best||0)});
      case 'game_start': window.__runs=(window.__runs||0)+1; return ok('run-'+window.__runs);
      case 'submit_score_v2': window.__ranked=(window.__ranked||[]).concat([{p_game:a.p_game,p_score:a.p_score,p_run:a.p_run}]); return ok({xp:6,bc:2,level:5,level_up:false,new_badges:[],score:a.p_score,best:Math.max(a.p_score,window.__best||0)});
+     case 'send_game_invite': window.__inv=a; return ok({id:'inv-1',status:'pending'});
+     case 'invite_report_score': window.__reported=(window.__reported||[]).concat([a]); return ok({status:'pending',from_score:null,to_score:null});
      case 'my_missions': return ok([]);
      case 'my_role': return ok(window.__role||null);
      case 'beta_survey_get': return ok(window.__survey||null);
