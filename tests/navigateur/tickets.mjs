@@ -20,5 +20,9 @@ for (let i = 0; i < 40 && !(await page.evaluate(()=>window.__ranked && window.__
 const ranked = await page.evaluate(()=>window.__ranked||[]), calls = await page.evaluate(()=>window.__calls.filter(c=>/^(submit_score|game_start)/.test(c)));
 console.log('ticket demandé au départ :', runs0, '| envoi :', JSON.stringify(ranked), '| appels :', calls.join(' '));
 if (runs0 !== 1 || !ranked.length || ranked[0].p_game !== 'snake' || ranked[0].p_run !== 'run-1' || calls.some(c=>/^submit_score\{/.test(c))) fail('ticket de partie');
+await page.waitForTimeout(300);
+const msg = await page.evaluate(()=>document.getElementById('snake-msg').textContent);
+console.log('message :', msg);
+if (!new RegExp('Score enregistré : '+ranked[0].p_score+' \\(record en ligne : '+ranked[0].p_score+'\\)').test(msg)) fail('« Score enregistré » doit citer le score confirmé par le serveur');
 if (errs.length) fail(errs.join('\n'));
 await b.close(); console.log('tickets OK');
