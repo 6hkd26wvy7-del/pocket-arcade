@@ -16,7 +16,7 @@ stamp = datetime.date.today().strftime("%Y.%m.%d") + "-" + hashlib.md5(html.enco
 html, n = re.subn(r'var APP_BUILD = "[^"]*";', 'var APP_BUILD = "%s";' % stamp, html, count=1)
 assert n == 1
 open(OUT + "/index.html", "w", encoding="utf-8").write(html)
-for n in ("config.test.js", "cgu.html", "privacy.html", "icon-180.png", "icon-192.png", "icon-512.png"):
+for n in ("config.test.js", "cgu.html", "privacy.html", "mentions-legales.html", "reglages-pub.js", "pub.js", "icon-180.png", "icon-192.png", "icon-512.png"):
     shutil.copyfile(ROOT + "/site/" + n, OUT + "/" + n)
 # config.js du site TEST = réglages TEST aussi : même si config.test.js ne se charge pas, jamais la production.
 shutil.copyfile(ROOT + "/site/config.test.js", OUT + "/config.js")

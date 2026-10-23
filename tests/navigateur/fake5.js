@@ -27,9 +27,11 @@ window.supabase = { createClient: function(){
      case 'monetization_public': return ok(Object.assign({donate: window.__donate || {enabled:false}}, window.__monet || {ads:{enabled:true,provider:'test',slots:{home:true,scores:true,shop:false}},rewarded:{enabled:true,continue_max:1,games:['snake','space']},premium:{enabled:true,price_eur:0.99,pioneer_limit:100,pioneer_left:99}}));
      case 'rewarded_continue': return ok({ok:true,remaining_today:9,skip_ad:!!window.__premium});
      case 'submit_continued_score': window.__cont=a; return ok({xp:5,bc:0,level:5,level_up:false,ranked:false});
-     case 'submit_score': window.__ranked=(window.__ranked||[]).concat([a]); return ok({xp:6,bc:2,level:5,level_up:false,new_badges:[]});
+     case 'submit_score': window.__ranked=(window.__ranked||[]).concat([a]); return ok({xp:6,bc:2,level:5,level_up:false,new_badges:[],score:a.p_score,best:Math.max(a.p_score,window.__best||0)});
      case 'game_start': window.__runs=(window.__runs||0)+1; return ok('run-'+window.__runs);
-     case 'submit_score_v2': window.__ranked=(window.__ranked||[]).concat([{p_game:a.p_game,p_score:a.p_score,p_run:a.p_run}]); return ok({xp:6,bc:2,level:5,level_up:false,new_badges:[]});
+     case 'submit_score_v2': window.__ranked=(window.__ranked||[]).concat([{p_game:a.p_game,p_score:a.p_score,p_run:a.p_run}]); return ok({xp:6,bc:2,level:5,level_up:false,new_badges:[],score:a.p_score,best:Math.max(a.p_score,window.__best||0)});
+     case 'send_game_invite': window.__inv=a; return ok({id:'inv-1',status:'pending'});
+     case 'invite_report_score': window.__reported=(window.__reported||[]).concat([a]); return ok({status:'pending',from_score:null,to_score:null});
      case 'my_missions': return ok([]);
      case 'my_role': return ok(window.__role||null);
      case 'beta_survey_get': return ok(window.__survey||null);

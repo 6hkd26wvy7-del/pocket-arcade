@@ -548,6 +548,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     <section id="view-amis" hidden>
       <h2>AMIS</h2>
       <div id="fr-info" class="panel"></div>
+      <div id="fr-invites" class="panel" hidden></div>
       <div id="fr-notifs" class="panel" hidden></div>
       <div id="fr-add" class="panel" hidden></div>
       <div id="fr-list" class="panel" hidden></div>
@@ -696,6 +697,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     <section id="view-snake" hidden>
       <div class="stage">
         <canvas id="screen" class="screen" width="144" height="208" tabindex="0" aria-label="Écran du jeu Snake. Glisse un doigt pour tourner."></canvas>
+        <div id="snake-hero" class="hero-slot" hidden aria-hidden="true"></div>   <!-- emplacement réservé : animation du héros (nouveau design), voir docs/FINS-DE-PARTIE.md -->
         <p id="snake-msg" class="msg" role="status"></p>
         <div class="row">
           <button class="btn" id="b-pause" type="button">PAUSE</button>
@@ -712,7 +714,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
   <div id="bug-modal" hidden role="dialog" aria-modal="true" aria-label="Signaler un bug"><div id="bug-card"></div></div>
   <div id="pf-modal" hidden role="dialog" aria-modal="true" aria-label="Profil du joueur"><div class="panel" id="pf-card"><div id="pf-sheet"></div><p id="pf-msg" class="msg" role="status"></p></div></div>
 
-  <footer class="foot"><a href="privacy.html">CONFIDENTIALITÉ</a> &middot; <a href="cgu.html">CONDITIONS</a></footer>
+  <footer class="foot"><a href="privacy.html">CONFIDENTIALITÉ</a> &middot; <a href="cgu.html">CONDITIONS</a> &middot; <a href="mentions-legales.html">MENTIONS LÉGALES</a><span id="pub-consent-wrap" hidden> &middot; <a href="#" id="pub-consent">GÉRER LES COOKIES</a></span></footer>
 
   <!-- Emplacement publicité : colle ici le code de ta régie pub, puis retire l'attribut hidden. -->
   <aside id="ad-slot" hidden aria-label="Publicité"></aside>
@@ -720,6 +722,8 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.0/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
+<script src="reglages-pub.js"></script>
+<script src="pub.js"></script>
 <script>if (/[?&]env=test/.test(location.search)) { document.write('<script src="config.test.js"><\/script>'); }</script>
 <script>
 (function () {
@@ -1252,6 +1256,10 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
   }
   function renderAds() {
     var a = monet && monet.ads, prem = !!(me && me.premium);
+    if (a && a.provider === "adsense") {   // vraie régie : décision, consentement et affichage dans pub.js (hors partie seulement)
+      if (window.BGAds) window.BGAds.render(a, prem); else document.querySelectorAll(".ad-slot").forEach(function (s) { s.hidden = true; });
+      return;
+    }
     document.querySelectorAll(".ad-slot").forEach(function (slot) {
       var on = !!(a && a.enabled && a.slots && a.slots[slot.getAttribute("data-slot")]) && !prem;
       slot.hidden = !on;
@@ -1288,6 +1296,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
   }
   // Ticket de partie (v22) : demandé à la base au premier instant de jeu ; le score n'est accepté qu'avec ce ticket et s'il
   // est vraisemblable pour la durée jouée. undefined = pas encore demandé, false = demande impossible, objet = en cours.
+  var SPACE_SCORE_MAX = 9007199254740991;   // = game_max_score('space') = Number.MAX_SAFE_INTEGER : seule limite technique (entier exact en JS, JSON et bigint). Jamais utilisée pour tronquer (bug du 19/10 : record bloqué à 100 000)
   var runIds = {};
   function resetRun(game) { runIds[game] = undefined; }
   function ensureRun(game) {
@@ -1296,10 +1305,70 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     sb.rpc("game_start", { p_game: game }).then(function (r) { if (runIds[game] === tag) runIds[game] = (r.error || !r.data) ? false : r.data; });
   }
   function takeRun(game) { var r = runIds[game]; runIds[game] = undefined; return typeof r === "string" ? r : null; }
+  // Envoi du score final. Le ticket n'est consommé par la base qu'en cas de succès complet (une erreur annule tout) : en cas
+  // d'échec réseau on garde ticket + score pour renvoyer EXACTEMENT la même partie, sans jamais doubler XP ni BOYCOINS.
+  var unsentRun = {};
+  async function sendRanked(game, value, rid) {
+    var r;
+    try { r = await sb.rpc("submit_score_v2", { p_game: game, p_score: value, p_run: rid }); }
+    catch (e) { r = { error: { message: "network" } }; }
+    if (r.error) {
+      var em = String(r.error.message || "");
+      if (!/invalid run|implausible|invalid score|banned|beta|maintenance|unknown game|no profile/.test(em)) unsentRun[game] = { run: rid, value: value };
+      else delete unsentRun[game];
+      return r;
+    }
+    delete unsentRun[game];
+    var d = r.data;
+    // « Score enregistré » seulement si la base confirme le score stocké et un record en ligne qui le contient
+    if (!d || typeof d !== "object" || d.score !== value || typeof d.best !== "number" || d.best < value) {
+      unsentRun[game] = null;
+      return { error: { message: "unconfirmed" } };
+    }
+    return r;
+  }
   async function submitRanked(game, value) {
     var rid = takeRun(game);
     if (!rid) return { error: { message: "no run" } };
-    return sb.rpc("submit_score_v2", { p_game: game, p_score: value, p_run: rid });
+    var r = await sendRanked(game, value, rid);
+    if (!r.error) reportInviteScore(game, rid);   // défi à distance : la base relit le score de CETTE partie, le téléphone n'envoie aucun score
+    return r;
+  }
+  var RANKED_ERRORS = [
+    ["maintenance", "Maintenance en cours : score non enregistré."],
+    ["beta", "Bêta privée : ton compte n'est pas encore ajouté, score non enregistré."],
+    ["banned", "Ton compte est suspendu : score non enregistré."],
+    ["invalid score", "Score hors limites : refusé par le serveur."],
+    ["unknown game", "Ce jeu n'est pas encore ouvert au classement."],
+    ["no run", "Score non enregistré : la partie a commencé avant ta connexion. Rejoue une partie."],
+    ["implausible", "Score refusé : partie non valide. Rejoue une partie."],
+    ["invalid run", "Score refusé : partie non valide, ou déjà enregistrée. Vérifie ton profil avant de rejouer."]
+  ];
+  // Affiche le résultat d'un envoi ; renvoie les données confirmées par la base, ou null (erreur affichée, avec « Réessayer » si sûr).
+  function reportRanked(m, game, value, r) {
+    if (!r.error) {
+      var d = r.data, txt = "Score enregistré : " + d.score + " (record en ligne : " + d.best + "). +" + d.xp + " XP, +" + d.bc + " BOYCOINS.";
+      if (d.level_up) txt += " NIVEAU " + d.level + " !";
+      if (d.new_badges && d.new_badges.length) txt += " Badge : " + d.new_badges.map(badgeName).join(", ") + ".";
+      setMsg(m, txt);
+      return d;
+    }
+    var em = String(r.error.message || ""), hit = RANKED_ERRORS.filter(function (e) { return em.indexOf(e[0]) >= 0; })[0];
+    if (hit) { setMsg(m, hit[1], true); return null; }
+    if (em === "unconfirmed") { setMsg(m, "Le serveur n'a pas confirmé le score : vérifie ton profil avant de rejouer.", true); return null; }
+    setMsg(m, "Score non envoyé (connexion). ", true);
+    if (unsentRun[game]) {
+      var a = document.createElement("a"); a.href = "#"; a.textContent = "Réessayer";
+      a.onclick = async function (ev) {
+        ev.preventDefault();
+        var u = unsentRun[game]; if (!u) return;
+        setMsg(m, "Envoi du score…");
+        var d2 = reportRanked(m, game, u.value, await sendRanked(game, u.value, u.run));
+        if (d2) { reportInviteScore(game, u.run); loadMe(); }
+      };
+      m.append(a, " (même partie, sans double récompense).");
+    }
+    return null;
   }
   async function submitContinued(game, value, used, msgEl) {
     if (!sb || !session || !profile) return;
@@ -1577,6 +1646,121 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
 
   function stopChatTimer() { if (chatTimer) { clearInterval(chatTimer); chatTimer = null; } }
 
+  /* ---------- Invitations de jeu entre amis (prototype v24 : migration non appliquée tant que non validée) ---------- */
+  var INV_GAMES = [["snake", "SNAKE"], ["space", "SPACE ATTACK"], ["boyblocks", "BOYBLOCKS"]];
+  var invState = { off: false, timer: null, joined: {}, active: {}, data: { incoming: [], outgoing: [] } };
+  function invLabel(g) { for (var i = 0; i < INV_GAMES.length; i++) if (INV_GAMES[i][0] === g) return INV_GAMES[i][1]; return g; }
+  function invReady() { return online && sb && session && profile && !invState.off; }
+  function invError(err) {
+    var m = String((err && err.message) || "");
+    var map = { "not friends": "Vous n'êtes plus amis.", "blocked": "Impossible d'inviter ce joueur.", "already pending": "Une invitation est déjà en attente avec cet ami.",
+      "too many pending": "Trop d'invitations en attente : annule-en une.", "too fast": "Doucement : trop d'invitations cette heure-ci.",
+      "too many for this friend": "Tu as déjà beaucoup invité cet ami : laisse-lui un peu de temps.", "declined recently": "Il vient de refuser : réessaie dans quelques minutes.",
+      "invite closed": "Cette invitation n'est plus valable.", "invite not found": "Cette invitation n'existe plus.", "banned": "Action indisponible." };
+    for (var k in map) if (m.indexOf(k) >= 0) return map[k];
+    return "Invitation impossible pour le moment.";
+  }
+  async function invSend(pseudo, game, mode, msgEl) {
+    var r = await sb.rpc("send_game_invite", { p_pseudo: pseudo, p_game: game, p_mode: mode });
+    if (r.error) { setMsg(msgEl, invError(r.error), true); return false; }
+    if (mode === "async") invState.active[game] = { id: r.data.id, side: "from" };   // le prochain score de ce jeu sera le « score à battre »
+    setMsg(msgEl, mode === "live" ? "Invitation envoyée à " + pseudo + ". Elle expire dans 2 minutes." : "Défi envoyé à " + pseudo + " : joue une partie de " + invLabel(game) + ", ton score sera son score à battre.");
+    invPoll();
+    return true;
+  }
+  async function invRespond(inv, accept) {
+    var r = await sb.rpc("respond_game_invite", { p_id: inv.id, p_accept: accept });
+    if (r.error) { setMsg($("fr-msg"), invError(r.error), true); return invPoll(); }
+    if (r.data.status === "cancelled") { setMsg($("fr-msg"), "Vous n'êtes plus amis : invitation annulée.", true); return invPoll(); }
+    if (accept && r.data.mode === "live" && r.data.room_code) { invState.joined[inv.id] = true; arena.join(r.data.room_code); location.hash = "#arena"; return; }
+    if (accept) invState.active[inv.game] = { id: inv.id, side: "to" };
+    invPoll();
+  }
+  // Défi à distance : on déclare la partie (ticket déjà consommé par la base), jamais un score.
+  function reportInviteScore(game, run) {
+    var a = invState.active[game];
+    if (!a || !run || !invReady()) return;
+    delete invState.active[game];
+    sb.rpc("invite_report_score", { p_id: a.id, p_run: run }).then(function (r) {
+      // partie refusée pour ce défi (commencée avant l'acceptation, déjà utilisée…) : le défi reste ouvert pour la prochaine partie
+      if (r.error && !/invite closed|invite not found/.test(String(r.error.message || "")) && !invState.active[game]) invState.active[game] = a;
+      invPoll();
+    });
+  }
+  async function invPoll() {
+    if (!invReady()) return;
+    var r = await sb.rpc("my_game_invites");
+    if (r.error) { invState.off = true; $("fr-invites").hidden = true; return; }   // fonction absente (migration pas encore appliquée) : on masque tout
+    invState.data = r.data || { incoming: [], outgoing: [] };
+    invState.data.outgoing.forEach(function (o) {   // l'ami a accepté : on rejoint la même salle automatiquement
+      if (o.mode === "live" && o.status === "accepted" && o.room_code && !invState.joined[o.id] && location.hash === "#amis") {
+        invState.joined[o.id] = true; arena.join(o.room_code); location.hash = "#arena";
+      }
+    });
+    invRender();
+  }
+  function invRender() {
+    var box = $("fr-invites"), d = invState.data, rows = [];
+    box.textContent = "";
+    var h = el("h3", "", "INVITATIONS"); h.style.cssText = "margin:0 0 6px;font-size:10px;font-weight:normal"; box.append(h);
+    d.incoming.forEach(function (i) {
+      var row = el("div", "line"), acts = el("span", "row");
+      function btn(label, alt, fn) { var b = el("button", "btn mini" + (alt ? " alt" : ""), label); b.type = "button"; b.addEventListener("click", fn); acts.append(b); }
+      if (i.status === "pending") {
+        row.append(el("span", "", i.from + " t'invite à " + invLabel(i.game) + (i.mode === "async" ? " (score à battre" + (i.from_score != null ? " : " + i.from_score : "") + ")" : "")));
+        btn("ACCEPTER", false, function () { invRespond(i, true); });
+        btn("REFUSER", true, function () { invRespond(i, false); });
+      } else {
+        row.append(el("span", "", "Défi de " + i.from + " : bats " + (i.from_score != null ? i.from_score : "son score") + " à " + invLabel(i.game) + " !"));
+      }
+      row.append(acts); box.append(row); rows.push(row);
+    });
+    d.outgoing.forEach(function (o) {
+      var row = el("div", "line"), acts = el("span", "row");
+      var label = { pending: "en attente", accepted: o.mode === "live" ? "accepté" : "accepté, à lui de jouer", declined: "refusé", done: "terminé : " + o.from_score + " contre " + o.to_score, expired: "expiré" }[o.status] || o.status;
+      row.append(el("span", "", "Toi → " + o.to + " · " + invLabel(o.game) + " · " + label));
+      if (o.status === "pending") {
+        var c = el("button", "btn mini alt", "ANNULER"); c.type = "button";
+        c.addEventListener("click", async function () { await sb.rpc("cancel_game_invite", { p_id: o.id }); invPoll(); });
+        acts.append(c);
+        if (o.mode === "live") {
+          var as = el("button", "btn mini", "DÉFI À DISTANCE"); as.type = "button";   // l'ami n'est pas là : même jeu, mais il a 48 h pour battre ton score
+          as.addEventListener("click", async function () { await sb.rpc("cancel_game_invite", { p_id: o.id }); await invSend(o.to, o.game, "async", $("fr-msg")); });
+          acts.append(as);
+        }
+      }
+      row.append(acts); box.append(row); rows.push(row);
+    });
+    box.hidden = !rows.length;
+  }
+  function invTick() {
+    if (location.hash !== "#amis" || !invReady()) { clearInterval(invState.timer); invState.timer = null; return; }
+    invPoll();
+  }
+  function invStart() { if (!invReady()) return; invPoll(); if (!invState.timer) invState.timer = setInterval(invTick, 4000); }
+  // Choix du jeu puis du mode, sous la ligne de l'ami. Pas de saisie de code ; la disponibilité de l'ami n'est pas affichée (aucune présence fiable).
+  function invPicker(pseudo, anchor, msgEl) {
+    var old = document.getElementById("inv-picker"); if (old) old.remove();
+    var box = el("div", "row"); box.id = "inv-picker";
+    INV_GAMES.forEach(function (g) {
+      var b = el("button", "btn mini", g[1]); b.type = "button";
+      b.addEventListener("click", async function () { box.remove(); await invSend(pseudo, g[0], "live", msgEl); });
+      box.append(b);
+    });
+    var far = el("button", "btn mini alt", "À DISTANCE"); far.type = "button";
+    far.addEventListener("click", function () {
+      box.textContent = "";
+      INV_GAMES.forEach(function (g) {
+        var b = el("button", "btn mini alt", g[1] + " · 48 H"); b.type = "button";
+        b.addEventListener("click", async function () { box.remove(); await invSend(pseudo, g[0], "async", msgEl); });
+        box.append(b);
+      });
+    });
+    box.append(far);
+    anchor.after(box);
+    setMsg(msgEl, "Choisis un jeu : " + pseudo + " reçoit une invitation à accepter, sans code à saisir.");
+  }
+
   async function renderFriends() {
     if (pendingChat) { var pc = pendingChat; pendingChat = null; setTimeout(function () { openChat(pc); }, 400); }   // « MESSAGE » depuis une fiche profil
     var info = $("fr-info"), msg = $("fr-msg");
@@ -1594,6 +1778,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     }
     if (!me) { info.textContent = "Les amis ne sont pas encore disponibles."; return; }
     info.hidden = true;
+    invStart();
 
     var nb = $("fr-notifs");
     var nlist = notifs.slice(0, 8);
@@ -1683,6 +1868,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       } else if (f.relation === "outgoing") {
         acts.append(el("span", "small", "EN ATTENTE"));
       } else {
+        if (cfg.ARENA_URL && !invState.off) btn("INVITER", false, function () { invPicker(f.pseudo, row, $("fr-msg")); });
         btn("CHAT", false, function () { openChat(f.pseudo); });
         btn("RETIRER", true, async function () {
           if (!window.confirm("Retirer " + f.pseudo + " de tes amis ?")) return;
@@ -1795,22 +1981,8 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       var pend = el("button", "btn mini alt", "DEMANDE EN COURS"); pend.type = "button"; pend.disabled = true; acts.append(pend);
     }
     if (p.relation === "friend" && cfg.ARENA_URL) {
-      // Défi 1V1 : réutilise les salles en ligne et la messagerie entre amis (le code de la salle est envoyé en message).
-      btn("DÉFIER", false, function () {
-        var pick = el("div", "row");
-        [["S", "SNAKE"], ["X", "BOYBLOCKS"]].forEach(function (g) {
-          var b = el("button", "btn mini", g[1]); b.type = "button";
-          b.addEventListener("click", async function () {
-            var code = arena.challenge(g[0]);
-            var res = await sb.rpc("send_message", { p_pseudo: p.pseudo, p_body: "⚔️ Je te défie à " + g[1] + " ! Va dans Jouer en ligne et entre le code " + code + "." });
-            if (res.error) { setMsg(msg, rewardError(res.error), true); return; }
-            close(); location.hash = "#arena";
-          });
-          pick.append(b);
-        });
-        acts.after(pick);
-        setMsg(msg, "Choisis le jeu : la salle est créée et ton ami reçoit le code par message.");
-      });
+      // Défi 1V1 : invitation directe (v24). Les codes restent dans « Jouer en ligne » pour inviter quelqu'un qui n'est pas ami.
+      btn("DÉFIER", false, function () { invPicker(p.pseudo, acts, msg); });
     }
     if (p.relation === "friend") {
       btn("MESSAGE", false, function () { close(); if (modal) { pendingChat = p.pseudo; location.hash = "#amis"; } else openChat(p.pseudo); });
@@ -2875,7 +3047,8 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
         var A = MS.ads || {}, AS = A.slots || {};
         pmo.append(el("h4", "", "Publicités (hors parties et duels, jamais pour les Premium)"));
         var aOn = check(pmo, "Activer les emplacements", A.enabled), aH = check(pmo, "Accueil", AS.home), aS = check(pmo, "Classements", AS.scores), aB = check(pmo, "Boutique", AS.shop);
-        button(pmo, "ENREGISTRER LES PUBLICITÉS", false, function () { saveMo("ads", { enabled: aOn.checked, provider: A.provider || "test", slots: { home: aH.checked, scores: aS.checked, shop: aB.checked } }, "publicités " + (aOn.checked ? "activées" : "désactivées")); });
+        var aG = check(pmo, "Régie Google AdSense (sinon cadre de test). Rien ne s'affiche tant que reglages-pub.js n'est pas rempli et le site approuvé par Google.", A.provider === "adsense");
+        button(pmo, "ENREGISTRER LES PUBLICITÉS", false, function () { saveMo("ads", { enabled: aOn.checked, provider: aG.checked ? "adsense" : "test", slots: { home: aH.checked, scores: aS.checked, shop: aB.checked } }, "publicités " + (aOn.checked ? "activées" : "désactivées")); });
         var R = MS.rewarded || {};
         pmo.append(el("h4", "", "Continuation par vidéo (solo : Snake, Space Attack)"));
         var rOn = check(pmo, "Activer", R.enabled);
@@ -3348,6 +3521,30 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     c.fillStyle = "#FDE68A"; c.fillRect(sx + 3, sy + 8, 2, 1); c.fillRect(sx + 7, sy + 8, 2, 1);
   }
 
+  /*SNAKE-LOGIC-START*/
+  // Logique pure de Snake (testée sans navigateur : tests/logique/snake.test.mjs)
+  var SNK = (function () {
+    var START_LEN = 3;
+    function key(x, y) { return y * 1000 + x; }
+    // Cases libres de la grille : un seul passage, sans boucle d'essais au hasard (aucun blocage possible, même grille presque pleine).
+    function freeCells(body, cols, rows) {
+      var taken = {}, out = [], i, x, y;
+      for (i = 0; i < body.length; i++) taken[key(body[i].x, body[i].y)] = true;
+      for (y = 0; y < rows; y++) for (x = 0; x < cols; x++) if (!taken[key(x, y)]) out.push({ x: x, y: y });
+      return out;
+    }
+    // Nouvelle nourriture, ou null quand il ne reste aucune case libre (= grille pleine = victoire).
+    function pickFood(body, cols, rows, rand) {
+      var free = freeCells(body, cols, rows);
+      return free.length ? free[Math.min(free.length - 1, Math.floor(rand() * free.length))] : null;
+    }
+    function isFull(body, cols, rows) { return body.length >= cols * rows; }
+    // Score maximal : une pomme par case libre au départ.
+    function maxScore(cols, rows) { return cols * rows - START_LEN; }
+    return { START_LEN: START_LEN, freeCells: freeCells, pickFood: pickFood, isFull: isFull, maxScore: maxScore };
+  })();
+  /*SNAKE-LOGIC-END*/
+
   var snake = (function () {
     var W = 144, H = 208, CELL = 8, HUD = 16;
     var COLS = W / CELL, ROWS = (H - HUD) / CELL;
@@ -3361,9 +3558,10 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     var body, dir, queue, food, score, speed, acc, last, deathAt;
     var state = "ready", soundOn = true, audio = null, running = false;
 
-    var continues = 0;
+    var continues = 0, won = false;
     function reset() {
       resetRun("snake");
+      won = false; clearVictory();
       var cx = Math.floor(COLS / 2), cy = Math.floor(ROWS / 2);
       continues = 0; clearContinue($("snake-msg").nextElementSibling);
       body = [{ x: cx, y: cy }, { x: cx - 1, y: cy }, { x: cx - 2, y: cy }];
@@ -3376,19 +3574,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       setMsg($("snake-msg"), "");
     }
 
-    function spawnFood() {
-      var free = [];
-      for (var y = 0; y < ROWS; y++) {
-        for (var x = 0; x < COLS; x++) {
-          var taken = false;
-          for (var i = 0; i < body.length; i++) {
-            if (body[i].x === x && body[i].y === y) { taken = true; break; }
-          }
-          if (!taken) free.push({ x: x, y: y });
-        }
-      }
-      food = free.length ? free[Math.floor(Math.random() * free.length)] : null;
-    }
+    function spawnFood() { food = SNK.pickFood(body, COLS, ROWS, Math.random); }
 
     function beep(freq, ms, delay) {
       if (!soundOn) return;
@@ -3442,21 +3628,40 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       beep(110, 260, 0.3);
     }
 
+    // Grille entièrement remplie : victoire exceptionnelle, distincte du Game Over (écran, fanfare, message, événements pour la suite).
     function win() {
-      beep(660, 100);
-      beep(880, 100, 0.12);
-      beep(1320, 200, 0.24);
+      if (won || state === "over") return;
+      won = true;
+      beep(660, 100); beep(880, 100, 0.12); beep(1320, 200, 0.24); beep(1760, 360, 0.36);
       finish();
+      showVictory();
+      // Points d'accroche, sans effet aujourd'hui : l'animation du héros (nouveau design) et le badge « grille complète » s'y brancheront.
+      // La récompense réelle (badge) passera par la base, jamais par le site : voir docs/FINS-DE-PARTIE.md.
+      document.dispatchEvent(new CustomEvent("boygames:victory", { detail: { game: "snake", score: score, perfect: true, ranked: continues === 0 } }));
+    }
+    function clearVictory() { var v = $("snake-win"); if (v) v.remove(); var h = $("snake-hero"); if (h) h.hidden = true; }
+    function showVictory() {
+      clearVictory();
+      var box = el("div", "row"); box.id = "snake-win"; box.setAttribute("role", "status");
+      var t = el("p", "msg", "VICTOIRE PARFAITE ! Toute la grille est remplie : " + score + " points, le maximum possible."); t.style.flexBasis = "100%";
+      var again = el("button", "btn", "REJOUER"); again.type = "button";
+      again.addEventListener("click", function () { reset(); state = "playing"; });
+      var home = el("button", "btn alt", "ACCUEIL"); home.type = "button";
+      home.addEventListener("click", function () { location.hash = "#menu"; });
+      box.append(t, again, home);
+      $("snake-msg").after(box);
+      var h = $("snake-hero"); if (h) h.hidden = false;
     }
 
     function finish() {
+      if (state === "over") return;    // une partie ne se termine qu'une fois (pas de double envoi de score)
       state = "over";
       if (continues > 0) submitContinued("snake", score, continues, $("snake-msg"));   // hors classement
       else {
         if (score > best) { best = score; saveLocalBest("snake", best); }
         if (score > 0) submit(score);
       }
-      if (body.length < COLS * ROWS) offerContinue($("snake-msg").nextElementSibling, $("snake-msg"), "snake", continues, revive);
+      if (!SNK.isFull(body, COLS, ROWS)) offerContinue($("snake-msg").nextElementSibling, $("snake-msg"), "snake", continues, revive);
     }
     // Reprise après une vidéo : le score est gardé, le serpent repart du centre (raccourci), il faut glisser pour repartir.
     function revive() {
@@ -3484,28 +3689,11 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       }
       setMsg(m, "Envoi du score…");
       var r = await submitRanked("snake", value);
-      if (r.error) {
-        var em = String(r.error.message || "");
-        if (em.indexOf("maintenance") >= 0) setMsg(m, "Maintenance en cours : score non enregistré.", true);
-        else if (em.indexOf("beta") >= 0) setMsg(m, "Bêta privée : ton compte n'est pas encore ajouté, score non enregistré.", true);
-        else if (em.indexOf("banned") >= 0) setMsg(m, "Ton compte est suspendu : score non enregistré.", true);
-        else if (em === "no run") setMsg(m, "Score non enregistré : la partie a commencé avant ta connexion. Rejoue une partie.", true);
-        else if (em.indexOf("implausible") >= 0 || em.indexOf("invalid run") >= 0) setMsg(m, "Score refusé : partie non valide. Rejoue une partie.", true);
-        else setMsg(m, "Score non envoyé. Joue une autre partie pour réessayer.", true);
-        return;
-      }
-      if (value > onlineBest) onlineBest = value;
-      var d = r.data;
-      if (d && typeof d === "object" && d.xp !== undefined) {
-        await loadBadgeCat();
-        var txt = "Score enregistré. +" + d.xp + " XP, +" + d.bc + " BOYCOINS.";
-        if (d.level_up) txt += " NIVEAU " + d.level + " !";
-        if (d.new_badges && d.new_badges.length) txt += " Badge : " + d.new_badges.map(badgeName).join(", ") + ".";
-        setMsg(m, txt);
-        loadMe();
-      } else {
-        setMsg(m, "Score enregistré sur ton compte.");
-      }
+      var d = reportRanked(m, "snake", value, r);
+      if (!d) return;
+      await loadBadgeCat();
+      if (d && value > onlineBest) onlineBest = value;
+      loadMe();
     }
 
     function action() {
@@ -3612,7 +3800,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
         panel(["PAUSE", "", "TOUCHE POUR", "REPRENDRE"]);
       } else if (state === "over") {
         var newBest = continues === 0 && score > 0 && score >= Math.max(best, onlineBest);
-        var lines = [body.length >= COLS * ROWS ? "BRAVO !" : "PERDU", "SCORE " + score];
+        var lines = won ? ["VICTOIRE !", "GRILLE COMPLETE", "SCORE " + score] : ["PERDU", "SCORE " + score];
         if (continues > 0) lines.push("HORS CLASSEMENT");
         else if (newBest) lines.push("NOUVEAU REC !");
         lines.push("", "TOUCHE POUR", "REJOUER");
@@ -3826,6 +4014,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       acc = 0;
     }
     function finish() {
+      if (state === "over") return;    // fin unique : pas de double envoi de score
       state = "over";
       if (score > best) { best = score; saveLocalBest("blocks", best); }
       if (score > 0) submit(score);
@@ -3844,26 +4033,10 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       }
       setMsg(m, "Envoi du score…");
       var r = await submitRanked("blocks", value);
-      if (r.error) {
-        var em = String(r.error.message || "");
-        if (em.indexOf("maintenance") >= 0) setMsg(m, "Maintenance en cours : score non enregistré.", true);
-        else if (em.indexOf("beta") >= 0) setMsg(m, "Bêta privée : ton compte n'est pas encore ajouté, score non enregistré.", true);
-        else if (em.indexOf("banned") >= 0) setMsg(m, "Ton compte est suspendu : score non enregistré.", true);
-        else if (em.indexOf("unknown game") >= 0) setMsg(m, "Ce jeu n'est pas encore ouvert au classement.", true);
-        else if (em === "no run") setMsg(m, "Score non enregistré : la partie a commencé avant ta connexion. Rejoue une partie.", true);
-        else if (em.indexOf("implausible") >= 0 || em.indexOf("invalid run") >= 0) setMsg(m, "Score refusé : partie non valide. Rejoue une partie.", true);
-        else setMsg(m, "Score non envoyé. Joue une autre partie pour réessayer.", true);
-        return;
-      }
-      var d = r.data;
-      if (d && typeof d === "object" && d.xp !== undefined) {
-        var txt = "Score enregistré. +" + d.xp + " XP, +" + d.bc + " BOYCOINS.";
-        if (d.level_up) txt += " NIVEAU " + d.level + " !";
-        setMsg(m, txt);
-        loadMe();
-      } else {
-        setMsg(m, "Score enregistré sur ton compte.");
-      }
+      var d = reportRanked(m, "blocks", value, r);
+      if (!d) return;
+      await loadBadgeCat();
+      loadMe();
     }
 
     function action() {
@@ -4169,8 +4342,8 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
       }
       if (token !== startToken) return;
       g = BBE.newGame(seed, { ensureFit: true, rules: rules, size: size });
-      state = g.over ? "over" : "playing";
-      if (g.over) finish();
+      state = "playing";
+      if (g.over) finish();             // grille de départ déjà bloquée : finish() passe l'état à « over » (une seule fois)
     }
     function bbStartError(err) {
       var m = String((err && err.message) || "");
@@ -4183,6 +4356,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     }
 
     async function finish() {
+      if (state === "over") return;    // fin unique : pas de double vérification ni de double envoi
       state = "over"; overAt = Date.now();
       var sc = g.score;
       if (sc > best) { best = sc; saveLocalBest(g.size === 9 ? "boyblocks9" : "boyblocks", best); }
@@ -4196,6 +4370,7 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
         if (g !== mine) return;
         if (r.error) { setMsg($("bb-msg"), "Partie non enregistrée (" + (String(r.error.message).indexOf("invalid") >= 0 ? "vérification refusée" : "serveur indisponible") + ").", true); return; }
         var d = r.data || {};
+        reportInviteScore("boyblocks", id);
         var txt = "Score vérifié et enregistré. +" + d.xp + " XP, +" + d.bc + " BOYCOINS.";
         if (d.level_up) txt += " NIVEAU " + d.level + " !";
         if (d.new_badges && d.new_badges.length) txt += " Badge : " + d.new_badges.map(badgeName).join(", ") + ".";
@@ -4502,8 +4677,9 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     var continues = 0;
     function reset() { resetRun("space"); g = SP.create(); state = "ready"; targetX = null; continues = 0; setMsg($("sp-msg"), ""); clearContinue($("sp-msg").nextElementSibling); }
     function finish() {
+      if (state === "over") return;    // fin unique : pas de double envoi de score ni de double proposition de vidéo
       state = "over";
-      if (continues > 0) submitContinued("space", Math.min(g.score, 100000), continues, $("sp-msg"));   // hors classement
+      if (continues > 0) submitContinued("space", g.score, continues, $("sp-msg"));   // hors classement
       else {
         if (g.score > best) { best = g.score; saveLocalBest("space", best); }
         if (g.score > 0) submit(g.score);
@@ -4533,27 +4709,12 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
         return;
       }
       setMsg(m, "Envoi du score…");
-      var r = await submitRanked("space", Math.min(value, 100000));   // plafond de la base (v17)
-      if (r.error) {
-        var em = String(r.error.message || "");
-        if (em.indexOf("maintenance") >= 0) setMsg(m, "Maintenance en cours : score non enregistré.", true);
-        else if (em.indexOf("beta") >= 0) setMsg(m, "Bêta privée : ton compte n'est pas encore ajouté, score non enregistré.", true);
-        else if (em.indexOf("banned") >= 0) setMsg(m, "Ton compte est suspendu : score non enregistré.", true);
-        else if (em.indexOf("unknown game") >= 0) setMsg(m, "Ce jeu n'est pas encore ouvert au classement.", true);
-        else if (em === "no run") setMsg(m, "Score non enregistré : la partie a commencé avant ta connexion. Rejoue une partie.", true);
-        else if (em.indexOf("implausible") >= 0 || em.indexOf("invalid run") >= 0) setMsg(m, "Score refusé : partie non valide. Rejoue une partie.", true);
-        else setMsg(m, "Score non envoyé. Joue une autre partie pour réessayer.", true);
-        return;
-      }
-      var d = r.data;
-      if (d && typeof d === "object" && d.xp !== undefined) {
-        var txt = "Score enregistré. +" + d.xp + " XP, +" + d.bc + " BOYCOINS.";
-        if (d.level_up) txt += " NIVEAU " + d.level + " !";
-        setMsg(m, txt);
-        loadMe();
-      } else {
-        setMsg(m, "Score enregistré sur ton compte.");
-      }
+      if (!Number.isSafeInteger(value) || value < 0 || value > SPACE_SCORE_MAX) { setMsg(m, "Score hors limites : non envoyé, merci de nous le signaler.", true); return; }   // jamais de troncature silencieuse
+      var r = await submitRanked("space", value);
+      var d = reportRanked(m, "space", value, r);
+      if (!d) return;
+      await loadBadgeCat();
+      loadMe();
     }
     function action() {
       if (state === "ready" || state === "paused") state = "playing";
@@ -5104,7 +5265,8 @@ body.ingame #bug-fab { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: a
     }
     // Défi lancé depuis une fiche profil : crée le code tout de suite (envoyé à l'ami), la salle s'ouvre sur « Jouer en ligne ».
     function challenge(letter) { var c = newCode(letter); pendingRoom = c; return c; }
-    return { enter: enter, leave: leave, challenge: challenge };
+    function join(c) { pendingRoom = c; }   // salle d'une invitation acceptée : s'ouvre sur « Jouer en ligne »
+    return { enter: enter, leave: leave, challenge: challenge, join: join };
   })();
 
 

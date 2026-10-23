@@ -19,13 +19,20 @@
   h2 { font-size: 17px; margin: 28px 0 8px; }
   p, li { margin: 0 0 10px; }
   a { color: var(--ink); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  td, th { border: 1px solid var(--ink); padding: 6px; text-align: left; vertical-align: top; }
+  .todo { background: #fde68a; padding: 0 4px; }
 </style>
 </head>
 <body>
 <main>
-  <p><a href="index.html">&larr; Retour aux jeux</a> &middot; <a href="cgu.html">Conditions d'utilisation</a></p>
+  <p><a href="index.html">&larr; Retour aux jeux</a> &middot; <a href="cgu.html">Conditions d'utilisation</a> &middot; <a href="mentions-legales.html">Mentions légales</a></p>
   <h1>Confidentialité</h1>
-  <p>Cette page explique comment BOYGAMES traite tes données.</p>
+  <p>Cette page explique comment BOYGAMES traite tes données. BOYGAMES est gratuit : il est financé par de la publicité discrète, affichée hors des parties.</p>
+  <p><em>Dernière mise à jour : <span class="todo">[date de mise en ligne]</span>.</em></p>
+
+  <h2>Qui est responsable</h2>
+  <p>L'éditeur du site indiqué dans les <a href="mentions-legales.html">mentions légales</a>. Contact : boygam.contact@gmail.com.</p>
 
   <h2>Les données que nous gardons</h2>
   <ul>
@@ -38,19 +45,44 @@
     <li>Les signalements de bugs que tu envoies : ton texte, la catégorie, une capture d'écran si tu en joins une, et quelques informations techniques (page ou jeu en cours, version du site, type d'appareil et de navigateur, taille d'écran, dernières erreurs affichées). Ils servent uniquement à corriger les problèmes et sont lus par l'équipe.</li>
   </ul>
 
-  <h2>Pourquoi</h2>
-  <p>Ces données servent à te laisser retrouver tes scores et ta progression sur tous tes appareils, à construire les classements, à faire fonctionner les amis et la messagerie, et à modérer le site. Nous ne les vendons pas et ne les utilisons pas pour de la publicité.</p>
+  <h2>Pourquoi, et sur quelle base</h2>
+  <table>
+    <tr><th>Usage</th><th>Base légale (RGPD)</th></tr>
+    <tr><td>Ton compte, tes scores, ta progression sur tous tes appareils, les classements, les amis et la messagerie</td><td>Exécution des conditions d'utilisation que tu acceptes en créant ton compte</td></tr>
+    <tr><td>Modération, lutte contre la triche, sécurité, sauvegardes, correction des bugs</td><td>Intérêt légitime à faire fonctionner un site sûr et juste</td></tr>
+    <tr><td>Publicité (voir plus bas)</td><td>Ton consentement, que tu peux refuser ou retirer à tout moment</td></tr>
+  </table>
+  <p>Nous ne vendons pas tes données. Ton e-mail, tes messages et ta progression ne sont jamais transmis aux régies publicitaires.</p>
 
-  <h2>Où sont-elles stockées</h2>
-  <p>Chez notre prestataire d'hébergement de base de données, Supabase. Le navigateur garde aussi ta session de connexion et ton meilleur score sur ton appareil.</p>
+  <h2>Publicité et cookies</h2>
+  <p>Des emplacements publicitaires peuvent apparaître sur l'accueil, les classements et la boutique. <strong>Jamais pendant une partie ou un duel.</strong> Les publicités sont fournies par Google (programme Google AdSense).</p>
+  <ul>
+    <li><strong>Rien n'est chargé avant ton choix.</strong> À ta première visite, une fenêtre de consentement (outil de Google, conforme au cadre européen IAB TCF) te laisse accepter, refuser ou choisir finalité par finalité. Refuser est aussi simple qu'accepter. Si tu refuses, aucune publicité n'est affichée et le site fonctionne exactement pareil.</li>
+    <li><strong>Publicités non personnalisées.</strong> Comme notre public peut être jeune, nous demandons à Google, pour tous les joueurs, de ne pas personnaliser les publicités selon ton profil ou ta navigation, et de ne pas faire appel à d'autres régies ou outils de mesure tiers. Une publicité peut quand même tenir compte du contexte (par exemple ta ville approximative ou la page affichée).</li>
+    <li>Si tu acceptes, Google peut déposer ou lire des cookies (ou identifiants similaires) sur ton appareil pour afficher les publicités, limiter leur répétition, mesurer leur affichage et lutter contre la fraude. Google agit alors comme responsable de ses propres traitements : voir <a href="https://policies.google.com/technologies/partner-sites?hl=fr">comment Google utilise les données des sites partenaires</a>.</li>
+    <li>Tu peux changer d'avis à tout moment avec le lien <strong>« Gérer les cookies »</strong> en bas du site. Ton choix est conservé au maximum 13 mois, puis la question t'est reposée.</li>
+  </ul>
+  <p>Le site utilise aussi le stockage de ton navigateur pour des besoins strictement nécessaires (ta session de connexion, ton meilleur score, tes réglages). Ceux-là ne demandent pas de consentement et ne servent jamais à la publicité.</p>
+
+  <h2>Les mineurs</h2>
+  <p>Si tu as moins de 15 ans, demande l'accord d'un parent avant de créer un compte et avant d'accepter les cookies publicitaires. Un parent peut nous écrire pour exercer tes droits ou faire supprimer ton compte.</p>
+
+  <h2>Où sont-elles stockées, et qui les reçoit</h2>
+  <ul>
+    <li>Base de données : Supabase (hébergeur de notre base).</li>
+    <li>Site : <span class="todo">[hébergeur du site, voir mentions légales]</span>.</li>
+    <li>Publicité, uniquement si tu l'acceptes : Google Ireland Limited et ses partenaires techniques.</li>
+  </ul>
+  <p>Certains de ces prestataires peuvent traiter des données hors de l'Union européenne (notamment aux États-Unis). Ces transferts sont encadrés par le cadre de protection des données UE–États-Unis (Data Privacy Framework) ou par les clauses contractuelles types de la Commission européenne.</p>
 
   <h2>Combien de temps</h2>
-  <p>Tant que ton compte existe. Si tu supprimes ton compte, tes données sont effacées.</p>
+  <p>Tant que ton compte existe. Si tu supprimes ton compte, tes données sont effacées. Les cookies publicitaires et ton choix de consentement durent au maximum 13 mois.</p>
+  <p>Une sauvegarde de la base peut être faite par l'équipe pour éviter toute perte ; elle ne contient pas les mots de passe.</p>
 
   <h2>Tes droits</h2>
-  <p>Si tu oublies ton mot de passe, nous ne pouvons pas le retrouver ni le réinitialiser.</p>
-  <p>Une sauvegarde de la base peut être faite par l'équipe pour éviter toute perte ; elle ne contient pas les mots de passe.</p>
-  <p>Tu peux supprimer ton compte et tous tes scores à tout moment depuis la page Compte du site. Pour toute autre demande (accès à tes données, correction), écris à : boygam.contact@gmail.com.</p>
+  <p>Tu peux demander l'accès à tes données, leur correction, leur effacement, leur portabilité, limiter leur utilisation ou t'y opposer, et retirer ton consentement à tout moment. Tu peux supprimer ton compte et tous tes scores à tout moment depuis la page Compte du site. Pour toute autre demande, écris à : boygam.contact@gmail.com. Nous répondons sous un mois.</p>
+  <p>Si tu oublies ton mot de passe, nous ne pouvons pas le lire, mais l'équipe peut t'envoyer un lien pour en choisir un nouveau.</p>
+  <p>Si tu penses que tes droits ne sont pas respectés, tu peux adresser une réclamation à la CNIL (<a href="https://www.cnil.fr/fr/plaintes">cnil.fr</a>).</p>
 </main>
 </body>
 </html>
