@@ -18,12 +18,18 @@ try:
     sql(STUB)
     run_file(c, f"{REPO}/schema_all.sql"); print("OK  installation neuve (schema_all.sql)")
     sql(SEED)
-    for f in ["schema_v6_v7.sql", "schema_v8_v9.sql", "schema_v10_boyblocks_regles2.sql", "schema_v11_economie_reglages.sql", "schema_v12_monetisation.sql", "schema_v13_marketing.sql", "schema_v14_boyblocks_9x9.sql", "schema_v15_questionnaire.sql", "schema_v16_espace_beta.sql", "schema_v17_plafond_space.sql", "schema_v18_invitations.sql", "schema_v19_liste_joueurs.sql", "schema_v20_fiche_joueur.sql", "schema_v21_stockage_marketing.sql", "schema_v22_tickets_partie.sql", "schema_v23_dons.sql", "schema_v6_v7.sql", "schema_v12_monetisation.sql", "schema_v13_marketing.sql", "schema_v14_boyblocks_9x9.sql", "schema_v15_questionnaire.sql", "schema_v16_espace_beta.sql", "schema_v17_plafond_space.sql", "schema_v18_invitations.sql", "schema_v19_liste_joueurs.sql", "schema_v20_fiche_joueur.sql", "schema_v21_stockage_marketing.sql", "schema_v22_tickets_partie.sql", "schema_v23_dons.sql"]:
+    for f in ["schema_v6_v7.sql", "schema_v8_v9.sql", "schema_v10_boyblocks_regles2.sql", "schema_v11_economie_reglages.sql", "schema_v12_monetisation.sql", "schema_v13_marketing.sql", "schema_v14_boyblocks_9x9.sql", "schema_v15_questionnaire.sql", "schema_v16_espace_beta.sql", "schema_v18_invitations.sql", "schema_v19_liste_joueurs.sql", "schema_v20_fiche_joueur.sql", "schema_v21_stockage_marketing.sql", "schema_v23_dons.sql", "schema_v25_plafond_space_v2.sql", "schema_v6_v7.sql", "schema_v12_monetisation.sql", "schema_v13_marketing.sql", "schema_v14_boyblocks_9x9.sql", "schema_v15_questionnaire.sql", "schema_v16_espace_beta.sql", "schema_v18_invitations.sql", "schema_v19_liste_joueurs.sql", "schema_v20_fiche_joueur.sql", "schema_v21_stockage_marketing.sql", "schema_v23_dons.sql", "schema_v25_plafond_space_v2.sql"]:   # v17 et v22 ne se relancent plus après la v25 (elles s'arrêtent sans rien modifier) ; la v25 se relance en dernier
         run_file(c, f"{REPO}/{f}"); print("OK  relance", f)
     for fn in ["boyblocks_start()", "boyblocks_start_v2()", "my_tiers()", "sync_tiers()"]:
         if not sql(f"select has_function_privilege('authenticated', 'public.{fn}', 'execute')")[0][0]:
             print("ECHEC", fn, "n'est plus appelable"); fail += 1
     print("OK  fonctions BoyBlocks / paliers toujours appelables" if not fail else "")
+    left = sql("select string_agg(p.oid::regprocedure::text, ' | ') from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname in ('submit_score','submit_score_v2','submit_continued_score','score_plausible','bc_for_score') and pg_get_function_identity_arguments(p.oid) ~ '^text, integer'")[0][0]
+    if left: print("ECHEC anciennes fonctions de score en integer après relance :", left); fail += 1
+    else: print("OK  relance des anciennes migrations puis v25 : aucune fonction de score en integer")
+    try: run_file(c, f"{REPO}/schema_v17_plafond_space.sql"); print("ECHEC la v17 s'est relancée après la v25"); fail += 1
+    except Exception as e:
+        sql("rollback"); print("OK  v17 refusée après la v25" if "v25 DEJA APPLIQUEE" in str(e) else f"ECHEC v17 : {e}")
 
     node = shutil.which("node") or os.path.expanduser("~/.local/node/bin/node")
     if not os.path.exists(node):
