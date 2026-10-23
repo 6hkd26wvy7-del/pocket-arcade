@@ -1,7 +1,7 @@
 /* Service worker : garde une copie des fichiers du site pour le démarrage rapide.
    Le réseau passe toujours en premier, donc une mise à jour du site arrive tout de suite. */
-var CACHE = "pocket-arcade-v1";
-var SHELL = ["./", "index.html", "config.js", "privacy.html", "manifest.webmanifest", "icon-192.png", "icon-512.png"];
+var CACHE = "pocket-arcade-v8";
+var SHELL = ["./", "index.html", "config.js", "privacy.html", "cgu.html", "manifest.webmanifest", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", function (e) {
   e.waitUntil(
